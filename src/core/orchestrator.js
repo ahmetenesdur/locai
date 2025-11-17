@@ -26,13 +26,6 @@ class Orchestrator {
 			lengthControl: options.lengthControl,
 		});
 
-		// Initialize glossary manager
-		this.glossaryManager = new GlossaryManager(options.glossary || {});
-		if (this.glossaryManager.enabled && this.advanced.debug) {
-			const stats = this.glossaryManager.getStats();
-			console.log(`Glossary enabled: ${stats.totalTerms} terms loaded`);
-		}
-
 		this.advanced = {
 			timeoutMs: options.advanced?.timeoutMs || 30000,
 			maxKeyLength: options.advanced?.maxKeyLength || 10000,
@@ -40,6 +33,13 @@ class Orchestrator {
 			autoOptimize: options.advanced?.autoOptimize !== false,
 			debug: options.advanced?.debug || false,
 		};
+
+		// Initialize glossary manager
+		this.glossaryManager = new GlossaryManager(options.glossary || {});
+		if (this.glossaryManager.enabled && this.advanced.debug) {
+			const stats = this.glossaryManager.getStats();
+			console.log(`Glossary enabled: ${stats.totalTerms} terms loaded`);
+		}
 
 		if (options.rateLimiter) {
 			rateLimiter.updateConfig({

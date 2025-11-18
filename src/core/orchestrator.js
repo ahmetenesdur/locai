@@ -9,6 +9,7 @@ import os from "os";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
 import GlossaryManager from "../utils/glossary-manager.js";
+import { FileManager } from "../utils/file-manager.js";
 import fs from "fs";
 import path from "path";
 
@@ -224,6 +225,24 @@ class Orchestrator {
 
 			const qualityResult = this.qualityChecker.validateAndFix(text, translated);
 			translated = qualityResult.fixedText;
+
+			// Step 3: JSON validation for translation value
+			const jsonValidation = FileManager.validateTranslationValue(key, translated);
+			if (!jsonValidation.valid) {
+				if (this.advanced.debug) {
+					console.warn(
+						`JSON validation warning for key "${key}": ${jsonValidation.error}`
+					);
+				}
+				// Try to fix by escaping quotes if that's the issue
+				const recheck = this.quoteBalanceChecker?.fixQuoteBalance(translated);
+				if (recheck && recheck.text !== translated) {
+					translated = recheck.text;
+					if (this.advanced.debug) {
+						console.log(`Applied quote balance fix for key "${key}"`);
+					}
+				}
+			}
 
 			const result = {
 				key,

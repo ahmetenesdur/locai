@@ -4,6 +4,7 @@ import HtmlTagChecker from "./html-tag-checker.js";
 import PunctuationChecker from "./punctuation-checker.js";
 import LengthChecker from "./length-checker.js";
 import TextSanitizer from "./text-sanitizer.js";
+import QuoteBalanceChecker from "./quote-balance-checker.js";
 
 class QualityChecker extends BaseChecker {
 	constructor(options = {}) {
@@ -18,6 +19,7 @@ class QualityChecker extends BaseChecker {
 		this.punctuationChecker = new PunctuationChecker();
 		this.lengthChecker = new LengthChecker();
 		this.textSanitizer = new TextSanitizer();
+		this.quoteBalanceChecker = new QuoteBalanceChecker();
 	}
 
 	validate(sourceText, translatedText, options = {}) {
@@ -33,6 +35,14 @@ class QualityChecker extends BaseChecker {
 
 		if (this.rules.punctuationCheck) {
 			issues.push(...this.punctuationChecker.checkPunctuation(sourceText, translatedText));
+		}
+
+		// Quote balance validation
+		if (this.rules.quoteBalanceCheck !== false) {
+			issues.push(...this.quoteBalanceChecker.checkQuoteBalance(translatedText));
+			issues.push(
+				...this.quoteBalanceChecker.validateQuoteConsistency(sourceText, translatedText)
+			);
 		}
 
 		if (this.rules.lengthValidation) {
@@ -77,6 +87,14 @@ class QualityChecker extends BaseChecker {
 
 		if (this.rules.punctuationCheck) {
 			const result = this.punctuationChecker.fixPunctuation(sourceText, fixedText);
+			fixedText = result.text;
+			issues.push(...result.foundIssues);
+			fixes.push(...result.appliedFixes);
+		}
+
+		// Quote balance auto-fix
+		if (this.rules.quoteBalanceCheck !== false) {
+			const result = this.quoteBalanceChecker.fixQuoteBalance(fixedText);
 			fixedText = result.text;
 			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);

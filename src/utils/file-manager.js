@@ -267,6 +267,77 @@ class FileManager {
 	}
 
 	/**
+	 * Validate JSON file structure
+	 * @param {string} filePath - Path to the JSON file
+	 * @returns {Promise<Object>} - Validation result
+	 */
+	static async validateJSONFile(filePath) {
+		try {
+			const content = await fs.readFile(filePath, "utf8");
+			JSON.parse(content); // Throws if invalid
+			return {
+				valid: true,
+				filePath,
+			};
+		} catch (error) {
+			return {
+				valid: false,
+				filePath,
+				error: error.message,
+				position: this._extractErrorPosition(error, filePath),
+			};
+		}
+	}
+
+	/**
+	 * Extract error position from JSON parse error
+	 * @param {Error} error - JSON parse error
+	 * @param {string} filePath - Path to the file
+	 * @returns {Object|null} - Error position details
+	 */
+	static _extractErrorPosition(error, filePath) {
+		const message = error.message;
+		const positionMatch = message.match(/position (\d+)/);
+		const lineMatch = message.match(/line (\d+)/);
+
+		if (positionMatch || lineMatch) {
+			return {
+				position: positionMatch ? parseInt(positionMatch[1]) : null,
+				line: lineMatch ? parseInt(lineMatch[1]) : null,
+			};
+		}
+
+		return null;
+	}
+
+	/**
+	 * Validate translation value can be safely added to JSON
+	 * @param {string} key - Translation key
+	 * @param {any} value - Translation value
+	 * @returns {Object} - Validation result
+	 */
+	static validateTranslationValue(key, value) {
+		try {
+			// Test if value can be part of valid JSON
+			const testObject = { [key]: value };
+			JSON.stringify(testObject);
+			JSON.parse(JSON.stringify(testObject)); // Round-trip test
+			return {
+				valid: true,
+				key,
+				value,
+			};
+		} catch (error) {
+			return {
+				valid: false,
+				key,
+				value,
+				error: `JSON validation failed: ${error.message}`,
+			};
+		}
+	}
+
+	/**
 	 * List files in a directory
 	 * @param {string} dirPath - Directory path
 	 * @param {Object} options - Options for listing

@@ -181,12 +181,14 @@ export default {
 	},
 
 	// Quality Checks
+	// Automated validation and fixing to ensure translation quality
 	qualityChecks: {
 		enabled: true, // Enable quality checks
 		rules: {
 			placeholderConsistency: true, // Check placeholders
 			htmlTagsConsistency: true, // Check HTML tags
 			punctuationCheck: true, // Check punctuation
+			quoteBalanceCheck: true, // Check quote balance (prevents missing quotes that cause JSON parse errors)
 			lengthValidation: true, // Check text length
 			sanitizeOutput: true, // Clean output text
 			markdownPreservation: true, // Preserve markdown

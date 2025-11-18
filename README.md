@@ -140,6 +140,7 @@ export default {
 			placeholderConsistency: true,
 			htmlTagsConsistency: true,
 			punctuationCheck: true,
+			quoteBalanceCheck: true, // Prevents missing quotes in translations
 			lengthValidation: true,
 		},
 		autoFix: true,
@@ -342,6 +343,7 @@ Context-aware errors with actionable solutions and error codes (API 1xxx, Config
 | -------------------------- | ----------------------------------------------------------------- |
 | **Placeholder Validation** | Preserves `{variable}` patterns exactly                           |
 | **HTML Preservation**      | Maintains `<tag>` structure and attributes                        |
+| **Quote Balance Check**    | Detects and auto-fixes unbalanced quotes to prevent JSON errors   |
 | **Length Control**         | 5 modes with language-specific rules                              |
 | **Context Detection**      | AI-powered categorization (technical, marketing, legal, DeFi, UI) |
 | **Confidence Scoring**     | Multi-factor quality scoring (0-1 scale) with review queue        |
@@ -358,6 +360,20 @@ Ensure consistent brand terminology and technical terms across all your translat
 - **Language-Specific**: Define different translations per target language
 - **Case Sensitivity**: Control exact case matching for specific terms
 - **Format Preservation**: Maintain capitalization from source text
+
+### Quote Balance Validation
+
+Automatically detects and fixes unbalanced quotation marks to prevent JSON parse errors. Supports single quotes (`'`), double quotes (`"`), French guillemets (`«»`), and German quotes (`„"`).
+
+**Example:**
+
+```json
+// Invalid - missing closing quote
+"part2": "'Go to stats page"
+
+// Auto-fixed
+"part2": "'Go to stats page'"
+```
 
 #### Configuration
 
@@ -777,6 +793,7 @@ export default {
 			placeholderConsistency: true, // Validate {{placeholders}}
 			htmlTagsConsistency: true, // Preserve <HTML> tags
 			punctuationCheck: true, // Check punctuation consistency
+			quoteBalanceCheck: true, // Detect and fix unbalanced quotes
 			lengthValidation: true, // Validate translation length
 			sanitizeOutput: true, // Clean AI artifacts
 			markdownPreservation: true, // Preserve markdown formatting

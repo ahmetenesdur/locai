@@ -18,7 +18,7 @@ class BaseProvider {
 		};
 	}
 
-	async translate(text, sourceLang, targetLang, options = {}) {
+	async translate(text, sourceLang, targetLang, _options = {}) {
 		throw new Error(`translate method must be implemented by ${this.name} provider`);
 	}
 

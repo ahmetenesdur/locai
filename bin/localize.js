@@ -2,7 +2,6 @@
 import dotenv from "dotenv";
 
 import { promises as fs } from "fs";
-import fsSync from "fs";
 import path from "path";
 import os from "os";
 import { createRequire } from "module";
@@ -24,6 +23,10 @@ import { getLogger } from "../src/utils/logger.js";
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
 
+/**
+ * Load environment variables from .env files.
+ * Prioritizes .env.local over .env.
+ */
 const loadEnvironmentVariables = async () => {
 	// Load environment files in priority order
 	// First load .env (base defaults), then .env.local (local overrides)
@@ -61,6 +64,10 @@ const loadEnvironmentVariables = async () => {
 	}
 };
 
+/**
+ * Load configuration from localize.config.js or similar files.
+ * @returns {Promise<Object>} - Loaded configuration object.
+ */
 const loadConfig = async () => {
 	try {
 		const configPaths = [
@@ -78,7 +85,9 @@ const loadConfig = async () => {
 				await fs.access(configPath);
 				configFile = configPath;
 				break;
-			} catch (e) {}
+			} catch (_e) {
+				// Silent fail used for fallback mechanism
+			}
 		}
 
 		if (!configFile) {
@@ -130,6 +139,10 @@ const loadConfig = async () => {
 	}
 };
 
+/**
+ * Configure global components (logger, rate limiter, etc.).
+ * @param {Object} config - Configuration object.
+ */
 const configureComponents = (config) => {
 	// Configure FileManager with config settings
 	if (config.fileOperations) {
@@ -166,6 +179,11 @@ const configureComponents = (config) => {
 	}
 };
 
+/**
+ * Configure and run the CLI program.
+ * @param {Object} defaultConfig - Default configuration.
+ * @returns {Promise<Object>} - Final configuration.
+ */
 const configureCLI = async (defaultConfig) => {
 	configureComponents(defaultConfig);
 
@@ -482,8 +500,6 @@ const configureCLI = async (defaultConfig) => {
 				);
 				process.exit(1);
 			}
-
-			const startTime = Date.now();
 
 			switch (commandName) {
 				case "fix":
@@ -807,6 +823,10 @@ const configureCLI = async (defaultConfig) => {
 	return defaultConfig;
 };
 
+/**
+ * Validate that necessary environment variables are set.
+ * @returns {Array<string>} - List of available providers.
+ */
 const validateEnvironment = () => {
 	try {
 		// Check that ProviderFactory can validate providers
@@ -832,6 +852,10 @@ const validateEnvironment = () => {
 	}
 };
 
+/**
+ * Display performance optimizations and tips.
+ * @param {Object} options - Configuration options.
+ */
 const displayPerformanceTips = async (options) => {
 	if (!options.debug) return;
 
@@ -871,12 +895,9 @@ const displayPerformanceTips = async (options) => {
 			);
 		}
 	} catch (error) {
-		console.log("Warning: Could not calculate performance tips");
+		console.log("Warning: Could not calculate performance tips", error);
 	}
 };
-
-// Top-level await - no IIFE needed in ESM!
-const startTime = Date.now();
 
 try {
 	await loadEnvironmentVariables();

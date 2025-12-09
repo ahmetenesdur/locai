@@ -1,4 +1,13 @@
+/**
+ * Quote Balance Checker.
+ * Ensures quotes (single, double, guillemets, etc.) are balanced in translation.
+ */
 class QuoteBalanceChecker {
+	/**
+	 * Check for unbalanced quotes.
+	 * @param {string} text - Text to check.
+	 * @returns {Array<Object>} - Array of quote balance issues.
+	 */
 	checkQuoteBalance(text) {
 		const issues = [];
 
@@ -51,6 +60,13 @@ class QuoteBalanceChecker {
 		return issues;
 	}
 
+	/**
+	 * Count occurrences of a quote character.
+	 * @param {string} text - Text to check.
+	 * @param {string} quoteChar - Quote character.
+	 * @returns {Object} - Count and balance status.
+	 * @private
+	 */
 	_countQuotes(text, quoteChar) {
 		const count = (text.match(new RegExp(`\\${quoteChar}`, "g")) || []).length;
 		return {
@@ -59,6 +75,11 @@ class QuoteBalanceChecker {
 		};
 	}
 
+	/**
+	 * Fix unbalanced quotes.
+	 * @param {string} text - Text to fix.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
+	 */
 	fixQuoteBalance(text) {
 		let fixedText = text;
 		const foundIssues = [];
@@ -119,7 +140,10 @@ class QuoteBalanceChecker {
 	}
 
 	/**
-	 * Validate that quotes in source and translation match in pattern
+	 * Validate that quotes in source and translation match in pattern.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Array<Object>} - Array of consistency issues.
 	 */
 	validateQuoteConsistency(source, translated) {
 		const issues = [];
@@ -128,7 +152,6 @@ class QuoteBalanceChecker {
 		const sourceHasSingleQuotes = source.includes("'");
 		const translatedHasSingleQuotes = translated.includes("'");
 
-		const sourceHasDoubleQuotes = source.includes('"');
 		const translatedHasDoubleQuotes = translated.includes('"');
 
 		// If source has quotes, translation should maintain similar quoting

@@ -1,4 +1,3 @@
-import axios from "axios";
 import ProviderFactory from "../core/provider-factory.js";
 import rateLimiter from "./rate-limiter.js";
 import { LRUCache } from "lru-cache";
@@ -242,7 +241,7 @@ RESPONSE FORMAT:
 			try {
 				analysisArray = JSON.parse(jsonMatch[0]);
 			} catch (jsonError) {
-				// Try to clean up the JSON
+				console.error("JSON parsing error:", jsonError);
 				const cleanedJson = jsonMatch[0]
 					.replace(/,\s*]/g, "]")
 					.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
@@ -303,6 +302,7 @@ RESPONSE FORMAT:
 			try {
 				analysisData = JSON.parse(jsonMatch[0]);
 			} catch (jsonError) {
+				console.error("JSON parsing error:", jsonError);
 				const cleanedJson = jsonMatch[0]
 					.replace(/,\s*}/g, "}")
 					.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');

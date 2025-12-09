@@ -1,4 +1,5 @@
 import rateLimiter from "../utils/rate-limiter.js";
+import pLimit from "p-limit";
 import ProviderFactory from "./provider-factory.js";
 import ProgressTracker from "../utils/progress-tracker.js";
 import QualityChecker from "../utils/quality/index.js";
@@ -7,14 +8,42 @@ import { LRUCache } from "lru-cache";
 import crypto from "crypto";
 import os from "os";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
-import ConfidenceScorer from "../utils/confidence-scorer.js";
+
 import GlossaryManager from "../utils/glossary-manager.js";
 import { FileManager } from "../utils/file-manager.js";
 import fs from "fs";
 import path from "path";
 import { log } from "../utils/logger.js";
 
+/**
+ * Orchestrator class manages the end-to-end translation process.
+ * It coordinates context analysis, translation providers, quality checks,
+ * glossary management, and caching.
+ */
 class Orchestrator {
+	/**
+	 * Create a new Orchestrator instance.
+	 * @param {Object} options - Configuration options.
+	 * @param {Object} [options.context] - Context analysis configuration.
+	 * @param {Object} [options.progressOptions] - Progress tracking configuration.
+	 * @param {Object} [options.styleGuide] - Style guide rules.
+	 * @param {Object} [options.lengthControl] - Length control settings.
+	 * @param {Object} [options.advanced] - Advanced settings (timeout, batch size, etc.).
+	 * @param {Object} [options.glossary] - Glossary configuration.
+	 * @param {Object} [options.rateLimiter] - Rate limiter configuration.
+	 * @param {number} [options.cacheSize] - Maximum number of items in cache.
+	 * @param {number} [options.cacheTTL] - Cache time-to-live in milliseconds.
+	 * @param {boolean} [options.updateAgeOnGet] - Whether to update cache item age on retrieval.
+	 * @param {boolean} [options.allowStaleCache] - Whether to allow serving stale cache items.
+	 * @param {boolean} [options.staleWhileRevalidate] - Whether to revalidate stale items in background.
+	 * @param {number} [options.minConfidence] - Minimum confidence score for auto-approval.
+	 * @param {boolean} [options.saveReviewQueue] - Whether to save low-confidence translations for review.
+	 * @param {Object} [options.confidenceScoring] - Detailed confidence scoring settings.
+	 * @param {number} [options.concurrencyLimit] - Maximum concurrent translation requests.
+	 * @param {string} [options.apiProvider] - Name of the AI provider to use.
+	 * @param {boolean} [options.useFallback] - Whether to use fallback providers on failure.
+	 * @param {string} options.source - Source language code.
+	 */
 	constructor(options) {
 		this.options = options;
 		this.contextProcessor = new ContextProcessor(options.context);
@@ -128,6 +157,15 @@ class Orchestrator {
 		}
 	}
 
+	/**
+	 * Process a single translation key.
+	 * @param {string} key - The translation key.
+	 * @param {string} text - The source text to translate.
+	 * @param {string} targetLang - The target language code.
+	 * @param {Object} [contextData] - Context data for the translation.
+	 * @param {string} [existingTranslation] - Existing translation (if any) to guide improvement.
+	 * @returns {Promise<Object>} - The translation result object.
+	 */
 	async processTranslation(key, text, targetLang, contextData, existingTranslation) {
 		if (typeof text !== "string") return { key, translated: text, error: "Invalid input type" };
 
@@ -140,128 +178,45 @@ class Orchestrator {
 			};
 		}
 
-		const cacheKey = this._generateCacheKey(text, targetLang, contextData?.category);
-
-		if (this.options.cacheEnabled !== false && this.translationCache?.has?.(cacheKey)) {
-			const cachedResult = this.translationCache.get(cacheKey);
-
-			if (!cachedResult || typeof cachedResult !== "object") {
-				this.cacheStats.misses++;
-				this.translationCache.delete(cacheKey);
-			} else {
-				this.cacheStats.hits++;
-
-				try {
-					const ttl = this.translationCache.getRemainingTTL?.(cacheKey);
-					if (typeof ttl === "number" && ttl <= 0) {
-						this.cacheStats.staleHits++;
-					}
-				} catch (error) {}
-
-				return {
-					...cachedResult,
-					key,
-					fromCache: true,
-				};
-			}
-		}
+		// 1. Check Cache
+		const cacheResult = this._checkCache(key, text, targetLang, contextData);
+		if (cacheResult) return cacheResult;
 
 		this.cacheStats.misses++;
 
 		try {
-			const provider = ProviderFactory.getProvider(
-				this.options?.apiProvider,
-				this.options?.useFallback !== false,
-				this.options
-			);
+			// 2. Get Provider
+			const provider = this._getProvider();
 
-			if (!provider || typeof provider.translate !== "function") {
-				throw new Error(
-					`Translation provider not available or invalid: ${this.options?.apiProvider || "unknown"}`
-				);
-			}
-
-			const translationContext = {
-				...contextData,
-				existingTranslation: existingTranslation || null,
-			};
-
-			// Step 1: Protect glossary terms
+			// 3. Protect Terms
 			const { protectedText, termMap } = this.glossaryManager.protectTerms(
 				text,
 				this.options.source,
 				targetLang
 			);
 
-			let translated;
-			let confidence = null;
+			// 4. Translate
+			const translationResult = await this._executeTranslation(
+				provider,
+				protectedText,
+				targetLang,
+				contextData,
+				existingTranslation
+			);
+			let translated = translationResult.translated;
+			const confidence = translationResult.confidence;
 
-			// If confidence scoring is enabled, use extended method
-			if (
-				this.confidenceSettings.enabled &&
-				typeof provider.extractTranslationWithConfidence === "function"
-			) {
-				// Get raw API response (translate protected text)
-				const rawResponse = await provider.translate(
-					protectedText,
-					this.options.source,
-					targetLang,
-					{
-						...this.options,
-						detectedContext: translationContext,
-						returnRawResponse: true,
-					}
-				);
-
-				// Extract translation with confidence
-				const result = provider.extractTranslationWithConfidence(
-					rawResponse,
-					provider.name,
-					protectedText,
-					this.options.source,
-					targetLang,
-					contextData?.category
-				);
-
-				translated = result.translation;
-				confidence = result.confidence;
-			} else {
-				// Standard translation without confidence (translate protected text)
-				translated = await provider.translate(
-					protectedText,
-					this.options.source,
-					targetLang,
-					{
-						...this.options,
-						detectedContext: translationContext,
-					}
-				);
-			}
-
-			// Step 2: Restore glossary terms
+			// 5. Restore Terms
 			translated = this.glossaryManager.restoreTerms(translated, termMap);
 
+			// 6. Quality Checks & Fixes
 			const qualityResult = this.qualityChecker.validateAndFix(text, translated);
 			translated = qualityResult.fixedText;
 
-			// Step 3: JSON validation for translation value
-			const jsonValidation = FileManager.validateTranslationValue(key, translated);
-			if (!jsonValidation.valid) {
-				if (this.advanced.debug || process.env.DEBUG) {
-					console.warn(
-						`JSON validation warning for key "${key}": ${jsonValidation.error}`
-					);
-				}
-				// Try to fix by escaping quotes if that's the issue
-				const recheck = this.quoteBalanceChecker?.fixQuoteBalance(translated);
-				if (recheck && recheck.text !== translated) {
-					translated = recheck.text;
-					if (this.advanced.debug || process.env.DEBUG) {
-						log(`Applied quote balance fix for key "${key}"`, true);
-					}
-				}
-			}
+			// 7. JSON Validation
+			translated = this._ensureJsonValidity(key, translated);
 
+			// 8. Construct Result
 			const result = {
 				key,
 				translated,
@@ -270,71 +225,21 @@ class Orchestrator {
 				qualityChecks: qualityResult,
 			};
 
-			// Add confidence if available
+			// 9. Handle Confidence & Review
 			if (confidence) {
-				result.confidence = confidence;
-
-				// Apply confidence thresholds
-				if (this.confidenceSettings.enabled) {
-					// Auto-approve if above threshold
-					if (confidence.score >= this.confidenceSettings.autoApproveThreshold) {
-						result.autoApproved = true;
-						this.confidenceSettings.autoApprovedCount++;
-
-						if (this.advanced.debug) {
-							log(
-								`Auto-approved: ${key} (score: ${confidence.score.toFixed(3)})`,
-								true
-							);
-						}
-					}
-					// Auto-reject if below threshold
-					else if (confidence.score < this.confidenceSettings.rejectThreshold) {
-						result.rejected = true;
-						result.rejectionReason = `Quality score too low: ${confidence.score.toFixed(3)}`;
-						this.confidenceSettings.rejectedCount++;
-
-						if (this.advanced.debug) {
-							log(
-								`Auto-rejected: ${key} (score: ${confidence.score.toFixed(3)})`,
-								true
-							);
-						}
-
-						// Keep original text for rejected translations
-						result.translated = text;
-					}
-					// Add to review queue if below review threshold
-					else if (
-						this.confidenceSettings.saveReviewQueue &&
-						confidence.score < this.confidenceSettings.reviewThreshold
-					) {
-						result.needsReview = true;
-
-						this.confidenceSettings.reviewQueue.push({
-							key,
-							source: text,
-							translation: translated,
-							confidence,
-							language: targetLang,
-							sourceLang: this.options.source,
-							category: contextData?.category || "general",
-							timestamp: new Date().toISOString(),
-						});
-					}
-				}
+				this._applyConfidenceRules(
+					result,
+					confidence,
+					key,
+					text,
+					translated,
+					targetLang,
+					contextData
+				);
 			}
 
-			if (this.options.cacheEnabled !== false) {
-				this.translationCache.set(cacheKey, result, {
-					context: {
-						text,
-						targetLang,
-						contextData,
-					},
-				});
-				this.cacheStats.stored++;
-			}
+			// 10. Store in Cache
+			this._cacheResult(key, text, targetLang, contextData, result);
 
 			return result;
 		} catch (err) {
@@ -348,71 +253,263 @@ class Orchestrator {
 		}
 	}
 
+	_checkCache(key, text, targetLang, contextData) {
+		if (this.options.cacheEnabled === false) return null;
+
+		const cacheKey = this._generateCacheKey(text, targetLang, contextData?.category);
+		if (!this.translationCache?.has?.(cacheKey)) return null;
+
+		const cachedResult = this.translationCache.get(cacheKey);
+
+		if (!cachedResult || typeof cachedResult !== "object") {
+			this.translationCache.delete(cacheKey);
+			return null;
+		}
+
+		this.cacheStats.hits++;
+		try {
+			const ttl = this.translationCache.getRemainingTTL?.(cacheKey);
+			if (typeof ttl === "number" && ttl <= 0) {
+				this.cacheStats.staleHits++;
+			}
+		} catch (_error) {
+			// Ignore cache errors
+		}
+
+		return {
+			...cachedResult,
+			key,
+			fromCache: true,
+		};
+	}
+
+	_getProvider() {
+		const provider = ProviderFactory.getProvider(
+			this.options?.apiProvider,
+			this.options?.useFallback !== false,
+			this.options
+		);
+
+		if (!provider || typeof provider.translate !== "function") {
+			throw new Error(
+				`Translation provider not available or invalid: ${this.options?.apiProvider || "unknown"}`
+			);
+		}
+		return provider;
+	}
+
+	async _executeTranslation(
+		provider,
+		protectedText,
+		targetLang,
+		contextData,
+		existingTranslation
+	) {
+		const translationContext = {
+			...contextData,
+			existingTranslation: existingTranslation || null,
+		};
+
+		// If confidence scoring is enabled, use extended method
+		if (
+			this.confidenceSettings.enabled &&
+			typeof provider.extractTranslationWithConfidence === "function"
+		) {
+			const rawResponse = await provider.translate(
+				protectedText,
+				this.options.source,
+				targetLang,
+				{
+					...this.options,
+					detectedContext: translationContext,
+					returnRawResponse: true,
+				}
+			);
+
+			const result = provider.extractTranslationWithConfidence(
+				rawResponse,
+				provider.name,
+				protectedText,
+				this.options.source,
+				targetLang,
+				contextData?.category
+			);
+
+			return { translated: result.translation, confidence: result.confidence };
+		}
+
+		// Standard translation without confidence
+		const translated = await provider.translate(
+			protectedText,
+			this.options.source,
+			targetLang,
+			{
+				...this.options,
+				detectedContext: translationContext,
+			}
+		);
+
+		return { translated, confidence: null };
+	}
+
+	_ensureJsonValidity(key, translated) {
+		const jsonValidation = FileManager.validateTranslationValue(key, translated);
+		if (!jsonValidation.valid) {
+			if (this.advanced.debug || process.env.DEBUG) {
+				console.warn(`JSON validation warning for key "${key}": ${jsonValidation.error}`);
+			}
+			// Try to fix by escaping quotes if that's the issue
+			const recheck = this.quoteBalanceChecker?.fixQuoteBalance(translated);
+			if (recheck && recheck.text !== translated) {
+				if (this.advanced.debug || process.env.DEBUG) {
+					log(`Applied quote balance fix for key "${key}"`, true);
+				}
+				return recheck.text;
+			}
+		}
+		return translated;
+	}
+
+	_applyConfidenceRules(result, confidence, key, text, translated, targetLang, contextData) {
+		result.confidence = confidence;
+
+		if (!this.confidenceSettings.enabled) return;
+
+		// Auto-approve if above threshold
+		if (confidence.score >= this.confidenceSettings.autoApproveThreshold) {
+			result.autoApproved = true;
+			this.confidenceSettings.autoApprovedCount++;
+
+			if (this.advanced.debug) {
+				log(`Auto-approved: ${key} (score: ${confidence.score.toFixed(3)})`, true);
+			}
+		}
+		// Auto-reject if below threshold
+		else if (confidence.score < this.confidenceSettings.rejectThreshold) {
+			result.rejected = true;
+			result.rejectionReason = `Quality score too low: ${confidence.score.toFixed(3)}`;
+			this.confidenceSettings.rejectedCount++;
+
+			if (this.advanced.debug) {
+				log(`Auto-rejected: ${key} (score: ${confidence.score.toFixed(3)})`, true);
+			}
+
+			// Keep original text for rejected translations
+			result.translated = text;
+		}
+		// Add to review queue if below review threshold
+		else if (
+			this.confidenceSettings.saveReviewQueue &&
+			confidence.score < this.confidenceSettings.reviewThreshold
+		) {
+			result.needsReview = true;
+
+			this.confidenceSettings.reviewQueue.push({
+				key,
+				source: text,
+				translation: translated,
+				confidence,
+				language: targetLang,
+				sourceLang: this.options.source,
+				category: contextData?.category || "general",
+				timestamp: new Date().toISOString(),
+			});
+		}
+	}
+
+	_cacheResult(key, text, targetLang, contextData, result) {
+		if (this.options.cacheEnabled === false) return;
+
+		const cacheKey = this._generateCacheKey(text, targetLang, contextData?.category);
+		this.translationCache.set(cacheKey, result, {
+			context: {
+				text,
+				targetLang,
+				contextData,
+			},
+		});
+		this.cacheStats.stored++;
+	}
+
+	/**
+	 * Process a batch of translation items.
+	 * Uses optimized concurrency (p-limit) and batch context analysis.
+	 * @param {Array<{key: string, text: string, targetLang: string, existingTranslation?: string}>} items - Items to translate.
+	 * @returns {Promise<Array<Object>>} - Array of translation results.
+	 */
 	async processTranslations(items) {
 		this.progress.start(items.length, items[0].targetLang);
 
-		const batchSize = Math.min(this.concurrencyLimit, this.advanced.maxBatchSize);
-		const results = [];
-		const chunks = this._chunkArray(items, batchSize);
+		// Use p-limit for concurrency control
+		const limit = pLimit(this.concurrencyLimit);
+
+		// Batch size for context analysis (not translation concurrency)
+		// We process context in chunks to be efficient with AI calls if needed,
+		// but then feed the translation tasks into the p-limit queue individually.
+		const contextBatchSize = this.advanced.maxBatchSize;
+		const chunks = this._chunkArray(items, contextBatchSize);
 
 		if (this.advanced.debug) {
 			log(
-				`Processing ${items.length} items in ${chunks.length} batches of max ${batchSize} items each`,
-				true
-			);
-			log(
-				`Processing ${items.length} items in ${chunks.length} chunks of size ${batchSize}`,
+				`Processing ${items.length} items with concurrency limit ${this.concurrencyLimit}`,
 				true
 			);
 		}
 
 		console.log(""); // Empty line for progress bar
 
-		for (let i = 0; i < chunks.length; i++) {
-			const chunk = chunks[i];
-			if (this.advanced.debug) {
-				log(`Processing batch ${i + 1}/${chunks.length} (${chunk.length} items)`, true);
-			}
+		// We will collect all promises here
+		const allPromises = [];
 
+		for (const chunk of chunks) {
+			// 1. Analyze context for this batch first
 			const texts = chunk.map((item) => item.text);
-			const contextResults = await this.contextProcessor.analyzeBatch(texts);
+			let contextResults = [];
 
-			for (let index = 0; index < chunk.length; index++) {
-				const item = chunk[index];
-				try {
-					const contextData =
-						contextResults[index] || (await this.contextProcessor.analyze(item.text));
-
-					const result = await this.processTranslation(
-						item.key,
-						item.text,
-						item.targetLang,
-						contextData,
-						item.existingTranslation
-					);
-
-					this.progress.increment(result.success ? "success" : "failed");
-					results.push(result);
-				} catch (error) {
-					if (this.advanced.debug || process.env.DEBUG) {
-						console.error(`Error processing item ${item.key}:`, error);
-					}
-					this.progress.increment("failed");
-					results.push({
-						key: item.key,
-						translated: item.text,
-						error: error.message,
-						success: false,
-					});
-				}
+			try {
+				contextResults = await this.contextProcessor.analyzeBatch(texts);
+			} catch (error) {
+				console.warn(`Context analysis failed for batch: ${error.message}`);
+				// Fallback will be handled inside the loop if context is missing
 			}
 
-			if (i < chunks.length - 1) {
-				await new Promise((resolve) => setTimeout(resolve, 50));
+			// 2. Queue translations for this batch using p-limit
+			for (let i = 0; i < chunk.length; i++) {
+				const item = chunk[i];
+				const contextData =
+					contextResults[i] || (await this.contextProcessor.analyze(item.text));
+
+				// Add to the limit queue
+				const promise = limit(async () => {
+					try {
+						const result = await this.processTranslation(
+							item.key,
+							item.text,
+							item.targetLang,
+							contextData,
+							item.existingTranslation
+						);
+
+						this.progress.increment(result.success ? "success" : "failed");
+						return result;
+					} catch (error) {
+						this.progress.increment("failed");
+						return {
+							key: item.key,
+							translated: item.text,
+							error: error.message,
+							success: false,
+						};
+					}
+				});
+
+				allPromises.push(promise);
 			}
 		}
 
-		return results;
+		// 3. Wait for all tasks to complete
+		const processedResults = await Promise.all(allPromises);
+		return processedResults;
 	}
 
 	_chunkArray(array, chunkSize) {
@@ -429,12 +526,13 @@ class Orchestrator {
 			const totalMemory = os.totalmem();
 			const memoryGB = Math.floor(totalMemory / (1024 * 1024 * 1024));
 
+			// Higher concurrency allowed thanks to p-limit's efficient management
 			if (memoryGB >= 8 && cpuCount >= 4) {
-				this.concurrencyLimit = Math.min(10, cpuCount);
+				this.concurrencyLimit = Math.min(20, cpuCount * 2); // Increased limits
 			} else if (memoryGB >= 4 && cpuCount >= 2) {
-				this.concurrencyLimit = Math.min(5, cpuCount);
+				this.concurrencyLimit = Math.min(10, cpuCount * 2);
 			} else {
-				this.concurrencyLimit = 2;
+				this.concurrencyLimit = 4;
 			}
 
 			if (this.advanced.debug) {

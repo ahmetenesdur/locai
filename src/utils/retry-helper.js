@@ -2,10 +2,27 @@
  * Retry helper for API operations with exponential backoff
  */
 
+/**
+ * Retry helper for API operations with exponential backoff.
+ */
 class RetryHelper {
 	/**
-	 * Retry an operation with configurable backoff strategy
-	 * Supports per-provider retry configuration
+	 * Retry an operation with configurable backoff strategy.
+	 * Supports per-provider retry configuration.
+	 *
+	 * @param {Function} operation - The async operation to retry.
+	 * @param {Object} options - Retry options.
+	 * @param {string} [options.provider] - Provider name for specific config lookup.
+	 * @param {Object} [options.perProviderRetry] - Map of provider-specific retry configs.
+	 * @param {string[]} [options.retryableErrors] - List of error codes/types to retry.
+	 * @param {number} [options.maxRetries=2] - Maximum number of retries.
+	 * @param {number} [options.initialDelay=1000] - Initial delay in ms.
+	 * @param {number} [options.maxDelay=10000] - Maximum delay in ms.
+	 * @param {string} [options.context] - context string for logging.
+	 * @param {Object} [options.logContext] - Additional context for error logging.
+	 * @param {Function} [options.retryCondition] - Custom function to determine if error is retryable.
+	 * @returns {Promise<any>} - Result of the operation.
+	 * @throws {Error} - Last error encountered if all retries fail.
 	 */
 	static async withRetry(operation, options = {}) {
 		const providerName = options.provider?.toLowerCase();
@@ -35,7 +52,7 @@ class RetryHelper {
 		const logContext = options.logContext ?? {};
 		const retryCondition =
 			options.retryCondition ??
-			((error, attempt, max) => this.defaultRetryCondition(error, retryableErrors));
+			((error) => this.defaultRetryCondition(error, retryableErrors));
 
 		let lastError = null;
 		let attempts = 0;
@@ -114,7 +131,12 @@ class RetryHelper {
 	}
 
 	/**
-	 * Calculate exponential backoff with jitter
+	 * Calculate exponential backoff with jitter.
+	 *
+	 * @param {number} attempt - Current attempt number.
+	 * @param {number} initialDelay - Initial delay in ms.
+	 * @param {number} maxDelay - Maximum delay in ms.
+	 * @returns {number} - Calculated delay in ms.
 	 */
 	static calculateBackoff(attempt, initialDelay, maxDelay) {
 		const expBackoff = Math.min(maxDelay, initialDelay * Math.pow(2, attempt - 1));
@@ -123,8 +145,12 @@ class RetryHelper {
 	}
 
 	/**
-	 * Default retry condition based on error type
-	 * Checks against retryableErrors list
+	 * Default retry condition based on error type.
+	 * Checks against retryableErrors list.
+	 *
+	 * @param {Error} error - The error encountered.
+	 * @param {string[]} [retryableErrors=[]] - List of retryable error types.
+	 * @returns {boolean} - True if error should be retried.
 	 */
 	static defaultRetryCondition(error, retryableErrors = []) {
 		// Check for rate_limit errors
@@ -196,7 +222,9 @@ class RetryHelper {
 	}
 
 	/**
-	 * Promise-based delay
+	 * Promise-based delay.
+	 * @param {number} ms - Milliseconds to delay.
+	 * @returns {Promise<void>}
 	 */
 	static delay(ms) {
 		return new Promise((resolve) => setTimeout(resolve, ms));

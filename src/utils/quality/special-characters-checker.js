@@ -1,8 +1,7 @@
 /**
- * Special Characters Preservation Checker
- * Ensures special characters, symbols, and formatting are preserved
+ * Special Characters Preservation Checker.
+ * Ensures special characters, symbols, and formatting are preserved.
  */
-
 class SpecialCharactersChecker {
 	constructor() {
 		// Define categories of special characters to preserve
@@ -38,7 +37,10 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Check if special characters are preserved
+	 * Check if special characters are preserved.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Array<Object>} - Array of found issues.
 	 */
 	checkSpecialCharacters(sourceText, translatedText) {
 		const issues = [];
@@ -93,7 +95,10 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Check emoji preservation
+	 * Check emoji preservation.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Array<Object>} - Array of emoji issues.
 	 */
 	checkEmojiPreservation(sourceText, translatedText) {
 		const issues = [];
@@ -121,7 +126,10 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Fix special character issues
+	 * Fix special character issues.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixSpecialCharacters(sourceText, translatedText) {
 		let fixedText = translatedText;
@@ -170,7 +178,9 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Extract special characters by category
+	 * Extract special characters by category.
+	 * @param {string} text - Text to extract from.
+	 * @returns {Object} - Map of categories to found characters.
 	 */
 	extractSpecialCharacters(text) {
 		const extracted = {};
@@ -184,11 +194,15 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Restore critical characters that were lost
+	 * Restore critical characters that were lost.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @param {Array<string>} missingChars - Missing characters.
+	 * @returns {Object} - Result with text and fixes.
 	 */
 	restoreCriticalCharacters(sourceText, translatedText, missingChars) {
 		const appliedFixes = [];
-		let fixedText = translatedText;
+		const fixedText = translatedText;
 
 		// This is a simplified restoration
 		// In practice, we'd need context to know where to place the characters
@@ -213,7 +227,10 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Fix common character substitutions
+	 * Fix common character substitutions.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with text, issues, and fixes.
 	 */
 	fixCommonSubstitutions(sourceText, translatedText) {
 		const foundIssues = [];
@@ -256,7 +273,9 @@ class SpecialCharactersChecker {
 	}
 
 	/**
-	 * Check if text has special characters
+	 * Check if text has special characters.
+	 * @param {string} text - Text to check.
+	 * @returns {boolean} - True if special characters found.
 	 */
 	hasSpecialCharacters(text) {
 		for (const pattern of Object.values(this.specialCharacterSets)) {

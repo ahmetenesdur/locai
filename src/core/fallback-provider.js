@@ -56,8 +56,8 @@ class FallbackProvider {
 		const maxAttempts = totalProviders * (this.maxRetries + 1);
 
 		while (currentAttempt < maxAttempts) {
-			let currentProviderIndex = this.currentIndex % totalProviders;
-			let providerData = availableProviders[currentProviderIndex];
+			const currentProviderIndex = this.currentIndex % totalProviders;
+			const providerData = availableProviders[currentProviderIndex];
 			const providerName = this._getProviderName(providerData);
 			const currentProvider = providerData.implementation;
 
@@ -186,8 +186,8 @@ class FallbackProvider {
 		const maxAttempts = totalProviders * (this.maxRetries + 1);
 
 		while (currentAttempt < maxAttempts) {
-			let currentProviderIndex = currentAttempt % totalProviders;
-			let providerData = availableProviders[currentProviderIndex];
+			const currentProviderIndex = currentAttempt % totalProviders;
+			const providerData = availableProviders[currentProviderIndex];
 			const providerName = this._getProviderName(providerData);
 			const currentProvider = providerData.implementation;
 

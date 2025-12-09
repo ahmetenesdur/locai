@@ -1,6 +1,6 @@
 /**
- * Interactive Review Command
- * Allows manual review of low-confidence translations
+ * Interactive Review Command.
+ * Allows manual review of low-confidence translations.
  */
 
 import fs from "fs";
@@ -9,6 +9,10 @@ import readline from "readline";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
 
 class ReviewCommand {
+	/**
+	 * Initialize ReviewCommand.
+	 * @param {Object} config - Configuration object.
+	 */
 	constructor(config) {
 		this.config = config;
 		this.reviewQueue = [];
@@ -22,7 +26,8 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Load review queue from file
+	 * Load review queue from cache file.
+	 * @returns {boolean} - True if loaded successfully, else false.
 	 */
 	loadReviewQueue() {
 		const reviewFile = path.join(process.cwd(), ".localize-cache", "review-queue.json");
@@ -47,7 +52,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Start interactive review session
+	 * Start interactive review session.
 	 */
 	async startReview() {
 		if (!this.loadReviewQueue()) {
@@ -79,7 +84,11 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Review a single translation
+	 * Review a single translation item.
+	 * @param {Object} item - Translation item to review.
+	 * @param {number} current - Current item index (1-based).
+	 * @param {number} total - Total items.
+	 * @returns {Promise<string>} - Decision result.
 	 */
 	async reviewItem(item, current, total) {
 		console.log(`\n[${current}/${total}] Translation Review`);
@@ -116,7 +125,10 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Handle user action
+	 * Handle user action input.
+	 * @param {string} action - User action code.
+	 * @param {Object} item - Current item.
+	 * @returns {Promise<string>} - Result status.
 	 */
 	async handleAction(action, item) {
 		switch (action) {
@@ -126,12 +138,12 @@ class ReviewCommand {
 				console.log("Accepted");
 				return "continue";
 
-			case "e":
-			case "edit":
+			case "edit": {
 				const edited = await this.editTranslation(item);
 				this.decisions.edited.push(edited);
 				console.log("Edited and saved");
 				return "continue";
+			}
 
 			case "r":
 			case "reject":
@@ -166,7 +178,9 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Edit translation interactively
+	 * Edit translation interactively.
+	 * @param {Object} item - Item to edit.
+	 * @returns {Promise<Object>} - Edited item.
 	 */
 	async editTranslation(item) {
 		console.log(`\nCurrent: "${item.translation}"`);
@@ -198,7 +212,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Show help information
+	 * Show help information to the user.
 	 */
 	showHelp() {
 		console.log("\n━━━ Help ━━━");
@@ -213,7 +227,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Show review summary
+	 * Show summary of review session.
 	 */
 	showSummary() {
 		console.log("\n━".repeat(70));
@@ -230,7 +244,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Save review decisions
+	 * Save review decisions to disk and apply them.
 	 */
 	saveDecisions() {
 		const cacheDir = path.join(process.cwd(), ".localize-cache");
@@ -259,7 +273,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Apply accepted and edited translations to locale files
+	 * Apply accepted and edited translations to locale files.
 	 */
 	applyDecisions() {
 		const toApply = [...this.decisions.accepted, ...this.decisions.edited];
@@ -299,7 +313,10 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Set nested value in object using dot notation
+	 * Set nested value in object using dot notation.
+	 * @param {Object} obj - Object to modify.
+	 * @param {string} path - Dot notation path.
+	 * @param {*} value - Value to set.
 	 */
 	setNestedValue(obj, path, value) {
 		const keys = path.split(".");
@@ -316,7 +333,9 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Get user input from terminal
+	 * Get user input from terminal.
+	 * @param {string} prompt - Prompt to display.
+	 * @returns {Promise<string>} - User input.
 	 */
 	getUserInput(prompt) {
 		return new Promise((resolve) => {
@@ -333,7 +352,8 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Export review queue to JSON
+	 * Export review queue to JSON.
+	 * @param {string} format - Export format (json or csv).
 	 */
 	exportReviewQueue(format = "json") {
 		if (this.reviewQueue.length === 0 && !this.loadReviewQueue()) {
@@ -354,7 +374,9 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Convert review queue to CSV format
+	 * Convert review queue to CSV format.
+	 * @param {Array<Object>} items - Items to convert.
+	 * @returns {string} - CSV content.
 	 */
 	convertToCSV(items) {
 		const headers = [

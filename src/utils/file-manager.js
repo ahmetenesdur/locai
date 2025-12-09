@@ -118,7 +118,7 @@ class FileManager {
 					);
 					await fs.copyFile(filePath, backupPath);
 				} catch (err) {
-					// File doesn't exist, no need to backup
+					console.error(`Backup failed (${filePath}): ${err.message}`);
 				}
 			}
 
@@ -255,7 +255,7 @@ class FileManager {
 					);
 					await fs.copyFile(filePath, backupPath);
 				} catch (err) {
-					// File doesn't exist or other error, can't backup
+					console.error(`Backup failed (${filePath}): ${err.message}`);
 				}
 			}
 
@@ -295,7 +295,7 @@ class FileManager {
 	 * @param {string} filePath - Path to the file
 	 * @returns {Object|null} - Error position details
 	 */
-	static _extractErrorPosition(error, filePath) {
+	static _extractErrorPosition(error) {
 		const message = error.message;
 		const positionMatch = message.match(/position (\d+)/);
 		const lineMatch = message.match(/line (\d+)/);
@@ -340,10 +340,9 @@ class FileManager {
 	/**
 	 * List files in a directory
 	 * @param {string} dirPath - Directory path
-	 * @param {Object} options - Options for listing
 	 * @returns {Promise<string[]>} - Array of file paths
 	 */
-	static async listFiles(dirPath, options = {}) {
+	static async listFiles(dirPath = {}) {
 		try {
 			const entries = await fs.readdir(dirPath, { withFileTypes: true });
 

@@ -6,9 +6,18 @@ import * as xaiProvider from "../providers/xai.js";
 import FallbackProvider from "./fallback-provider.js";
 import rateLimiter from "../utils/rate-limiter.js";
 
+/**
+ * Factory for creating and managing AI providers.
+ * Handles provider instantiation, configuration, and fallback chains.
+ */
 class ProviderFactory {
 	/**
-	 * Get provider with intelligent fallback
+	 * Get provider instance with intelligent fallback support.
+	 * @param {string} providerName - Name of the primary provider.
+	 * @param {boolean} [useFallback=true] - Whether to use fallback chain on failure.
+	 * @param {Object} [config=null] - Optional configuration overrides.
+	 * @returns {Object|FallbackProvider} - Provider instance or wrapped FallbackProvider.
+	 * @throws {Error} If provider is not found or configured.
 	 */
 	static getProvider(providerName, useFallback = true, config = null) {
 		const providers = {
@@ -107,6 +116,10 @@ class ProviderFactory {
 		return new FallbackProvider(allProviders);
 	}
 
+	/**
+	 * Get list of available (configured) providers.
+	 * @returns {string[]} - Array of provider names with valid API keys.
+	 */
 	static getAvailableProviders() {
 		const providers = {
 			dashscope: process.env.DASHSCOPE_API_KEY,
@@ -121,6 +134,11 @@ class ProviderFactory {
 			.map(([name]) => name);
 	}
 
+	/**
+	 * Validate that at least one provider is configured.
+	 * @returns {string[]} - Array of available providers.
+	 * @throws {Error} If no providers are configured.
+	 */
 	static validateProviders() {
 		const available = this.getAvailableProviders();
 		if (available.length === 0) {
@@ -130,6 +148,11 @@ class ProviderFactory {
 		return available;
 	}
 
+	/**
+	 * Check if a specific provider is configured.
+	 * @param {string} providerName - Name of the provider.
+	 * @returns {boolean} - True if provider has an API key configured.
+	 */
 	static isProviderConfigured(providerName) {
 		const envVarMap = {
 			dashscope: "DASHSCOPE_API_KEY",

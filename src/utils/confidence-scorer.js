@@ -309,7 +309,6 @@ class ConfidenceScorer {
 
 		// Gemini confidence scores
 		if (provider === "gemini" && response.candidates?.[0]) {
-			const safetyRatings = response.candidates[0].safetyRatings || [];
 			const finishReason = response.candidates[0].finishReason;
 
 			if (finishReason === "STOP") return 0.9; // Normal completion

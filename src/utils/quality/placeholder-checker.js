@@ -1,4 +1,14 @@
+/**
+ * Placeholder Consistency Checker.
+ * Ensures placeholders like {name}, ${value}, %s are preserved correctly.
+ */
 class PlaceholderChecker {
+	/**
+	 * Check for placeholder mismatches or corruptions.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Array<Object>} - Array of placeholder issues.
+	 */
 	checkPlaceholders(source, translated) {
 		const placeholderRegex = /\{[^}]+\}|\$\{[^}]+\}|%[sd]/g;
 		const sourcePlaceholders = source.match(placeholderRegex) || [];
@@ -44,6 +54,12 @@ class PlaceholderChecker {
 		return issues;
 	}
 
+	/**
+	 * Fix corrupted or missing placeholders in translated text.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and applied fixes.
+	 */
 	fixPlaceholders(source, translated) {
 		const placeholderRegex = /\{[^}]+\}|\$\{[^}]+\}|%[sd]/g;
 		const sourcePlaceholders = source.match(placeholderRegex) || [];
@@ -102,6 +118,12 @@ class PlaceholderChecker {
 		return { text: fixedText, foundIssues, appliedFixes };
 	}
 
+	/**
+	 * Find a corrupted version of a placeholder in translated text.
+	 * @param {string} translated - Translated text.
+	 * @param {string} sourcePlaceholder - Original placeholder.
+	 * @returns {string|null} - Corrupted placeholder or null.
+	 */
 	findCorruptedPlaceholder(translated, sourcePlaceholder) {
 		// Extract the placeholder name (e.g., "message" from "{message}")
 		const placeholderName = sourcePlaceholder.slice(1, -1); // Remove { and }
@@ -138,6 +160,13 @@ class PlaceholderChecker {
 		return null;
 	}
 
+	/**
+	 * Find best position to insert a missing placeholder.
+	 * @param {string} translated - Translated text.
+	 * @param {string} source - Source text.
+	 * @param {string} placeholder - Placeholder to insert.
+	 * @returns {number} - Insertion index or -1.
+	 */
 	findBestPlaceholderPosition(translated, source, placeholder) {
 		const sourcePosition = source.indexOf(placeholder);
 		const sourceWords = source.slice(0, sourcePosition).split(" ").length;
@@ -148,6 +177,13 @@ class PlaceholderChecker {
 			: translatedWords.slice(0, sourceWords).join(" ").length;
 	}
 
+	/**
+	 * Insert placeholder into text at specified position.
+	 * @param {string} text - Text to modify.
+	 * @param {string} placeholder - Placeholder to insert.
+	 * @param {number} position - Insertion index.
+	 * @returns {string} - Modified text.
+	 */
 	insertPlaceholder(text, placeholder, position) {
 		return text.slice(0, position) + placeholder + text.slice(position);
 	}

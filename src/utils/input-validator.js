@@ -1,5 +1,6 @@
 /**
- * Input validation utility for security and data integrity
+ * Input validation utility for security and data integrity.
+ * Defines regex patterns, limits, and validation methods.
  */
 
 import path from "path";
@@ -15,14 +16,18 @@ class InputValidator {
 	static DANGEROUS_PATTERNS = [
 		/\.\.\//g,
 		/\0/g,
-		/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,
+		/[\x00-\x08\x0b\x0c\x0e-\x1f\x7F]/g, // eslint-disable-line no-control-regex
 		/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
 		/javascript:/gi,
 		/data:.*base64/gi,
 	];
 
 	/**
-	 * Validate and sanitize language code
+	 * Validate and sanitize language code.
+	 * @param {string} langCode - Language code to validate.
+	 * @param {string} [paramName="language"] - Parameter name for error messages.
+	 * @returns {string} - Sanitized language code.
+	 * @throws {Error} If validation fails.
 	 */
 	static validateLanguageCode(langCode, paramName = "language") {
 		if (!langCode || typeof langCode !== "string") {
@@ -53,7 +58,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate array of language codes
+	 * Validate array of language codes.
+	 * @param {string[]} langCodes - Array of language codes.
+	 * @param {string} [paramName="languages"] - Parameter name for errors.
+	 * @returns {string[]} - Sanitized array of language codes.
+	 * @throws {Error} If array is empty or contains invalid codes.
 	 */
 	static validateLanguageCodes(langCodes, paramName = "languages") {
 		if (!Array.isArray(langCodes)) {
@@ -74,7 +83,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate and sanitize directory path
+	 * Validate and sanitize directory path.
+	 * @param {string} dirPath - Directory path.
+	 * @param {string} [paramName="directory"] - Parameter name for errors.
+	 * @returns {string} - Resolved and validated absolute path.
+	 * @throws {Error} If path is invalid or outside working directory.
 	 */
 	static validateDirectoryPath(dirPath, paramName = "directory") {
 		if (!dirPath || typeof dirPath !== "string") {
@@ -95,7 +108,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate translation text
+	 * Validate translation text.
+	 * @param {string} text - Text to validate.
+	 * @param {string} [paramName="text"] - Parameter name for errors.
+	 * @returns {string} - Validated text.
+	 * @throws {Error} If text is invalid or too long.
 	 */
 	static validateText(text, paramName = "text") {
 		if (text === null || text === undefined) {
@@ -116,7 +133,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate translation key
+	 * Validate translation key.
+	 * @param {string} key - Key to validate.
+	 * @param {string} [paramName="key"] - Parameter name.
+	 * @returns {string} - Validated key.
+	 * @throws {Error} If key is invalid, too long, or contains traversal.
 	 */
 	static validateKey(key, paramName = "key") {
 		if (!key || typeof key !== "string") {
@@ -137,7 +158,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate API provider name
+	 * Validate API provider name.
+	 * @param {string} provider - Provider name.
+	 * @param {string} [paramName="provider"] - Parameter name.
+	 * @returns {string} - Normalized provider name.
+	 * @throws {Error} If provider is unknown.
 	 */
 	static validateProvider(provider, paramName = "provider") {
 		if (!provider || typeof provider !== "string") {
@@ -156,7 +181,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Sanitize filename to prevent path traversal
+	 * Sanitize filename to prevent path traversal.
+	 * @param {string} filename - Filename to sanitize.
+	 * @param {string} [extension=null] - Optional extension to enforce.
+	 * @returns {string} - Sanitized filename.
+	 * @throws {Error} If filename is invalid.
 	 */
 	static sanitizeFilename(filename, extension = null) {
 		if (!filename || typeof filename !== "string") {
@@ -165,7 +194,7 @@ class InputValidator {
 
 		let sanitized = path
 			.basename(filename)
-			.replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+			.replace(/[<>:"/\\|?*\x00-\x1f]/g, "") // eslint-disable-line no-control-regex
 			.replace(/^\.+/, "")
 			.trim();
 
@@ -181,7 +210,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Create safe file path within a directory
+	 * Create safe file path within a directory.
+	 * @param {string} baseDir - Base directory.
+	 * @param {string} filename - Filename.
+	 * @returns {string} - Safe full path.
+	 * @throws {Error} If path escapes base directory.
 	 */
 	static createSafeFilePath(baseDir, filename) {
 		const safeFilename = this.sanitizeFilename(filename);
@@ -198,7 +231,10 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate configuration object
+	 * Validate configuration object.
+	 * @param {Object} config - Configuration object to validate.
+	 * @returns {Object} - Validated configuration.
+	 * @throws {Error} If configuration is invalid.
 	 */
 	static validateConfig(config) {
 		if (!config || typeof config !== "object") {
@@ -376,7 +412,10 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate API config for each provider
+	 * Validate API config for each provider.
+	 * @param {Object} apiConfig - API configuration object.
+	 * @param {string[]} errors - Array to push errors to.
+	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateApiConfig(apiConfig, errors, warnings) {
 		for (const [provider, settings] of Object.entries(apiConfig)) {
@@ -414,7 +453,10 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate rate limiter configuration
+	 * Validate rate limiter configuration.
+	 * @param {Object} rateLimiter - Rate limiter configuration.
+	 * @param {string[]} errors - Array to push errors to.
+	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateRateLimiterConfig(rateLimiter, errors, warnings) {
 		if (rateLimiter.queueStrategy) {
@@ -466,9 +508,12 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate retry options
+	 * Validate retry options.
+	 * @param {Object} retryOptions - Retry options.
+	 * @param {string[]} errors - Array to push errors to.
+	 * @param {string[]} warnings - Array to push warnings to.
 	 */
-	static validateRetryOptions(retryOptions, errors, warnings) {
+	static validateRetryOptions(retryOptions, errors, _warnings) {
 		if (retryOptions.maxRetries !== undefined) {
 			const retries = parseInt(retryOptions.maxRetries);
 			if (isNaN(retries) || retries < 0 || retries > 10) {
@@ -500,7 +545,10 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate context configuration
+	 * Validate context configuration.
+	 * @param {Object} context - Context configuration.
+	 * @param {string[]} errors - Array to push errors to.
+	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateContextConfig(context, errors, warnings) {
 		if (context.aiProvider) {
@@ -544,7 +592,10 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate quality checks configuration
+	 * Validate quality checks configuration.
+	 * @param {Object} qualityChecks - Quality checks configuration.
+	 * @param {string[]} errors - Array to push errors to.
+	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateQualityChecks(qualityChecks, errors, warnings) {
 		if (qualityChecks.rules && typeof qualityChecks.rules !== "object") {
@@ -557,9 +608,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate length control configuration
+	 * Validate length control configuration.
+	 * @param {Object} lengthControl - Length control configuration.
+	 * @param {string[]} errors - Array to push errors to.
 	 */
-	static validateLengthControl(lengthControl, errors, warnings) {
+	static validateLengthControl(lengthControl, errors) {
 		if (lengthControl.mode) {
 			const validModes = ["strict", "flexible", "exact", "relaxed", "smart"];
 			if (!validModes.includes(lengthControl.mode)) {
@@ -575,9 +628,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate advanced configuration
+	 * Validate advanced configuration.
+	 * @param {Object} advanced - Advanced configuration.
+	 * @param {string[]} errors - Array to push errors to.
 	 */
-	static validateAdvancedConfig(advanced, errors, warnings) {
+	static validateAdvancedConfig(advanced, errors) {
 		if (advanced.timeoutMs !== undefined) {
 			const timeout = parseInt(advanced.timeoutMs);
 			if (isNaN(timeout) || timeout < 1000 || timeout > 300000) {
@@ -601,7 +656,9 @@ class InputValidator {
 	}
 
 	/**
-	 * Sanitize translation text for security
+	 * Sanitize translation text for security.
+	 * @param {string} text - Text to sanitize.
+	 * @returns {string} - Sanitized text.
 	 */
 	static sanitizeTranslationText(text) {
 		if (!text || typeof text !== "string") {
@@ -624,7 +681,11 @@ class InputValidator {
 	}
 
 	/**
-	 * Validate API key format
+	 * Validate API key format.
+	 * @param {string} apiKey - API key to validate.
+	 * @param {string} providerName - Provider name.
+	 * @returns {boolean} - True if valid.
+	 * @throws {Error} If key is invalid.
 	 */
 	static validateApiKeyFormat(apiKey, providerName) {
 		if (!apiKey || typeof apiKey !== "string") {
@@ -651,6 +712,14 @@ class InputValidator {
 		return true;
 	}
 
+	/**
+	 * Validate object depth to prevent circular references and deep nesting.
+	 * @param {Object} obj - Object to validate.
+	 * @param {number} [maxDepth=10] - Maximum depth.
+	 * @param {number} [currentDepth=0] - Current depth.
+	 * @returns {boolean} - True if valid.
+	 * @throws {Error} If depth exceeded.
+	 */
 	static validateObjectDepth(obj, maxDepth = this.MAX_CONFIG_DEPTH, currentDepth = 0) {
 		if (currentDepth > maxDepth) {
 			throw new Error(`Configuration object too deeply nested (max depth: ${maxDepth})`);
@@ -667,6 +736,13 @@ class InputValidator {
 		return true;
 	}
 
+	/**
+	 * Validate request rate for an identifier.
+	 * @param {string} identifier - Identifier (e.g., user ID or IP).
+	 * @param {number} [maxRequestsPerMinute=60] - Max requests per minute.
+	 * @returns {boolean} - True if allowed.
+	 * @throws {Error} If rate limit exceeded.
+	 */
 	static validateRequestRate(identifier, maxRequestsPerMinute = 60) {
 		const now = Date.now();
 		const minute = Math.floor(now / 60000);

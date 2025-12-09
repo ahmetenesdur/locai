@@ -10,13 +10,24 @@ import MarkdownChecker from "./markdown-checker.js";
 import CodeBlockChecker from "./code-block-checker.js";
 import SpecialCharactersChecker from "./special-characters-checker.js";
 
+/**
+ * Main Quality Checker Class.
+ * Orchestrates various quality checks and fixes for translated text.
+ */
 class QualityChecker extends BaseChecker {
+	/**
+	 * Initialize QualityChecker with options.
+	 * @param {Object} options - Configuration options.
+	 */
 	constructor(options = {}) {
 		super(options);
 		this.initializeCheckers();
 		this.context = options.context || {};
 	}
 
+	/**
+	 * Initialize all individual checkers.
+	 */
 	initializeCheckers() {
 		this.placeholderChecker = new PlaceholderChecker();
 		this.htmlTagChecker = new HtmlTagChecker();
@@ -30,6 +41,13 @@ class QualityChecker extends BaseChecker {
 		this.specialCharactersChecker = new SpecialCharactersChecker();
 	}
 
+	/**
+	 * Validate translated text against source text.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @param {Object} options - Validation options.
+	 * @returns {Object} - Validation result with issues.
+	 */
 	validate(sourceText, translatedText, options = {}) {
 		const issues = [];
 
@@ -96,7 +114,13 @@ class QualityChecker extends BaseChecker {
 		};
 	}
 
-	validateAndFix(sourceText, translatedText, options = {}) {
+	/**
+	 * Validate and attempt to fix translated text.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
+	 */
+	validateAndFix(sourceText, translatedText = {}) {
 		let fixedText = translatedText;
 		const issues = [];
 		const fixes = [];
@@ -184,6 +208,11 @@ class QualityChecker extends BaseChecker {
 		};
 	}
 
+	/**
+	 * Sanitize translated text using multiple passes.
+	 * @param {string} text - Text to sanitize.
+	 * @returns {string} - Sanitized text.
+	 */
 	sanitizeTranslation(text) {
 		if (!text) return text;
 

@@ -3,7 +3,14 @@ import BaseProvider from "./base-provider.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
+/**
+ * Provider implementation for Alibaba DashScope (Qwen) models.
+ */
 class DashScopeProvider extends BaseProvider {
+	/**
+	 * Create a new DashScopeProvider instance.
+	 * @param {Object} config - Provider configuration.
+	 */
 	constructor(config = {}) {
 		super("dashscope", config);
 
@@ -43,6 +50,14 @@ class DashScopeProvider extends BaseProvider {
 		return "/text-generation/generation";
 	}
 
+	/**
+	 * Translate text using DashScope.
+	 * @param {string} text - Text to translate.
+	 * @param {string} sourceLang - Source language code.
+	 * @param {string} targetLang - Target language code.
+	 * @param {Object} options - Translation options.
+	 * @returns {Promise<string>} - Translated text.
+	 */
 	async translate(text, sourceLang, targetLang, options = {}) {
 		this.validateRequest(text, sourceLang, targetLang);
 

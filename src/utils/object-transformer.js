@@ -1,4 +1,14 @@
+/**
+ * Utility class for object manipulation.
+ */
 class ObjectTransformer {
+	/**
+	 * Flatten a nested object into a single-level object with dot notation keys.
+	 * @param {Object} obj - The object to flatten.
+	 * @param {string} [prefix=""] - Prefix for keys (used internally).
+	 * @param {number} [maxDepth=20] - Maximum recursion depth.
+	 * @returns {Object} - Flattened object.
+	 */
 	static flatten(obj, prefix = "", maxDepth = 20) {
 		if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
 			return prefix ? { [prefix]: obj } : {};
@@ -42,6 +52,11 @@ class ObjectTransformer {
 		return result;
 	}
 
+	/**
+	 * Unflatten an object with dot notation keys into a nested object.
+	 * @param {Object} obj - The flattened object.
+	 * @returns {Object} - Nested object.
+	 */
 	static unflatten(obj) {
 		if (!obj || typeof obj !== "object") {
 			return {};
@@ -94,6 +109,12 @@ class ObjectTransformer {
 		return result;
 	}
 
+	/**
+	 * Create a deep copy of an object.
+	 * @param {any} obj - The object to clone.
+	 * @param {WeakSet} [seen] - Internal set to track circular references.
+	 * @returns {any} - Deep copy of the object.
+	 */
 	static deepClone(obj, seen = new WeakSet()) {
 		if (obj === null || typeof obj !== "object") {
 			return obj;
@@ -130,6 +151,13 @@ class ObjectTransformer {
 		return result;
 	}
 
+	/**
+	 * deeply merge two objects.
+	 * @param {Object} target - The target object.
+	 * @param {Object} source - The source object.
+	 * @param {boolean} [overwriteArrays=false] - Whether to overwrite arrays or merge them.
+	 * @returns {Object} - Merged object.
+	 */
 	static mergeObjects(target, source, overwriteArrays = false) {
 		if (!target || !source || typeof target !== "object" || typeof source !== "object") {
 			return target;

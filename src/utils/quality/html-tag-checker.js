@@ -1,4 +1,14 @@
+/**
+ * HTML Tag Consistency Checker.
+ * Ensures HTML tags are preserved and correctly nested in translations.
+ */
 class HtmlTagChecker {
+	/**
+	 * Check for HTML tag mismatches between source and translation.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Array<Object>} - Array of HTML tag issues.
+	 */
 	checkHtmlTags(source, translated) {
 		const tagRegex = /<[^>]+>/g;
 		const sourceTags = source.match(tagRegex) || [];
@@ -17,6 +27,12 @@ class HtmlTagChecker {
 		return [];
 	}
 
+	/**
+	 * Fix missing HTML tags in translated text.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and applied fixes.
+	 */
 	fixHtmlTags(source, translated) {
 		const tagRegex = /<[^>]+>/g;
 		const sourceTags = source.match(tagRegex) || [];
@@ -42,6 +58,12 @@ class HtmlTagChecker {
 		return { text: fixedText, foundIssues, appliedFixes };
 	}
 
+	/**
+	 * Insert HTML tag into text.
+	 * @param {string} text - Text to modify.
+	 * @param {string} tag - Tag to insert.
+	 * @returns {string} - Modified text.
+	 */
 	insertHtmlTag(text, tag) {
 		const isClosingTag = tag.startsWith("</");
 		if (isClosingTag) {

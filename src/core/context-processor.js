@@ -1,10 +1,17 @@
 import crypto from "crypto";
 import AIContextAnalyzer from "../utils/ai-context-analyzer.js";
-import ProviderFactory from "./provider-factory.js";
 import { LRUCache } from "lru-cache";
 import { log } from "../utils/logger.js";
 
+/**
+ * Handles context analysis for translation keys.
+ * Uses keyword matching and optional AI analysis to determine the best context category.
+ */
 class ContextProcessor {
+	/**
+	 * Create a new ContextProcessor instance.
+	 * @param {Object} config - Configuration object.
+	 */
 	constructor(config) {
 		this.config = config;
 		this.keywordCache = new Map();
@@ -23,6 +30,9 @@ class ContextProcessor {
 		this.initializeKeywords();
 	}
 
+	/**
+	 * Initialize keyword matching patterns from configuration.
+	 */
 	initializeKeywords() {
 		for (const [category, config] of Object.entries(this.config.categories)) {
 			const pattern = config.keywords
@@ -38,7 +48,11 @@ class ContextProcessor {
 		}
 	}
 
-	// Batch analysis for multiple texts
+	/**
+	 * Perform context analysis on a batch of texts.
+	 * @param {string[]} texts - Array of texts to analyze.
+	 * @returns {Promise<Object[]>} - Array of context analysis results.
+	 */
 	async analyzeBatch(texts) {
 		if (!texts || !Array.isArray(texts) || !this.config.enabled) {
 			return texts.map(() => this.getFallback());
@@ -129,13 +143,22 @@ class ContextProcessor {
 		return results;
 	}
 
-	// Single text analysis (legacy support)
+	/**
+	 * Perform context analysis on a single text.
+	 * @param {string} text - Text to analyze.
+	 * @returns {Promise<Object>} - Context analysis result.
+	 */
 	async analyze(text) {
 		const results = await this.analyzeBatch([text]);
 		return results[0];
 	}
 
-	// Extract keyword analysis logic
+	/**
+	 * Perform keyword-based analysis on text.
+	 * @param {string} text - Text to analyze.
+	 * @returns {Object} - Keyword analysis result.
+	 * @private
+	 */
 	_performKeywordAnalysis(text) {
 		const lowerText = text.toLowerCase();
 		const results = new Map();
@@ -183,6 +206,12 @@ class ContextProcessor {
 		return this.getBestMatch(results, totalScore);
 	}
 
+	/**
+	 * Determine the best category match from analysis results.
+	 * @param {Map} results - Map of category scores.
+	 * @param {number} totalScore - Total score across all categories.
+	 * @returns {Object} - Best match result.
+	 */
 	getBestMatch(results, totalScore) {
 		if (totalScore === 0) return this.getFallback();
 
@@ -199,6 +228,10 @@ class ContextProcessor {
 		return bestMatches[0] || this.getFallback();
 	}
 
+	/**
+	 * Get fallback analysis result.
+	 * @returns {Object} - Fallback result.
+	 */
 	getFallback() {
 		return {
 			category: this.config.fallback.category,
@@ -209,7 +242,10 @@ class ContextProcessor {
 	}
 
 	/**
-	 * Generate a collision-resistant cache key for text and context
+	 * Generate a collision-resistant cache key for text and context.
+	 * @param {string} text - processing text.
+	 * @param {Object} context - processing context.
+	 * @returns {string} - Cache key.
 	 */
 	getCacheKey(text, context) {
 		let keyContent;

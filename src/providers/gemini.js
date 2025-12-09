@@ -3,7 +3,14 @@ import BaseProvider from "./base-provider.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
+/**
+ * Provider implementation for Google Gemini models.
+ */
 class GeminiProvider extends BaseProvider {
+	/**
+	 * Create a new GeminiProvider instance.
+	 * @param {Object} config - Provider configuration.
+	 */
 	constructor(config = {}) {
 		super("gemini", config);
 
@@ -26,6 +33,14 @@ class GeminiProvider extends BaseProvider {
 		return `/models/${model}:generateContent`;
 	}
 
+	/**
+	 * Translate text using Gemini.
+	 * @param {string} text - Text to translate.
+	 * @param {string} sourceLang - Source language code.
+	 * @param {string} targetLang - Target language code.
+	 * @param {Object} options - Translation options.
+	 * @returns {Promise<string>} - Translated text.
+	 */
 	async translate(text, sourceLang, targetLang, options = {}) {
 		this.validateRequest(text, sourceLang, targetLang);
 

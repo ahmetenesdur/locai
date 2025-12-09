@@ -1,6 +1,17 @@
 import { performance } from "perf_hooks";
 
+/**
+ * Handles API rate limiting and request throttling.
+ * Supports provider-specific limits and adaptive throttling.
+ */
 class RateLimiter {
+	/**
+	 * Create a new RateLimiter.
+	 * @param {Object} config - Rate limiter configuration.
+	 * @param {string} [config.queueStrategy="fifo"] - Queue strategy (fifo, priority).
+	 * @param {number} [config.queueTimeout=15000] - Queue timeout in ms.
+	 * @param {boolean} [config.adaptiveThrottling=true] - Enable adaptive throttling.
+	 */
 	constructor(config = {}) {
 		this.queues = {};
 		this.processing = {};
@@ -69,7 +80,10 @@ class RateLimiter {
 		}
 	}
 
-	// Update config options
+	/**
+	 * Update rate limiter configuration.
+	 * @param {Object} config - Configuration updates.
+	 */
 	updateConfig(config) {
 		if (!config) return;
 
@@ -105,6 +119,13 @@ class RateLimiter {
 		}
 	}
 
+	/**
+	 * Enqueue a task for execution with rate limiting.
+	 * @param {string} provider - Provider name.
+	 * @param {Function} task - Async task to execute.
+	 * @param {number} [priority=0] - Task priority (higher is better).
+	 * @returns {Promise<any>} - Task result.
+	 */
 	async enqueue(provider, task, priority = 0) {
 		provider = provider.toLowerCase();
 
@@ -136,6 +157,11 @@ class RateLimiter {
 		});
 	}
 
+	/**
+	 * Process the queue for a specific provider.
+	 * @param {string} provider - Provider name.
+	 * @private
+	 */
 	async _processQueue(provider) {
 		if (!provider || typeof provider !== "string") {
 			return;
@@ -194,7 +220,9 @@ class RateLimiter {
 									`Request timed out in queue after ${this.config.queueTimeout}ms`
 								)
 							);
-						} catch (error) {}
+						} catch (error) {
+							console.error(`Failed to reject timed out request: ${error.message}`);
+						}
 					});
 				});
 			}
@@ -375,11 +403,20 @@ class RateLimiter {
 		});
 	}
 
+	/**
+	 * Get current queue size for a provider.
+	 * @param {string} provider - Provider name.
+	 * @returns {number} - Queue size.
+	 */
 	getQueueSize(provider) {
 		provider = provider.toLowerCase();
 		return this.queues[provider]?.length || 0;
 	}
 
+	/**
+	 * Get complete rate limiter status.
+	 * @returns {Object} - Status object including active metrics.
+	 */
 	getStatus() {
 		const status = {};
 
@@ -408,10 +445,17 @@ class RateLimiter {
 		return status;
 	}
 
+	/**
+	 * Get current configuration.
+	 * @returns {Object} - Configuration object.
+	 */
 	getConfig() {
 		return { ...this.config };
 	}
 
+	/**
+	 * Clear all pending queues.
+	 */
 	clearAllQueues() {
 		for (const provider in this.queues) {
 			if (this.queues[provider] && this.queues[provider].length > 0) {

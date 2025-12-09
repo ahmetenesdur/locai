@@ -60,7 +60,7 @@ class ErrorHelper {
 	static formatError(error, options = {}) {
 		const { showDebug = false, showSolutions = true, showContext = true } = options;
 
-		let output = [];
+		const output = [];
 
 		// Error header
 		const code = error.code || "ERR_UNKNOWN";

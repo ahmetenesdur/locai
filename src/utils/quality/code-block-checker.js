@@ -1,8 +1,7 @@
 /**
- * Code Block Preservation Checker
- * Ensures code blocks are preserved exactly during translation
+ * Code Block Preservation Checker.
+ * Ensures code blocks are preserved exactly during translation.
  */
-
 class CodeBlockChecker {
 	constructor() {
 		this.codePatterns = {
@@ -20,7 +19,10 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Check if code blocks are preserved
+	 * Check if code blocks are preserved.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Array<Object>} - Array of issues found.
 	 */
 	checkCodeBlockPreservation(sourceText, translatedText) {
 		const issues = [];
@@ -65,7 +67,9 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Extract all code blocks from text
+	 * Extract all code blocks from text.
+	 * @param {string} text - Text to extract from.
+	 * @returns {Array<Object>} - Array of extracted code blocks.
 	 */
 	extractCodeBlocks(text) {
 		const blocks = [];
@@ -118,7 +122,10 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Fix code block preservation issues
+	 * Fix code block preservation issues.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixCodeBlockPreservation(sourceText, translatedText) {
 		const foundIssues = [];
@@ -167,11 +174,15 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Restore missing code blocks from source
+	 * Restore missing code blocks from source.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @param {Array} sourceCodeBlocks - Source code blocks.
+	 * @returns {Object} - Result with text and fixes.
 	 */
 	restoreCodeBlocks(sourceText, translatedText, sourceCodeBlocks) {
 		const appliedFixes = [];
-		let fixedText = translatedText;
+		const fixedText = translatedText;
 
 		// This is a simplified restoration - in reality, we'd need more context
 		// to know exactly where to place the code blocks
@@ -194,8 +205,10 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Protect code blocks before translation
-	 * Replaces code blocks with tokens to prevent translation
+	 * Protect code blocks before translation.
+	 * Replaces code blocks with tokens to prevent translation.
+	 * @param {string} text - Text to protect.
+	 * @returns {Object} - Protected text and token map.
 	 */
 	protectCodeBlocks(text) {
 		const codeBlocks = this.extractCodeBlocks(text);
@@ -212,7 +225,10 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Restore code blocks after translation
+	 * Restore code blocks after translation.
+	 * @param {string} text - Text with tokens.
+	 * @param {Map} tokenMap - Map of tokens to original code.
+	 * @returns {string} - Restored text.
 	 */
 	restoreCodeBlocksFromTokens(text, tokenMap) {
 		let restoredText = text;
@@ -225,7 +241,9 @@ class CodeBlockChecker {
 	}
 
 	/**
-	 * Check if text contains code blocks
+	 * Check if text contains code blocks.
+	 * @param {string} text - Text to check.
+	 * @returns {boolean} - True if code blocks detected.
 	 */
 	hasCodeBlocks(text) {
 		for (const pattern of Object.values(this.codePatterns)) {

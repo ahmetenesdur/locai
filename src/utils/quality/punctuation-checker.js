@@ -1,4 +1,14 @@
+/**
+ * Punctuation Consistency Checker.
+ * Ensures end punctuation marks are preserved in translation.
+ */
 class PunctuationChecker {
+	/**
+	 * Check for punctuation mismatches.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Array<Object>} - Array of punctuation issues.
+	 */
 	checkPunctuation(source, translated) {
 		const issues = [];
 		const endPunctuation = /[.!?]$/;
@@ -13,6 +23,12 @@ class PunctuationChecker {
 		return issues;
 	}
 
+	/**
+	 * Fix missing punctuation marks.
+	 * @param {string} source - Source text.
+	 * @param {string} translated - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
+	 */
 	fixPunctuation(source, translated) {
 		const endPunctuation = /[.!?]$/;
 		let fixedText = translated;
@@ -38,6 +54,12 @@ class PunctuationChecker {
 		return { text: fixedText, foundIssues, appliedFixes };
 	}
 
+	/**
+	 * Add punctuation to the end of text.
+	 * @param {string} text - Text to modify.
+	 * @param {string} punctuation - Punctuation mark to add.
+	 * @returns {string} - Modified text.
+	 */
 	addPunctuation(text, punctuation) {
 		return text.trim() + punctuation;
 	}

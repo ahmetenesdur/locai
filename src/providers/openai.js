@@ -3,7 +3,14 @@ import BaseProvider from "./base-provider.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
+/**
+ * Provider implementation for OpenAI (GPT) models.
+ */
 class OpenAIProvider extends BaseProvider {
+	/**
+	 * Create a new OpenAIProvider instance.
+	 * @param {Object} config - Provider configuration.
+	 */
 	constructor(config = {}) {
 		super("openai", config);
 
@@ -27,6 +34,14 @@ class OpenAIProvider extends BaseProvider {
 		return "/chat/completions";
 	}
 
+	/**
+	 * Translate text using OpenAI.
+	 * @param {string} text - Text to translate.
+	 * @param {string} sourceLang - Source language code.
+	 * @param {string} targetLang - Target language code.
+	 * @param {Object} options - Translation options.
+	 * @returns {Promise<string>} - Translated text.
+	 */
 	async translate(text, sourceLang, targetLang, options = {}) {
 		this.validateRequest(text, sourceLang, targetLang);
 

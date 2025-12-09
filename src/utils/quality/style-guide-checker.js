@@ -1,8 +1,7 @@
 /**
- * Style Guide Checker
- * Enforces style guide conventions like Oxford comma and sentence case
+ * Style Guide Checker.
+ * Enforces style guide conventions like Oxford comma and sentence case.
  */
-
 class StyleGuideChecker {
 	constructor(styleGuide = {}) {
 		this.styleGuide = {
@@ -17,7 +16,10 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Check if text follows style guide conventions
+	 * Check if text follows style guide conventions.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Array<Object>} - Array of found issues.
 	 */
 	checkStyleGuide(sourceText, translatedText) {
 		const issues = [];
@@ -36,7 +38,9 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Check for Oxford comma usage in lists
+	 * Check for Oxford comma usage in lists.
+	 * @param {string} text - Text to check.
+	 * @returns {Array<Object>} - Array of found issues.
 	 */
 	checkOxfordComma(text) {
 		const issues = [];
@@ -63,7 +67,9 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Check sentence case for headings/titles
+	 * Check sentence case for headings/titles.
+	 * @param {string} text - Text to check.
+	 * @returns {Array<Object>} - Array of found issues.
 	 */
 	checkSentenceCase(text) {
 		const issues = [];
@@ -78,7 +84,6 @@ class StyleGuideChecker {
 			if (!trimmed || trimmed.length > 100) continue;
 
 			// Check if line looks like a title (multiple consecutive capitals)
-			const titlePattern = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)+$/;
 			const allCapsPattern = /^[A-Z\s]+$/;
 
 			if (allCapsPattern.test(trimmed) && trimmed.length > 5) {
@@ -95,7 +100,10 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Fix style guide issues
+	 * Fix style guide issues.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixStyleGuide(sourceText, translatedText) {
 		let fixedText = translatedText;
@@ -120,7 +128,9 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Fix missing Oxford commas
+	 * Fix missing Oxford commas.
+	 * @param {string} text - Text to fix.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixOxfordComma(text) {
 		const foundIssues = [];
@@ -152,7 +162,9 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Fix sentence case issues
+	 * Fix sentence case issues.
+	 * @param {string} text - Text to fix.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixSentenceCase(text) {
 		const foundIssues = [];
@@ -191,7 +203,9 @@ class StyleGuideChecker {
 	}
 
 	/**
-	 * Convert text to sentence case
+	 * Convert text to sentence case.
+	 * @param {string} text - Text to convert.
+	 * @returns {string} - Converted text.
 	 */
 	convertToSentenceCase(text) {
 		// Capitalize first letter, lowercase the rest

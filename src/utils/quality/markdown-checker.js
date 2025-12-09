@@ -1,8 +1,7 @@
 /**
- * Markdown Preservation Checker
- * Ensures markdown formatting is preserved during translation
+ * Markdown Preservation Checker.
+ * Ensures markdown formatting is preserved during translation.
  */
-
 class MarkdownChecker {
 	constructor() {
 		this.markdownPatterns = {
@@ -19,7 +18,7 @@ class MarkdownChecker {
 			// Code inline
 			inlineCode: /`([^`]+)`/g,
 			// Lists
-			unorderedLists: /^[\*\-\+]\s+/gm,
+			unorderedLists: /^[*+-]\s+/gm,
 			orderedLists: /^\d+\.\s+/gm,
 			// Blockquotes
 			blockquotes: /^>\s+/gm,
@@ -29,7 +28,10 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Check if markdown is preserved between source and translation
+	 * Check if markdown is preserved between source and translation.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Array<Object>} - Array of issues found.
 	 */
 	checkMarkdownPreservation(sourceText, translatedText) {
 		const issues = [];
@@ -61,7 +63,9 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Check for broken markdown links
+	 * Check for broken markdown links.
+	 * @param {string} text - Text to check.
+	 * @returns {Array<Object>} - Array of link issues.
 	 */
 	checkBrokenMarkdownLinks(text) {
 		const issues = [];
@@ -102,7 +106,10 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Fix markdown preservation issues
+	 * Fix markdown preservation issues.
+	 * @param {string} sourceText - Source text.
+	 * @param {string} translatedText - Translated text.
+	 * @returns {Object} - Result with fixed text, issues, and fixes.
 	 */
 	fixMarkdownPreservation(sourceText, translatedText) {
 		let fixedText = translatedText;
@@ -132,7 +139,9 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Extract markdown elements from text
+	 * Extract markdown elements from text.
+	 * @param {string} text - Text to extract from.
+	 * @returns {Object} - Extracted elements by type.
 	 */
 	extractMarkdownElements(text) {
 		const elements = {
@@ -177,12 +186,16 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Restore markdown elements that were lost in translation
+	 * Restore markdown elements that were lost in translation.
+	 * @param {string} text - Text to fix.
+	 * @param {Array} elements - Original elements.
+	 * @param {string} type - Element type.
+	 * @returns {Object} - Result with text, issues, and fixes.
 	 */
 	restoreMarkdownElements(text, elements, type) {
 		const foundIssues = [];
 		const appliedFixes = [];
-		let fixedText = text;
+		const fixedText = text;
 
 		// For now, we'll just report issues
 		// Full restoration would require more context about where to place elements
@@ -204,7 +217,9 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Fix broken markdown links
+	 * Fix broken markdown links.
+	 * @param {string} text - Text to fix.
+	 * @returns {Object} - Result with text, issues, and fixes.
 	 */
 	fixBrokenLinks(text) {
 		const foundIssues = [];
@@ -241,7 +256,9 @@ class MarkdownChecker {
 	}
 
 	/**
-	 * Check if text contains markdown
+	 * Check if text contains markdown.
+	 * @param {string} text - Text to check.
+	 * @returns {boolean} - True if markdown detected.
 	 */
 	hasMarkdown(text) {
 		for (const pattern of Object.values(this.markdownPatterns)) {

@@ -1,13 +1,23 @@
 /**
- * Advanced Logging System
- * Implements saveErrorLogs, logDirectory, logRotation, and other logging features
+ * Advanced Logging System.
+ * Implements saveErrorLogs, logDirectory, logRotation, and other logging features.
  */
 
-import fs from "fs";
 import path from "path";
 import { promises as fsPromises } from "fs";
 
 class Logger {
+	/**
+	 * Create a new Logger instance.
+	 * @param {Object} config - Logger configuration.
+	 * @param {boolean} [config.verbose=false] - Enable verbose logging.
+	 * @param {string} [config.diagnosticsLevel="minimal"] - Diagnostics level (minimal, normal, detailed).
+	 * @param {string} [config.outputFormat="pretty"] - Output format (pretty, json, simple).
+	 * @param {boolean} [config.saveErrorLogs=true] - Whether to save error logs to files.
+	 * @param {string} [config.logDirectory="./logs"] - Directory to save log files.
+	 * @param {boolean} [config.includeTimestamps=true] - Whether to include timestamps in logs.
+	 * @param {Object} [config.logRotation] - Log rotation configuration.
+	 */
 	constructor(config = {}) {
 		this.config = {
 			verbose: config.verbose || false,
@@ -35,7 +45,8 @@ class Logger {
 	}
 
 	/**
-	 * Initialize logger (create directories, check rotation)
+	 * Initialize logger (create directories, check rotation).
+	 * @returns {Promise<void>}
 	 */
 	async initialize() {
 		if (this.initialized) return;
@@ -58,7 +69,9 @@ class Logger {
 	}
 
 	/**
-	 * Parse size string (e.g., "10MB") to bytes
+	 * Parse size string (e.g., "10MB") to bytes.
+	 * @param {string} sizeStr - Size string to parse.
+	 * @returns {number} - Size in bytes.
 	 */
 	parseSize(sizeStr) {
 		const units = {
@@ -76,7 +89,8 @@ class Logger {
 	}
 
 	/**
-	 * Check and rotate logs if needed
+	 * Check and rotate logs if needed.
+	 * @returns {Promise<void>}
 	 */
 	async checkAndRotateLogs() {
 		for (const [level, logPath] of Object.entries(this.logFiles)) {
@@ -88,14 +102,16 @@ class Logger {
 					await this.rotateLog(logPath);
 				}
 			} catch (error) {
-				// File doesn't exist yet, that's fine
+				console.warn(`Log rotation failed for ${logPath}: ${error.message}`);
 				this.currentLogSizes[level] = 0;
 			}
 		}
 	}
 
 	/**
-	 * Rotate a log file
+	 * Rotate a log file.
+	 * @param {string} logPath - Path to the log file.
+	 * @returns {Promise<void>}
 	 */
 	async rotateLog(logPath) {
 		try {
@@ -121,7 +137,10 @@ class Logger {
 	}
 
 	/**
-	 * Clean up old log files
+	 * Clean up old log files.
+	 * @param {string} dir - Directory containing log files.
+	 * @param {string} basename - Basename of the log file.
+	 * @returns {Promise<void>}
 	 */
 	async cleanupOldLogs(dir, basename) {
 		try {
@@ -157,7 +176,11 @@ class Logger {
 	}
 
 	/**
-	 * Format log message
+	 * Format log message.
+	 * @param {string} level - Log level.
+	 * @param {string} message - Log message.
+	 * @param {any} [data=null] - Additional data to log.
+	 * @returns {string} - Formatted log message.
 	 */
 	formatMessage(level, message, data = null) {
 		const timestamp = this.config.includeTimestamps ? new Date().toISOString() : null;
@@ -175,16 +198,21 @@ class Logger {
 				return `[${level.toUpperCase()}] ${message}`;
 
 			case "pretty":
-			default:
+			default: {
 				const timeStr = timestamp ? `[${timestamp}] ` : "";
 				const levelStr = `[${level.toUpperCase()}]`;
 				const dataStr = data ? `\n${JSON.stringify(data, null, 2)}` : "";
 				return `${timeStr}${levelStr} ${message}${dataStr}`;
+			}
 		}
 	}
 
 	/**
-	 * Write to log file
+	 * Write to log file.
+	 * @param {string} level - Log level.
+	 * @param {string} message - Log message.
+	 * @param {any} [data=null] - Additional data to log.
+	 * @returns {Promise<void>}
 	 */
 	async writeToFile(level, message, data = null) {
 		if (!this.config.saveErrorLogs) return;
@@ -216,9 +244,10 @@ class Logger {
 	}
 
 	/**
-	 * Simple console log with debug awareness
+	 * Simple console log with debug awareness.
 	 * @param {string} message - Message to log
-	 * @param {boolean} debugOnly - Only log if debug mode is enabled
+	 * @param {boolean} [debugOnly=false] - Only log if debug mode is enabled
+	 * @returns {Promise<void>}
 	 */
 	async log(message, debugOnly = false) {
 		if (debugOnly && !this.config.verbose && !process.env.DEBUG) {
@@ -228,7 +257,10 @@ class Logger {
 	}
 
 	/**
-	 * Log error
+	 * Log error.
+	 * @param {string} message - Error message.
+	 * @param {any} [data=null] - Additional data.
+	 * @returns {Promise<void>}
 	 */
 	async error(message, data = null) {
 		console.error(`ERROR: ${message}`);
@@ -239,7 +271,10 @@ class Logger {
 	}
 
 	/**
-	 * Log warning
+	 * Log warning.
+	 * @param {string} message - Warning message.
+	 * @param {any} [data=null] - Additional data.
+	 * @returns {Promise<void>}
 	 */
 	async warn(message, data = null) {
 		console.warn(`WARNING: ${message}`);
@@ -250,7 +285,10 @@ class Logger {
 	}
 
 	/**
-	 * Log info
+	 * Log info.
+	 * @param {string} message - Info message.
+	 * @param {any} [data=null] - Additional data.
+	 * @returns {Promise<void>}
 	 */
 	async info(message, data = null) {
 		if (this.config.diagnosticsLevel !== "minimal" || this.config.verbose) {
@@ -263,7 +301,10 @@ class Logger {
 	}
 
 	/**
-	 * Log debug
+	 * Log debug.
+	 * @param {string} message - Debug message.
+	 * @param {any} [data=null] - Additional data.
+	 * @returns {Promise<void>}
 	 */
 	async debug(message, data = null) {
 		if (this.config.verbose || this.config.diagnosticsLevel === "detailed") {
@@ -276,7 +317,11 @@ class Logger {
 	}
 
 	/**
-	 * Log based on diagnostics level
+	 * Log based on diagnostics level.
+	 * @param {string} level - Log level.
+	 * @param {string} message - Log message.
+	 * @param {any} [data=null] - Additional data.
+	 * @returns {Promise<void>}
 	 */
 	async diagnostics(level, message, data = null) {
 		const levels = {
@@ -294,7 +339,8 @@ class Logger {
 	}
 
 	/**
-	 * Get log statistics
+	 * Get log statistics.
+	 * @returns {Promise<Object>} - Object containing log stats.
 	 */
 	async getLogStats() {
 		const stats = {};
@@ -308,6 +354,7 @@ class Logger {
 					modified: fileStats.mtime,
 				};
 			} catch (error) {
+				console.warn(`Failed to get stats for ${logPath}: ${error.message}`);
 				stats[level] = {
 					size: 0,
 					sizeFormatted: "0 B",
@@ -320,7 +367,9 @@ class Logger {
 	}
 
 	/**
-	 * Format size to human-readable
+	 * Format size to human-readable.
+	 * @param {number} bytes - Size in bytes.
+	 * @returns {string} - Formatted size string.
 	 */
 	formatSize(bytes) {
 		const units = ["B", "KB", "MB", "GB"];
@@ -336,14 +385,15 @@ class Logger {
 	}
 
 	/**
-	 * Clear all logs
+	 * Clear all logs.
+	 * @returns {Promise<void>}
 	 */
 	async clearLogs() {
 		for (const logPath of Object.values(this.logFiles)) {
 			try {
 				await fsPromises.unlink(logPath);
 			} catch (error) {
-				// Ignore if file doesn't exist
+				console.warn(`Failed to clear log ${logPath}: ${error.message}`);
 			}
 		}
 
@@ -362,9 +412,9 @@ export function getLogger(config = null) {
 }
 
 /**
- * Quick debug-aware logging helper
- * @param {string} message - Message to log
- * @param {boolean} debugOnly - Only log in debug/verbose mode
+ * Quick debug-aware logging helper.
+ * @param {string} message - Message to log.
+ * @param {boolean} [debugOnly=false] - Only log in debug/verbose mode.
  */
 export function log(message, debugOnly = false) {
 	if (debugOnly && !process.env.DEBUG && !process.env.VERBOSE) {

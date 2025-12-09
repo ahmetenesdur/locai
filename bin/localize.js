@@ -17,8 +17,8 @@ import { FileManager } from "../src/utils/file-manager.js";
 import rateLimiter from "../src/utils/rate-limiter.js";
 import Orchestrator from "../src/core/orchestrator.js";
 import InputValidator from "../src/utils/input-validator.js";
-import gracefulShutdown from "../src/utils/graceful-shutdown.js";
 import ErrorHelper from "../src/utils/error-helper.js";
+import { getLogger } from "../src/utils/logger.js";
 
 // Use createRequire to load package.json in ESM context
 const require = createRequire(import.meta.url);
@@ -131,8 +131,21 @@ const loadConfig = async () => {
 };
 
 const configureComponents = (config) => {
+	// Configure FileManager with config settings
 	if (config.fileOperations) {
 		FileManager.configure(config.fileOperations);
+	}
+
+	// Initialize logger with config
+	if (config.logging) {
+		const logger = getLogger(config.logging);
+		if (config.logging.verbose || config.debug) {
+			logger.info("Logger initialized", {
+				saveErrorLogs: config.logging.saveErrorLogs,
+				logDirectory: config.logging.logDirectory,
+				rotationEnabled: config.logging.logRotation?.enabled,
+			});
+		}
 	}
 
 	if (config.rateLimiter) {
@@ -156,10 +169,13 @@ const configureComponents = (config) => {
 const configureCLI = async (defaultConfig) => {
 	configureComponents(defaultConfig);
 
+	// Use config version if available, otherwise use package.json version
+	const toolVersion = defaultConfig.version || version;
+
 	program
 		.name("localize")
 		.description("AI-powered localization tool for Next.js projects")
-		.version(version);
+		.version(toolVersion);
 
 	program
 		.option("-s, --source <lang>", "Source language", defaultConfig.source)
@@ -709,6 +725,9 @@ const configureCLI = async (defaultConfig) => {
 
 					// Show summary
 					console.log("Configuration Summary:");
+					if (defaultConfig.version) {
+						console.log(`   Version: ${defaultConfig.version}`);
+					}
 					console.log(`   Source: ${defaultConfig.source}`);
 					console.log(
 						`   Targets: ${defaultConfig.targets.length} languages (${defaultConfig.targets.slice(0, 5).join(", ")}${defaultConfig.targets.length > 5 ? "..." : ""})`
@@ -806,7 +825,6 @@ const validateEnvironment = () => {
 			"DEEPSEEK_API_KEY",
 			"GEMINI_API_KEY",
 			"XAI_API_KEY",
-			"AZURE_DEEPSEEK_API_KEY",
 		];
 
 		possibleProviders.forEach((key) => console.error(`  - ${key}`));

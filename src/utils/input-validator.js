@@ -410,14 +410,6 @@ class InputValidator {
 					errors.push(`apiConfig.${provider}.maxTokens must be between 100 and 8000`);
 				}
 			}
-
-			// Validate contextWindow
-			if (settings.contextWindow !== undefined) {
-				const window = parseInt(settings.contextWindow);
-				if (isNaN(window) || window < 1000) {
-					errors.push(`apiConfig.${provider}.contextWindow must be at least 1000`);
-				}
-			}
 		}
 	}
 

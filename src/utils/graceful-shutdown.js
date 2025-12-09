@@ -6,9 +6,8 @@ import path from "path";
 class GracefulShutdown {
 	constructor(options = {}) {
 		this.options = {
-			shutdownTimeout: options.shutdownTimeout || 5000,
-			cleanupCache: options.cleanupCache !== false,
-			cleanupLogs: options.cleanupLogs || false,
+			shutdownTimeout: 5000,
+			waitForPending: true,
 			...options,
 		};
 
@@ -95,17 +94,9 @@ class GracefulShutdown {
 				}
 			}
 
-			if (this.options.cleanupCache) {
-				this.logger.info("Flushing cache...");
-			}
-
-			this.logger.info("Closing provider connections...");
-
-			this.logger.info("Waiting for pending operations...");
-			await this.waitForPendingOperations();
-
-			if (this.options.cleanupLogs) {
-				this.logger.info("Cleaning up logs...");
+			if (this.options.waitForPending) {
+				this.logger.info("Waiting for pending operations...");
+				await this.waitForPendingOperations();
 			}
 
 			const duration = Date.now() - startTime;

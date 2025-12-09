@@ -14,9 +14,13 @@ const __dirname = dirname(__filename);
  */
 class StateManager {
 	constructor(options = {}) {
+		// Support both direct options and nested stateTracking config
+		const stateTracking = options.stateTracking || options;
+
 		this.options = {
-			stateFileName: options.stateFileName || "localization.state.json",
-			stateDir: options.stateDir || ".localize-cache",
+			enabled: stateTracking.enabled !== false,
+			stateFileName: stateTracking.stateFileName || "localization.state.json",
+			stateDir: stateTracking.stateDir || ".localize-cache",
 			...options,
 		};
 	}

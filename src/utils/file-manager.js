@@ -356,6 +356,20 @@ class FileManager {
 			throw new Error(`Directory read error (${dirPath}): ${err.message}`);
 		}
 	}
+
+	/**
+	 * Ensure directory exists, create if it doesn't
+	 * @param {string} dirPath - Directory path
+	 * @returns {Promise<boolean>} - True if directory exists or was created
+	 */
+	static async ensureDirectoryExists(dirPath) {
+		try {
+			await fs.mkdir(dirPath, { recursive: true });
+			return true;
+		} catch (err) {
+			throw new Error(`Failed to create directory (${dirPath}): ${err.message}`);
+		}
+	}
 }
 
 // Initialize options with defaults

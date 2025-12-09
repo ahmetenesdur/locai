@@ -12,6 +12,7 @@ import GlossaryManager from "../utils/glossary-manager.js";
 import { FileManager } from "../utils/file-manager.js";
 import fs from "fs";
 import path from "path";
+import { log } from "../utils/logger.js";
 
 class Orchestrator {
 	constructor(options) {
@@ -39,7 +40,7 @@ class Orchestrator {
 		this.glossaryManager = new GlossaryManager(options.glossary || {});
 		if (this.glossaryManager.enabled && this.advanced.debug) {
 			const stats = this.glossaryManager.getStats();
-			console.log(`Glossary enabled: ${stats.totalTerms} terms loaded`);
+			log(`Glossary enabled: ${stats.totalTerms} terms loaded`, true);
 		}
 
 		if (options.rateLimiter) {
@@ -54,10 +55,10 @@ class Orchestrator {
 		this.translationCache = new LRUCache({
 			max: options.cacheSize || 1000,
 			ttl: options.cacheTTL || 1000 * 60 * 60 * 24,
-			updateAgeOnGet: true,
-			allowStale: true,
+			updateAgeOnGet: options.updateAgeOnGet !== false,
+			allowStale: options.allowStaleCache !== false,
 			fetchMethod: async (key, staleValue, { context }) => {
-				if (staleValue) {
+				if (staleValue && options.staleWhileRevalidate !== false) {
 					this._refreshCacheEntry(key, context).catch((err) => {
 						console.warn(`Cache refresh failed for key ${key}: ${err.message}`);
 					});
@@ -77,10 +78,19 @@ class Orchestrator {
 
 		// Confidence scoring settings
 		this.confidenceSettings = {
-			enabled: options.minConfidence !== undefined || options.saveReviewQueue,
-			minConfidence: options.minConfidence || 0.0,
-			saveReviewQueue: options.saveReviewQueue || false,
+			enabled:
+				options.minConfidence !== undefined ||
+				options.saveReviewQueue ||
+				options.confidenceScoring?.enabled,
+			minConfidence: options.minConfidence || options.confidenceScoring?.minConfidence || 0.0,
+			saveReviewQueue:
+				options.saveReviewQueue || options.confidenceScoring?.saveReviewQueue || false,
+			autoApproveThreshold: options.confidenceScoring?.autoApproveThreshold || 0.9,
+			reviewThreshold: options.confidenceScoring?.reviewThreshold || 0.7,
+			rejectThreshold: options.confidenceScoring?.rejectThreshold || 0.5,
 			reviewQueue: [],
+			autoApprovedCount: 0,
+			rejectedCount: 0,
 		};
 
 		this.concurrencyLimit = options.concurrencyLimit || 5;
@@ -99,14 +109,22 @@ class Orchestrator {
 		gracefulShutdown.registerCallback(this._shutdownCallback);
 
 		if (this.advanced.debug) {
-			console.log("Orchestrator initialized with options:", {
-				concurrencyLimit: this.concurrencyLimit,
-				cacheEnabled: options.cacheEnabled !== false,
-				cacheSize: options.cacheSize || 1000,
-				cacheTTL: options.cacheTTL || 1000 * 60 * 60 * 24,
-				rateLimiter: rateLimiter.getConfig(),
-				advanced: this.advanced,
-			});
+			log("Orchestrator initialized with options:", true);
+			log(
+				JSON.stringify(
+					{
+						concurrencyLimit: this.concurrencyLimit,
+						cacheEnabled: options.cacheEnabled !== false,
+						cacheSize: options.cacheSize || 1000,
+						cacheTTL: options.cacheTTL || 1000 * 60 * 60 * 24,
+						rateLimiter: rateLimiter.getConfig(),
+						advanced: this.advanced,
+					},
+					null,
+					2
+				),
+				true
+			);
 		}
 	}
 
@@ -229,7 +247,7 @@ class Orchestrator {
 			// Step 3: JSON validation for translation value
 			const jsonValidation = FileManager.validateTranslationValue(key, translated);
 			if (!jsonValidation.valid) {
-				if (this.advanced.debug) {
+				if (this.advanced.debug || process.env.DEBUG) {
 					console.warn(
 						`JSON validation warning for key "${key}": ${jsonValidation.error}`
 					);
@@ -238,8 +256,8 @@ class Orchestrator {
 				const recheck = this.quoteBalanceChecker?.fixQuoteBalance(translated);
 				if (recheck && recheck.text !== translated) {
 					translated = recheck.text;
-					if (this.advanced.debug) {
-						console.log(`Applied quote balance fix for key "${key}"`);
+					if (this.advanced.debug || process.env.DEBUG) {
+						log(`Applied quote balance fix for key "${key}"`, true);
 					}
 				}
 			}
@@ -256,21 +274,54 @@ class Orchestrator {
 			if (confidence) {
 				result.confidence = confidence;
 
-				// Add to review queue if below threshold
-				if (
-					this.confidenceSettings.saveReviewQueue &&
-					confidence.score < this.confidenceSettings.minConfidence
-				) {
-					this.confidenceSettings.reviewQueue.push({
-						key,
-						source: text,
-						translation: translated,
-						confidence,
-						language: targetLang,
-						sourceLang: this.options.source,
-						category: contextData?.category || "general",
-						timestamp: new Date().toISOString(),
-					});
+				// Apply confidence thresholds
+				if (this.confidenceSettings.enabled) {
+					// Auto-approve if above threshold
+					if (confidence.score >= this.confidenceSettings.autoApproveThreshold) {
+						result.autoApproved = true;
+						this.confidenceSettings.autoApprovedCount++;
+
+						if (this.advanced.debug) {
+							log(
+								`Auto-approved: ${key} (score: ${confidence.score.toFixed(3)})`,
+								true
+							);
+						}
+					}
+					// Auto-reject if below threshold
+					else if (confidence.score < this.confidenceSettings.rejectThreshold) {
+						result.rejected = true;
+						result.rejectionReason = `Quality score too low: ${confidence.score.toFixed(3)}`;
+						this.confidenceSettings.rejectedCount++;
+
+						if (this.advanced.debug) {
+							log(
+								`Auto-rejected: ${key} (score: ${confidence.score.toFixed(3)})`,
+								true
+							);
+						}
+
+						// Keep original text for rejected translations
+						result.translated = text;
+					}
+					// Add to review queue if below review threshold
+					else if (
+						this.confidenceSettings.saveReviewQueue &&
+						confidence.score < this.confidenceSettings.reviewThreshold
+					) {
+						result.needsReview = true;
+
+						this.confidenceSettings.reviewQueue.push({
+							key,
+							source: text,
+							translation: translated,
+							confidence,
+							language: targetLang,
+							sourceLang: this.options.source,
+							category: contextData?.category || "general",
+							timestamp: new Date().toISOString(),
+						});
+					}
 				}
 			}
 
@@ -305,11 +356,13 @@ class Orchestrator {
 		const chunks = this._chunkArray(items, batchSize);
 
 		if (this.advanced.debug) {
-			console.log(
-				`Processing ${items.length} items in ${chunks.length} batches of max ${batchSize} items each`
+			log(
+				`Processing ${items.length} items in ${chunks.length} batches of max ${batchSize} items each`,
+				true
 			);
-			console.log(
-				`Processing ${items.length} items in ${chunks.length} chunks of size ${batchSize}`
+			log(
+				`Processing ${items.length} items in ${chunks.length} chunks of size ${batchSize}`,
+				true
 			);
 		}
 
@@ -318,7 +371,7 @@ class Orchestrator {
 		for (let i = 0; i < chunks.length; i++) {
 			const chunk = chunks[i];
 			if (this.advanced.debug) {
-				console.log(`Processing batch ${i + 1}/${chunks.length} (${chunk.length} items)`);
+				log(`Processing batch ${i + 1}/${chunks.length} (${chunk.length} items)`, true);
 			}
 
 			const texts = chunk.map((item) => item.text);
@@ -341,7 +394,7 @@ class Orchestrator {
 					this.progress.increment(result.success ? "success" : "failed");
 					results.push(result);
 				} catch (error) {
-					if (this.advanced.debug) {
+					if (this.advanced.debug || process.env.DEBUG) {
 						console.error(`Error processing item ${item.key}:`, error);
 					}
 					this.progress.increment("failed");
@@ -385,8 +438,9 @@ class Orchestrator {
 			}
 
 			if (this.advanced.debug) {
-				console.log(
-					`Auto-optimized settings - CPU: ${cpuCount}, Memory: ${memoryGB}GB, Concurrency: ${this.concurrencyLimit}`
+				log(
+					`Auto-optimized settings - CPU: ${cpuCount}, Memory: ${memoryGB}GB, Concurrency: ${this.concurrencyLimit}`,
+					true
 				);
 			}
 		} catch (error) {
@@ -419,16 +473,37 @@ class Orchestrator {
 	}
 
 	/**
-	 * Generate cache key
+	 * Generate cache key using SHA-256 with smart sampling
 	 */
 	_generateCacheKey(text, targetLang, category = "unknown") {
-		if (text.length < 50) {
-			return `${targetLang}:${category}:${text.length}:${text.slice(0, 30)}`;
+		let keyContent;
+
+		if (text.length <= 100) {
+			// Short text: use as-is (lowercased for consistency)
+			keyContent = `${targetLang}:${category}:${text.toLowerCase()}`;
+		} else if (text.length <= 500) {
+			// Medium text: sample from beginning, middle, and end
+			const start = text.substring(0, 40).toLowerCase();
+			const middlePos = Math.floor(text.length / 2);
+			const middle = text.substring(middlePos - 20, middlePos + 20).toLowerCase();
+			const end = text.substring(text.length - 40).toLowerCase();
+			keyContent = `${targetLang}:${category}:${start}|MID:${middle}|${end}`;
+		} else {
+			// Long text: enhanced sampling
+			const quarter = Math.floor(text.length / 4);
+			const start = text.substring(0, 30).toLowerCase();
+			const q1 = text.substring(quarter, quarter + 25).toLowerCase();
+			const q2 = text.substring(quarter * 2, quarter * 2 + 25).toLowerCase();
+			const q3 = text.substring(quarter * 3, quarter * 3 + 25).toLowerCase();
+			const end = text.substring(text.length - 30).toLowerCase();
+			keyContent = `${targetLang}:${category}:LEN:${text.length}|${start}|Q1:${q1}|Q2:${q2}|Q3:${q3}|${end}`;
 		}
 
-		const keyData = `${text}:${targetLang}:${category}:${text.length}`;
-
-		return crypto.createHash("md5").update(keyData, "utf8").digest("hex").substring(0, 24);
+		return crypto
+			.createHash("sha256")
+			.update(keyContent, "utf8")
+			.digest("hex")
+			.substring(0, 32);
 	}
 
 	async _refreshCacheEntry(key, context) {
@@ -485,7 +560,12 @@ class Orchestrator {
 			confidence: this.confidenceSettings.enabled
 				? {
 						minThreshold: this.confidenceSettings.minConfidence,
+						autoApproveThreshold: this.confidenceSettings.autoApproveThreshold,
+						reviewThreshold: this.confidenceSettings.reviewThreshold,
+						rejectThreshold: this.confidenceSettings.rejectThreshold,
 						reviewQueueSize: this.confidenceSettings.reviewQueue.length,
+						autoApprovedCount: this.confidenceSettings.autoApprovedCount,
+						rejectedCount: this.confidenceSettings.rejectedCount,
 					}
 				: null,
 		};

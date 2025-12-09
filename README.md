@@ -617,31 +617,26 @@ export default {
 			model: "deepseek-chat", // Model name
 			temperature: 0.1, // Creativity level (0.0-1.0)
 			maxTokens: 2000, // Maximum tokens per request
-			contextWindow: 8000, // Maximum context window size
 		},
 		openai: {
 			model: "gpt-4o", // Latest optimized model
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 16000, // Larger context window
 		},
 		gemini: {
 			model: "gemini-2.0-flash-exp", // Latest Gemini model
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 16000,
 		},
 		dashscope: {
 			model: "qwen-plus",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 8000,
 		},
 		xai: {
 			model: "grok-4",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 8000,
 		},
 	},
 
@@ -650,6 +645,15 @@ export default {
 	cacheEnabled: true, // Enable translation caching
 	cacheTTL: 24 * 60 * 60 * 1000, // Cache time-to-live (24 hours)
 	cacheSize: 2000, // Maximum cached items
+	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
+	allowStaleCache: true, // Allow returning stale cache while refreshing
+	staleWhileRevalidate: true, // Serve stale content while revalidating in background
+
+	// Progress Tracker Options
+	progressOptions: {
+		logToConsole: true, // Show progress in console
+		logFrequency: 1, // Update frequency (every N items)
+	},
 
 	// Rate Limiter Configuration (Speed Optimized)
 	rateLimiter: {
@@ -849,16 +853,6 @@ export default {
 		},
 	},
 
-	// ===== FILE OPERATIONS =====
-	fileOperations: {
-		atomic: true, // Use atomic file operations (safer)
-		createMissingDirs: true, // Auto-create missing directories
-		backupFiles: false, // Create backups before modifying
-		backupDir: "./backups", // Backup directory
-		encoding: "utf8", // File encoding
-		jsonIndent: 2, // JSON indentation spaces
-	},
-
 	// ===== LOGGING & DIAGNOSTICS =====
 	logging: {
 		verbose: false, // Disable verbose logging for cleaner output
@@ -879,7 +873,11 @@ export default {
 		enabled: true, // Enable sync features
 		removeDeletedKeys: true, // Remove deleted keys from target files
 		retranslateModified: true, // Re-translate modified keys
-		backupBeforeSync: false, // Create backup before sync operations
+		stateTracking: {
+			enabled: true, // Enable state tracking for change detection
+			stateFileName: "localization.state.json", // State file name
+			stateDir: ".localize-cache", // Directory for state files
+		},
 	},
 
 	// ===== ADVANCED SETTINGS =====

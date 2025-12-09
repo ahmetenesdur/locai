@@ -2,16 +2,24 @@ import crypto from "crypto";
 import AIContextAnalyzer from "../utils/ai-context-analyzer.js";
 import ProviderFactory from "./provider-factory.js";
 import { LRUCache } from "lru-cache";
+import { log } from "../utils/logger.js";
 
 class ContextProcessor {
 	constructor(config) {
 		this.config = config;
 		this.keywordCache = new Map();
 		this.aiAnalyzer = new AIContextAnalyzer(config);
-		this.resultCache = new LRUCache({
-			max: 1000,
-			ttl: 1000 * 60 * 60 * 24,
-		});
+
+		// Use analysisOptions.cacheAnalysis setting, default true
+		const enableCache = config.analysisOptions?.cacheAnalysis !== false;
+
+		this.resultCache = enableCache
+			? new LRUCache({
+					max: 1000,
+					ttl: 1000 * 60 * 60 * 24,
+				})
+			: null;
+
 		this.initializeKeywords();
 	}
 
@@ -50,7 +58,7 @@ class ContextProcessor {
 			}
 
 			const cacheKey = this.getCacheKey(text, {});
-			if (this.resultCache.has(cacheKey)) {
+			if (this.resultCache?.has(cacheKey)) {
 				results[i] = this.resultCache.get(cacheKey);
 				continue;
 			}
@@ -65,7 +73,9 @@ class ContextProcessor {
 				text.length < this.config.minTextLength
 			) {
 				results[i] = keywordResult;
-				this.resultCache.set(cacheKey, keywordResult);
+				if (this.resultCache) {
+					this.resultCache.set(cacheKey, keywordResult);
+				}
 			} else {
 				// Need AI analysis
 				aiTexts.push(text);
@@ -97,15 +107,18 @@ class ContextProcessor {
 						};
 
 						results[originalIndex] = processedResult;
-						const cacheKey = this.getCacheKey(aiTexts[i], {});
-						this.resultCache.set(cacheKey, processedResult);
+						if (this.resultCache) {
+							const cacheKey = this.getCacheKey(aiTexts[i], {});
+							this.resultCache.set(cacheKey, processedResult);
+						}
 					}
 				}
 
 				// Log batch AI analysis summary
 				if (aiResults.some((r) => r)) {
-					console.log(
-						`Batch AI Context Analysis: ${aiResults.filter((r) => r).length}/${aiTexts.length} analyzed`
+					log(
+						`Batch AI Context Analysis: ${aiResults.filter((r) => r).length}/${aiTexts.length} analyzed`,
+						true
 					);
 				}
 			} catch (error) {

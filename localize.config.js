@@ -19,31 +19,26 @@ export default {
 			model: "qwen-plus",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 8000,
 		},
 		xai: {
 			model: "grok-4",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 8000,
 		},
 		openai: {
 			model: "gpt-4o",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 16000,
 		},
 		deepseek: {
 			model: "deepseek-chat",
 			temperature: 0.1,
 			maxTokens: 2000,
-			contextWindow: 8000,
 		},
 		gemini: {
 			model: "gemini-2.0-flash-exp",
 			temperature: 0.3,
 			maxTokens: 2000,
-			contextWindow: 16000,
 		},
 	},
 
@@ -52,6 +47,9 @@ export default {
 	cacheEnabled: true,
 	cacheTTL: 24 * 60 * 60 * 1000,
 	cacheSize: 2000,
+	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
+	allowStaleCache: true, // Allow returning stale cache while refreshing
+	staleWhileRevalidate: true, // Serve stale content while revalidating in background
 
 	// Rate Limiter Configuration
 	rateLimiter: {
@@ -73,7 +71,6 @@ export default {
 		maxRetries: 2,
 		initialDelay: 1000,
 		maxDelay: 10000,
-		jitter: true,
 		retryableErrors: ["rate_limit", "timeout", "network", "server", "unknown"],
 		perProviderRetry: {
 			dashscope: { maxRetries: 3 },
@@ -93,6 +90,11 @@ export default {
 			model: "gpt-4o",
 			temperature: 0.2,
 			maxTokens: 1000,
+			timeout: 10000, // AI analysis timeout (ms)
+			retries: 2, // Number of retries for AI analysis
+			cacheAnalysis: true, // Cache context analysis results
+			cacheSize: 500, // Maximum number of cached analysis results
+			cacheTTL: 24 * 60 * 60 * 1000, // Cache time-to-live (24 hours)
 		},
 		detection: {
 			threshold: 2,
@@ -242,29 +244,27 @@ export default {
 		},
 	},
 
-	// File Operations
-	fileOperations: {
-		atomic: true,
-		createMissingDirs: true,
-		backupFiles: false,
-		backupDir: "./backups",
-		encoding: "utf8",
-		jsonIndent: 2,
+	// Progress Tracker Options
+	progressOptions: {
+		logToConsole: true, // Show progress in console
+		logFrequency: 1, // Update frequency (every N items)
 	},
 
 	// Logging
 	logging: {
 		verbose: false,
-		diagnosticsLevel: "minimal",
-		outputFormat: "pretty",
 		saveErrorLogs: true,
 		logDirectory: "./logs",
-		includeTimestamps: true,
 		logRotation: {
 			enabled: true,
-			maxFiles: 5,
-			maxSize: "10MB",
 		},
+	},
+
+	// File Operations
+	fileOperations: {
+		backupDir: "./backups", // Directory for backup files
+		atomic: true, // Use atomic write operations
+		createMissingDirs: true, // Automatically create missing directories
 	},
 
 	// Synchronization
@@ -272,7 +272,11 @@ export default {
 		enabled: true,
 		removeDeletedKeys: true,
 		retranslateModified: true,
-		backupBeforeSync: false,
+		stateTracking: {
+			enabled: true, // Enable state tracking for change detection
+			stateFileName: "localization.state.json", // State file name
+			stateDir: ".localize-cache", // Directory for state files
+		},
 	},
 
 	// Advanced Settings

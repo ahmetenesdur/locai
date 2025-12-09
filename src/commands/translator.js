@@ -96,7 +96,7 @@ async function validateTranslationInputs(file, options) {
  * Initialize translation state and sync analysis
  */
 async function initializeTranslationState(resolvedFile, flattenedSource, options) {
-	const stateManager = new StateManager();
+	const stateManager = new StateManager(options.syncOptions);
 	const projectRoot = process.cwd();
 
 	const previousState = await stateManager.loadState(projectRoot);
@@ -768,6 +768,52 @@ async function findLocaleFiles(localesDir, sourceLang) {
 	} catch (error) {
 		await consoleLock.log(`Error finding locale files: ${error.message}`);
 		return [];
+	}
+}
+
+/**
+ * Create backup of locale files before sync
+ * @param {string} sourceFile - Path to source file
+ * @param {Object} options - Configuration options
+ */
+async function createSyncBackup(sourceFile, options) {
+	const sourceDir = path.dirname(sourceFile);
+	const backupDir =
+		options.syncOptions?.backupDir || options.fileOperations?.backupDir || "./backups";
+	const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+	const backupPath = path.join(backupDir, `sync-backup-${timestamp}`);
+
+	try {
+		// Create backup directory
+		await FileManager.ensureDirectoryExists(backupPath);
+
+		// Backup source file
+		const sourceFilename = path.basename(sourceFile);
+		const sourceBackupPath = path.join(backupPath, sourceFilename);
+		const fs = await import("fs/promises");
+		await fs.default.copyFile(sourceFile, sourceBackupPath);
+
+		// Backup all target files
+		let backedUpCount = 1; // source file
+		for (const targetLang of options.targets) {
+			try {
+				const safeTargetFilename = `${targetLang}.json`;
+				const targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
+				const targetBackupPath = path.join(backupPath, safeTargetFilename);
+
+				const fileExists = await FileManager.exists(targetPath);
+				if (fileExists) {
+					await fs.default.copyFile(targetPath, targetBackupPath);
+					backedUpCount++;
+				}
+			} catch (error) {
+				// Continue even if one file fails
+			}
+		}
+
+		await consoleLock.log(`   Backup created: ${backupPath} (${backedUpCount} files)`);
+	} catch (error) {
+		await consoleLock.log(`   Warning: Backup failed: ${error.message}`);
 	}
 }
 

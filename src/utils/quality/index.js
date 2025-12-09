@@ -5,6 +5,10 @@ import PunctuationChecker from "./punctuation-checker.js";
 import LengthChecker from "./length-checker.js";
 import TextSanitizer from "./text-sanitizer.js";
 import QuoteBalanceChecker from "./quote-balance-checker.js";
+import StyleGuideChecker from "./style-guide-checker.js";
+import MarkdownChecker from "./markdown-checker.js";
+import CodeBlockChecker from "./code-block-checker.js";
+import SpecialCharactersChecker from "./special-characters-checker.js";
 
 class QualityChecker extends BaseChecker {
 	constructor(options = {}) {
@@ -20,6 +24,10 @@ class QualityChecker extends BaseChecker {
 		this.lengthChecker = new LengthChecker();
 		this.textSanitizer = new TextSanitizer();
 		this.quoteBalanceChecker = new QuoteBalanceChecker();
+		this.styleGuideChecker = new StyleGuideChecker(this.styleGuide);
+		this.markdownChecker = new MarkdownChecker();
+		this.codeBlockChecker = new CodeBlockChecker();
+		this.specialCharactersChecker = new SpecialCharactersChecker();
 	}
 
 	validate(sourceText, translatedText, options = {}) {
@@ -47,6 +55,32 @@ class QualityChecker extends BaseChecker {
 
 		if (this.rules.lengthValidation) {
 			issues.push(...this.lengthChecker.checkLength(sourceText, translatedText, options));
+		}
+
+		// Style guide validation
+		if (this.styleGuide && this.styleGuideChecker) {
+			issues.push(...this.styleGuideChecker.checkStyleGuide(sourceText, translatedText));
+		}
+
+		// Markdown preservation
+		if (this.rules.markdownPreservation) {
+			issues.push(
+				...this.markdownChecker.checkMarkdownPreservation(sourceText, translatedText)
+			);
+		}
+
+		// Code block preservation
+		if (this.rules.codeBlockPreservation) {
+			issues.push(
+				...this.codeBlockChecker.checkCodeBlockPreservation(sourceText, translatedText)
+			);
+		}
+
+		// Special characters preservation
+		if (this.rules.specialCharacters) {
+			issues.push(
+				...this.specialCharactersChecker.checkSpecialCharacters(sourceText, translatedText)
+			);
 		}
 
 		if (this.rules.sanitizeOutput) {
@@ -95,6 +129,41 @@ class QualityChecker extends BaseChecker {
 		// Quote balance auto-fix
 		if (this.rules.quoteBalanceCheck !== false) {
 			const result = this.quoteBalanceChecker.fixQuoteBalance(fixedText);
+			fixedText = result.text;
+			issues.push(...result.foundIssues);
+			fixes.push(...result.appliedFixes);
+		}
+
+		// Style guide fixes
+		if (this.styleGuide && this.styleGuideChecker) {
+			const result = this.styleGuideChecker.fixStyleGuide(sourceText, fixedText);
+			fixedText = result.text;
+			issues.push(...result.foundIssues);
+			fixes.push(...result.appliedFixes);
+		}
+
+		// Markdown preservation fixes
+		if (this.rules.markdownPreservation) {
+			const result = this.markdownChecker.fixMarkdownPreservation(sourceText, fixedText);
+			fixedText = result.text;
+			issues.push(...result.foundIssues);
+			fixes.push(...result.appliedFixes);
+		}
+
+		// Code block preservation fixes
+		if (this.rules.codeBlockPreservation) {
+			const result = this.codeBlockChecker.fixCodeBlockPreservation(sourceText, fixedText);
+			fixedText = result.text;
+			issues.push(...result.foundIssues);
+			fixes.push(...result.appliedFixes);
+		}
+
+		// Special characters fixes
+		if (this.rules.specialCharacters) {
+			const result = this.specialCharactersChecker.fixSpecialCharacters(
+				sourceText,
+				fixedText
+			);
 			fixedText = result.text;
 			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);

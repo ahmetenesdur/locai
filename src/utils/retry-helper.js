@@ -5,19 +5,42 @@
 class RetryHelper {
 	/**
 	 * Retry an operation with configurable backoff strategy
+	 * Supports per-provider retry configuration
 	 */
 	static async withRetry(operation, options = {}) {
-		const maxRetries = options.maxRetries ?? 2;
-		const initialDelay = options.initialDelay ?? 1000;
-		const maxDelay = options.maxDelay ?? 10000;
+		const providerName = options.provider?.toLowerCase();
+		const perProviderRetry = options.perProviderRetry || {};
+		const retryableErrors = options.retryableErrors || [
+			"rate_limit",
+			"timeout",
+			"network",
+			"server",
+			"unknown",
+		];
+
+		// Get provider-specific retry settings or use defaults
+		let maxRetries = options.maxRetries ?? 2;
+		let initialDelay = options.initialDelay ?? 1000;
+		let maxDelay = options.maxDelay ?? 10000;
+
+		// Override with provider-specific settings if available
+		if (providerName && perProviderRetry[providerName]) {
+			const providerConfig = perProviderRetry[providerName];
+			maxRetries = providerConfig.maxRetries ?? maxRetries;
+			initialDelay = providerConfig.initialDelay ?? initialDelay;
+			maxDelay = providerConfig.maxDelay ?? maxDelay;
+		}
+
 		const context = options.context ?? "Operation";
 		const logContext = options.logContext ?? {};
-		const retryCondition = options.retryCondition ?? this.defaultRetryCondition;
+		const retryCondition =
+			options.retryCondition ??
+			((error, attempt, max) => this.defaultRetryCondition(error, retryableErrors));
 
 		let lastError = null;
 		let attempts = 0;
 		const startTime = Date.now();
-		const retryStats = { attempts: 0, totalTime: 0 };
+		const retryStats = { attempts: 0, totalTime: 0, provider: providerName };
 
 		while (attempts <= maxRetries) {
 			try {
@@ -26,8 +49,9 @@ class RetryHelper {
 				if (attempts > 0) {
 					const delay = this.calculateBackoff(attempts, initialDelay, maxDelay);
 					if (process.env.DEBUG) {
+						const providerInfo = providerName ? ` [${providerName}]` : "";
 						console.log(
-							`${context}: Retrying attempt ${attempts}/${maxRetries} after ${delay}ms delay`
+							`${context}${providerInfo}: Retrying attempt ${attempts}/${maxRetries} after ${delay}ms delay`
 						);
 					}
 					await this.delay(delay);
@@ -58,6 +82,7 @@ class RetryHelper {
 						maxRetries,
 						willRetry: attempts <= maxRetries,
 						context: logContext,
+						provider: providerName,
 					};
 				}
 
@@ -65,12 +90,13 @@ class RetryHelper {
 					attempts <= maxRetries && (await retryCondition(error, attempts, maxRetries));
 
 				if (process.env.DEBUG) {
+					const providerInfo = providerName ? ` [${providerName}]` : "";
 					console.warn(
-						`Warning: ${context}: Error on attempt ${attempts}/${maxRetries + 1}: ${error.message}` +
+						`Warning: ${context}${providerInfo}: Error on attempt ${attempts}/${maxRetries + 1}: ${error.message}` +
 							(error.code ? ` [${error.code}]` : "")
 					);
 				}
-				if (shouldRetry) {
+				if (!shouldRetry) {
 					break;
 				}
 			}
@@ -98,29 +124,75 @@ class RetryHelper {
 
 	/**
 	 * Default retry condition based on error type
+	 * Checks against retryableErrors list
 	 */
-	static defaultRetryCondition(error) {
-		if (error.status && error.status >= 400 && error.status < 500) {
-			if (error.status === 429) return true;
-
-			if ([408, 425, 449].includes(error.status)) return true;
-
-			return false;
-		}
-
+	static defaultRetryCondition(error, retryableErrors = []) {
+		// Check for rate_limit errors
 		if (
-			error.code === "ECONNRESET" ||
-			error.code === "ETIMEDOUT" ||
-			error.code === "ECONNREFUSED" ||
-			error.code === "ENOTFOUND" ||
-			error.message?.includes("network") ||
-			error.message?.includes("timeout") ||
-			error.message?.includes("connection")
+			retryableErrors.includes("rate_limit") &&
+			(error.status === 429 || error.code === "ERR_RATE_LIMIT")
 		) {
 			return true;
 		}
 
-		return error.status >= 500 || !error.status;
+		// Check for timeout errors
+		if (
+			retryableErrors.includes("timeout") &&
+			(error.code === "ETIMEDOUT" ||
+				error.code === "ECONNABORTED" ||
+				error.message?.includes("timeout"))
+		) {
+			return true;
+		}
+
+		// Check for network errors
+		if (
+			retryableErrors.includes("network") &&
+			(error.code === "ECONNRESET" ||
+				error.code === "ECONNREFUSED" ||
+				error.code === "ENOTFOUND" ||
+				error.code === "ERR_NETWORK" ||
+				error.message?.includes("network") ||
+				error.message?.includes("connection"))
+		) {
+			return true;
+		}
+
+		// Check for server errors (5xx)
+		if (retryableErrors.includes("server") && error.status >= 500 && error.status < 600) {
+			return true;
+		}
+
+		// Check for unknown/general errors
+		if (retryableErrors.includes("unknown") && !error.status) {
+			return true;
+		}
+
+		// Legacy fallback for backward compatibility
+		if (retryableErrors.length === 0) {
+			// Old behavior when no retryableErrors specified
+			if (error.status && error.status >= 400 && error.status < 500) {
+				if (error.status === 429) return true;
+				if ([408, 425, 449].includes(error.status)) return true;
+				return false;
+			}
+
+			if (
+				error.code === "ECONNRESET" ||
+				error.code === "ETIMEDOUT" ||
+				error.code === "ECONNREFUSED" ||
+				error.code === "ENOTFOUND" ||
+				error.message?.includes("network") ||
+				error.message?.includes("timeout") ||
+				error.message?.includes("connection")
+			) {
+				return true;
+			}
+
+			return error.status >= 500 || !error.status;
+		}
+
+		return false;
 	}
 
 	/**

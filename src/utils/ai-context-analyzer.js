@@ -3,6 +3,7 @@ import ProviderFactory from "../core/provider-factory.js";
 import rateLimiter from "./rate-limiter.js";
 import { LRUCache } from "lru-cache";
 import crypto from "crypto";
+import { log } from "./logger.js";
 
 class AIContextAnalyzer {
 	constructor(config) {
@@ -131,6 +132,8 @@ class AIContextAnalyzer {
 			provider.analyze(batchPrompt, {
 				...this.config.analysisOptions,
 				maxTokens: Math.min(4000, this.config.analysisOptions?.maxTokens || 2000),
+				timeout: this.config.analysisOptions?.timeout || 10000,
+				retries: this.config.analysisOptions?.retries || 2,
 			})
 		);
 
@@ -444,7 +447,7 @@ RESPONSE FORMAT:
 
 			this.categoryKeywords[category] = new Set(keywords.map((k) => k.toLowerCase()));
 
-			console.log(`Added new context category: ${category}`);
+			log(`Added new context category: ${category}`, true);
 		}
 	}
 

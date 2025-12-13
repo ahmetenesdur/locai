@@ -2,15 +2,19 @@
 	"name": "ai-localization-tool",
 	"version": "2.0.0",
 	"type": "module",
-	"main": "src/core/orchestrator.js",
+	"main": "dist/core/orchestrator.js",
 	"directories": {
-		"src": "src"
+		"src": "src",
+		"dist": "dist"
 	},
 	"bin": {
-		"localize": "./bin/localize.js"
+		"localize": "./dist/cli.js"
 	},
 	"scripts": {
-		"start": "node bin/localize.js",
+		"start": "node dist/core/orchestrator.js",
+		"dev": "tsx src/core/orchestrator.js",
+		"build": "tsc",
+		"type-check": "tsc --noEmit",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write \"**/*.{js,json,md,jsx,ts,tsx,css}\"",
@@ -34,9 +38,9 @@
 		"node": ">=14.13.0"
 	},
 	"exports": {
-		".": "./src/core/orchestrator.js",
-		"./orchestrator": "./src/core/orchestrator.js",
-		"./translator": "./src/commands/translator.js"
+		".": "./dist/core/orchestrator.js",
+		"./orchestrator": "./dist/core/orchestrator.js",
+		"./translator": "./dist/commands/translator.js"
 	},
 	"dependencies": {
 		"axios": "1.13.1",
@@ -47,13 +51,16 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
+		"@types/node": "^25.0.1",
 		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^16.5.0",
-		"prettier": "^3.6.2"
+		"prettier": "^3.6.2",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3"
 	},
 	"files": [
-		"bin/",
+		"dist/",
 		"src/"
 	]
 }

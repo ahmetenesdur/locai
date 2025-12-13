@@ -555,7 +555,13 @@ localize review --export csv
 # Install dependencies
 pnpm install
 
-# Run CLI locally
+# Build the project (TypeScript -> JavaScript)
+pnpm build
+
+# Run CLI locally (Development)
+pnpm dev
+
+# Run CLI locally (Production/Compiled)
 pnpm start
 
 # Format with Prettier
@@ -568,21 +574,23 @@ pnpm format:check
 ```
 src/
 ├── commands/        # CLI commands (translate, fix, review, analyze)
-│   ├── translator.js         # Translation command
-│   └── review.js             # Interactive review TUI
+│   ├── translator.ts         # Translation command
+│   └── review.ts             # Interactive review TUI
 ├── core/           # Core orchestration and processing
-│   ├── orchestrator.js       # Main translation engine
+│   ├── orchestrator.ts       # Main translation engine
 │   ├── pipeline/             # Pipeline steps (Validation -> Cache -> Translation -> Quality)
-│   ├── provider-factory.js   # AI provider management
-│   ├── fallback-provider.js  # Fallback logic wrapper
-│   └── context-processor.js  # Context detection
+│   ├── provider-factory.ts   # AI provider management
+│   ├── fallback-provider.ts  # Fallback logic wrapper
+│   └── context-processor.ts  # Context detection
+├── services/       # Business logic services
+│   └── translation-service.ts # High-level translation logic
 ├── providers/      # AI provider implementations
-│   ├── base-provider.js      # Base with confidence extraction
-│   ├── openai.js
-│   ├── gemini.js
+│   ├── base-provider.ts      # Base with confidence extraction
+│   ├── openai.ts
+│   ├── gemini.ts
 │   └── ...
 └── utils/          # Utilities (cache, rate-limit, quality)
-    ├── confidence-scorer.js  # Quality confidence scoring
+    ├── confidence-scorer.ts  # Quality confidence scoring
     └── quality/              # Quality validation modules
 ```
 

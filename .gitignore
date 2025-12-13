@@ -1,42 +1,43 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
+# Dependencies
+node_modules/
+.pnp
 .pnp.js
 
-# testing
-/coverage
+# Build Output
+dist/
+*.tsbuildinfo
 
-# misc
-.DS_Store
+# Environment Variables
+.env
+.env*.local
 *.pem
 
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+logs/
+*.log
 
-# local env files
-.env
-.env*.local
+# Testing
+coverage/
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# OS
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
 
-# tasks
-tasks/
+# IDE - VSCode, JetBrains
+.vscode/
+.idea/
+*.iml
 
-# localization tool cache and state files
+# Project Specific
 .localize-cache/
 localization.state.json
 
-# Cursor
-.cursor
-/tasks
-
-# Claude
-.claude
-CLAUDE.md
+# Temporary
+tmp/
+temp/

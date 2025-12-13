@@ -12,7 +12,8 @@ Enterprise-grade translation CLI for Next.js applications with intelligent synch
 
 **Performance & Quality**
 
-- Smart sync with SHA-256 change detection for incremental updates
+- **Robust Architecture:** Pipeline-based processing with distinct validation, translation, and quality check steps
+- **Smart Sync:** SHA-256 change detection for incremental updates
 - Parallel processing with configurable rate limiting
 - LRU cache with stale-while-revalidate pattern
 - Automated validation and fixing of placeholders, HTML tags, and length
@@ -571,7 +572,9 @@ src/
 │   └── review.js             # Interactive review TUI
 ├── core/           # Core orchestration and processing
 │   ├── orchestrator.js       # Main translation engine
+│   ├── pipeline/             # Pipeline steps (Validation -> Cache -> Translation -> Quality)
 │   ├── provider-factory.js   # AI provider management
+│   ├── fallback-provider.js  # Fallback logic wrapper
 │   └── context-processor.js  # Context detection
 ├── providers/      # AI provider implementations
 │   ├── base-provider.js      # Base with confidence extraction
@@ -601,7 +604,7 @@ src/
 
 export default {
 	// ===== BASIC CONFIGURATION =====
-	version: "1.0.0", // Configuration version
+	version: "2.0.0", // Configuration version
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],

@@ -160,20 +160,20 @@ class InputValidator {
 	/**
 	 * Validate API provider name.
 	 * @param {string} provider - Provider name.
-	 * @param {string} [paramName="provider"] - Parameter name.
+	 * @param {string} [fieldName="API provider"] - Parameter name.
 	 * @returns {string} - Normalized provider name.
 	 * @throws {Error} If provider is unknown.
 	 */
-	static validateProvider(provider, paramName = "provider") {
+	static validateProvider(provider, fieldName = "API provider") {
 		if (!provider || typeof provider !== "string") {
-			throw new Error(`${paramName} must be a non-empty string`);
+			throw new Error(`${fieldName} must be a non-empty string`);
 		}
 
 		const normalized = provider.toLowerCase().trim();
 
 		if (!this.VALID_PROVIDERS.includes(normalized)) {
 			throw new Error(
-				`Invalid ${paramName}: '${provider}'. Valid providers: ${this.VALID_PROVIDERS.join(", ")}`
+				`Invalid ${fieldName}: '${provider}'. Valid providers: ${this.VALID_PROVIDERS.join(", ")}`
 			);
 		}
 

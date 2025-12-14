@@ -1,6 +1,11 @@
+import { ProviderConfig } from "../../providers/base-provider.js";
+
 export interface StyleGuideConfig {
 	formality?: string;
 	toneOfVoice?: string;
+	toneProvider?: string;
+	analysisOptions?: ProviderConfig;
+	enforceTone?: boolean;
 	conventions?: {
 		useOxfordComma?: boolean;
 		useSentenceCase?: boolean;
@@ -32,12 +37,15 @@ class StyleGuideChecker {
 
 	constructor(styleGuide: StyleGuideConfig = {}) {
 		this.styleGuide = {
-			formality: styleGuide.formality || "neutral",
-			toneOfVoice: styleGuide.toneOfVoice || "professional",
+			formality: styleGuide?.formality || "neutral",
+			toneOfVoice: styleGuide?.toneOfVoice || "neutral",
+			toneProvider: styleGuide?.toneProvider || "openai",
+			enforceTone: styleGuide?.enforceTone || false, // Use the configured value directly
+			analysisOptions: styleGuide?.analysisOptions || {},
 			conventions: {
-				useOxfordComma: styleGuide.conventions?.useOxfordComma !== false,
-				useSentenceCase: styleGuide.conventions?.useSentenceCase !== false,
-				...styleGuide.conventions,
+				useOxfordComma: styleGuide?.conventions?.useOxfordComma ?? true,
+				useSentenceCase: styleGuide?.conventions?.useSentenceCase ?? true,
+				...styleGuide?.conventions,
 			},
 		};
 	}

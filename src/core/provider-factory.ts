@@ -16,6 +16,7 @@ export interface AIProvider {
 		options?: TranslateOptions
 	): Promise<string>;
 	analyze?(prompt: string, options?: ProviderConfig): Promise<string>;
+	chat?(messages: any[], options?: ProviderConfig): Promise<string>;
 }
 
 /**
@@ -80,6 +81,18 @@ class ProviderFactory {
 					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					return rateLimiter.enqueue(normalizedProviderName, () =>
 						selected.analyze!(prompt, options)
+					);
+				};
+			}
+
+			if (selected.chat) {
+				wrappedProvider.chat = (
+					messages: any[],
+					options: ProviderConfig = {}
+				): Promise<string> => {
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+					return rateLimiter.enqueue(normalizedProviderName, () =>
+						selected.chat!(messages, options)
 					);
 				};
 			}

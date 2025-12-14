@@ -114,6 +114,40 @@ class OpenAIProvider extends BaseProvider {
 			}
 		);
 	}
+
+	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+		const config = this.getConfig({
+			model: options.model || "gpt-4o",
+			temperature: options.temperature || 0.3,
+			maxTokens: options.maxTokens || 2000,
+		});
+
+		return RetryHelper.withRetry(
+			async () => {
+				try {
+					const response = await this.client.post(this.getEndpoint(), {
+						model: config.model,
+						messages: messages,
+						temperature: config.temperature,
+						max_completion_tokens: config.maxTokens || config.max_tokens,
+						response_format: options.json ? { type: "json_object" } : undefined,
+					});
+
+					this.validateResponse(response, this.name);
+					const result = this.extractTranslation(response.data, this.name);
+					return this.sanitizeTranslation(result);
+				} catch (error: any) {
+					this.handleApiError(error, this.name);
+					throw error;
+				}
+			},
+			{
+				maxRetries: options.maxRetries || 2,
+				initialDelay: options.initialDelay || 1000,
+				context: "OpenAI Provider Chat",
+			}
+		);
+	}
 }
 
 // Lazy singleton - created on first use
@@ -140,4 +174,8 @@ async function analyze(prompt: string, options: ProviderConfig = {}): Promise<st
 	return getProvider().analyze(prompt, options);
 }
 
-export { translate, analyze, OpenAIProvider };
+async function chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+	return getProvider().chat(messages, options);
+}
+
+export { translate, analyze, chat, OpenAIProvider };

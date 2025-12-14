@@ -10,6 +10,7 @@ export interface ProviderModule {
 		options?: TranslateOptions
 	): Promise<string>;
 	analyze?(prompt: string, options?: ProviderConfig): Promise<string>;
+	chat?(messages: any[], options?: ProviderConfig): Promise<string>;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any;
 }
@@ -349,6 +350,144 @@ class FallbackProvider {
 		this.currentIndex = savedIndex;
 		throw new Error(
 			`All providers failed for analysis after ${maxAttempts} attempts (${Date.now() - startTime}ms):\n${JSON.stringify(errors, null, 2)}`
+		);
+	}
+
+	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const errors: any[] = [];
+		const startTime = Date.now();
+		const savedIndex = this.currentIndex;
+		let currentAttempt = 0;
+
+		this._checkAndReRankProviders();
+
+		const availableProviders = this.providers.filter(
+			(provider) =>
+				!this._isProviderDisabled(provider) &&
+				typeof provider.implementation.chat === "function"
+		);
+
+		if (availableProviders.length === 0) {
+			this._resetDisabledProviders();
+			availableProviders.push(
+				...this.providers.filter((p) => typeof p.implementation.chat === "function")
+			);
+		}
+
+		const totalProviders = availableProviders.length;
+		if (totalProviders === 0) {
+			throw new Error("No providers support chat capability");
+		}
+
+		const maxAttempts = totalProviders * (this.maxRetries + 1);
+
+		while (currentAttempt < maxAttempts) {
+			const currentProviderIndex = currentAttempt % totalProviders;
+			const providerData = availableProviders[currentProviderIndex];
+			const providerName = this._getProviderName(providerData);
+			const currentProvider = providerData.implementation;
+
+			this.operationCount++;
+
+			try {
+				if (!this.providerStats.has(providerName)) {
+					this.providerStats.set(providerName, {
+						success: 0,
+						failure: 0,
+						avgResponseTime: 0,
+						totalTime: 0,
+						lastSuccess: null,
+						consecutiveFailures: 0,
+						lastError: null,
+						disabled: false,
+						disabledUntil: null,
+					});
+				}
+
+				const providerStartTime = Date.now();
+
+				const result = await rateLimiter.enqueue(
+					providerName.toLowerCase(),
+					() =>
+						RetryHelper.withRetry(
+							() =>
+								currentProvider.chat
+									? currentProvider.chat(messages, options)
+									: Promise.reject(new Error("Chat not supported")),
+							{
+								maxRetries: 0,
+								context: `Fallback:${providerName}`,
+								logContext: {
+									providerIndex: currentProviderIndex,
+									attempt: currentAttempt + 1,
+									maxAttempts,
+								},
+							}
+						),
+					1 // Priority 1 (normal)
+				);
+
+				const responseTime = Date.now() - providerStartTime;
+
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+				const stats = this.providerStats.get(providerName)!;
+				stats.success++;
+				stats.consecutiveFailures = 0;
+				stats.lastSuccess = new Date();
+
+				const prevTotal = stats.avgResponseTime * (stats.success + stats.failure - 1);
+				stats.totalTime = prevTotal + responseTime;
+				stats.avgResponseTime = stats.totalTime / (stats.success + stats.failure);
+
+				this.consecutiveErrors = 0;
+				this.lastErrorTime = null;
+
+				this.currentIndex = savedIndex;
+				return result;
+			} catch (error: any) {
+				if (this.providerStats.has(providerName)) {
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+					const stats = this.providerStats.get(providerName)!;
+					stats.failure++;
+					stats.consecutiveFailures++;
+					stats.lastError = {
+						time: new Date(),
+						message: error.message,
+					};
+
+					if (stats.consecutiveFailures >= 5) {
+						this._disableProvider(providerData, 2 * 60 * 1000);
+					}
+				}
+
+				this.consecutiveErrors++;
+				this.lastErrorTime = Date.now();
+
+				errors.push({
+					provider: providerName,
+					error: error.message,
+					attempt: currentAttempt + 1,
+				});
+
+				const safeProviderName = `Provider_${(currentProviderIndex % totalProviders) + 1}`;
+				const safeErrorMessage =
+					error.message.includes("API") || error.message.includes("key")
+						? "Authentication or API error"
+						: error.message.substring(0, 100);
+
+				console.warn(
+					`${safeProviderName} failed (attempt ${currentAttempt + 1}/${maxAttempts}): ${safeErrorMessage}`
+				);
+
+				currentAttempt++;
+				this.currentIndex++;
+			}
+		}
+
+		this.currentIndex = savedIndex;
+		throw new Error(
+			`All providers failed for chat after ${maxAttempts} attempts (${Date.now() - startTime}ms):\n${JSON.stringify(errors, null, 2)}`
 		);
 	}
 

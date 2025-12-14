@@ -25,6 +25,7 @@ import GlossaryPreStep from "./pipeline/steps/GlossaryPreStep.js";
 import TranslationStep, { ConfidenceSettings } from "./pipeline/steps/TranslationStep.js";
 import GlossaryPostStep from "./pipeline/steps/GlossaryPostStep.js";
 import QualityCheckStep from "./pipeline/steps/QualityCheckStep.js";
+import ToneCheckStep from "./pipeline/steps/ToneCheckStep.js";
 import ConfidenceCheckStep from "./pipeline/steps/ConfidenceCheckStep.js";
 import CacheWriteStep from "./pipeline/steps/CacheWriteStep.js";
 
@@ -135,7 +136,7 @@ class Orchestrator {
 			maxKeyLength: options.advanced?.maxKeyLength || 10000,
 			maxBatchSize: options.advanced?.maxBatchSize || 50,
 			autoOptimize: options.advanced?.autoOptimize !== false,
-			debug: options.advanced?.debug || false,
+			debug: options.advanced?.debug || process.env.DEBUG === "true" || false,
 		};
 
 		// Initialize glossary manager
@@ -256,7 +257,15 @@ class Orchestrator {
 		// 6. Quality Check & JSON Validation
 		this.pipeline.use(new QualityCheckStep(this.qualityChecker, this.advanced.debug));
 
-		// 7. Confidence Check
+		// 6.5. Tone Verification (New)
+		this.pipeline.use(
+			new ToneCheckStep({
+				enabled: this.options.styleGuide?.enforceTone,
+				debug: this.advanced.debug,
+			})
+		);
+
+		// 7. Confidence Score Calculationk
 		this.pipeline.use(new ConfidenceCheckStep(this.confidenceSettings, this.advanced.debug));
 
 		// 8. Cache Write

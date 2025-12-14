@@ -90,11 +90,6 @@ export default {
 			model: "gpt-4o",
 			temperature: 0.2,
 			maxTokens: 1000,
-			timeout: 10000, // AI analysis timeout (ms)
-			retries: 2, // Number of retries for AI analysis
-			cacheAnalysis: true, // Cache context analysis results
-			cacheSize: 500, // Maximum number of cached analysis results
-			cacheTTL: 24 * 60 * 60 * 1000, // Cache time-to-live (24 hours)
 		},
 		detection: {
 			threshold: 2,
@@ -204,6 +199,12 @@ export default {
 	styleGuide: {
 		formality: "neutral", // formal, neutral, informal
 		toneOfVoice: "professional", // professional, friendly, casual, technical
+		toneProvider: "openai", // Provider for tone verification (e.g., openai, gemini)
+		enforceTone: true, // Validate tone with AI (Smart Stylist)
+		analysisOptions: {
+			model: "gpt-4o",
+			temperature: 0.1,
+		},
 		conventions: {
 			useOxfordComma: true, // Use Oxford comma in lists
 			useSentenceCase: true, // Use sentence case for headings

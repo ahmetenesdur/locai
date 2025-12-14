@@ -18,6 +18,7 @@ Enterprise-grade translation CLI for Next.js applications with intelligent synch
 - LRU cache with stale-while-revalidate pattern
 - Automated validation and fixing of placeholders, HTML tags, and length
 - Quality confidence scoring with interactive review workflow
+- **Style Guard:** Tone verification and style guide enforcement (Oxford comma, sentence case)
 - Glossary management for consistent brand terminology
 
 **Developer Experience**
@@ -145,6 +146,17 @@ export default {
 			lengthValidation: true,
 		},
 		autoFix: true,
+	},
+
+	// Style Guide & Tone Verification
+	styleGuide: {
+		toneOfVoice: "professional", // professional, friendly, casual, technical
+		toneProvider: "openai", // Provider for tone verification
+		enforceTone: true, // Verify translation tone with AI
+		conventions: {
+			useOxfordComma: true,
+			useSentenceCase: true,
+		},
 	},
 
 	// Advanced Settings
@@ -348,6 +360,8 @@ Context-aware errors with actionable solutions and error codes (API 1xxx, Config
 | **Length Control**         | 5 modes with language-specific rules                              |
 | **Context Detection**      | AI-powered categorization (technical, marketing, legal, DeFi, UI) |
 | **Confidence Scoring**     | Multi-factor quality scoring (0-1 scale) with review queue        |
+| **Tone Verification**      | AI auditing of translation tone (e.g., ensuring "professional")   |
+| **Style Enforcement**      | Checks for conventions like Oxford comma and sentence case        |
 | **Glossary Management**    | Consistent brand terminology across all translations              |
 
 ### Glossary/Terminology Management

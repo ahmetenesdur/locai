@@ -76,6 +76,10 @@ class BaseProvider {
 		throw new Error(`analyze method must be implemented by ${this.name} provider if supported`);
 	}
 
+	async chat(messages: any[], options: any = {}): Promise<string> {
+		throw new Error(`chat method must be implemented by ${this.name} provider if supported`);
+	}
+
 	getApiKey(): string | undefined {
 		throw new Error(`getApiKey method must be implemented by ${this.name} provider`);
 	}

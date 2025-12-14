@@ -19,6 +19,7 @@ Enterprise-grade translation CLI for Next.js applications with intelligent synch
 - Automated validation and fixing of placeholders, HTML tags, and length
 - Quality confidence scoring with interactive review workflow
 - **Style Guard:** Tone verification and style guide enforcement (Oxford comma, sentence case)
+- "Infinite Memory" (Vector Cache) for semantic recycling of translations
 - Glossary management for consistent brand terminology
 
 **Developer Experience**
@@ -69,6 +70,16 @@ export default {
 	cacheEnabled: true,
 	cacheTTL: 24 * 60 * 60 * 1000,
 	cacheSize: 2000,
+
+	// Infinite Memory (Vector Cache)
+	vectorMemory: {
+		enabled: true,
+		similarityThreshold: 0.85,
+		exactMatchThreshold: 0.98,
+		vectorDbPath: "./.localize-cache/vector-memory",
+		embeddingProvider: "openai",
+		embeddingModel: "text-embedding-3-small",
+	},
 
 	// Quality Confidence Scoring
 	confidenceScoring: {
@@ -563,6 +574,38 @@ localize review --export csv
 - Language indicator for current target
 - Items per second processing speed
 
+### Infinite Memory (Vector Cache)
+
+The tool includes a vector-based semantic cache ("Infinite Memory") that goes beyond simple key-value pairs.
+
+**How it works:**
+
+1.  **Exact Match (Similarity > 98%)**:
+    If you translate a sentence that is identical (or nearly identical) to a previous translation, the tool reuses the previous result instantly. This saves AI costs and ensures 100% consistency.
+2.  **Semantic Match (Similarity > 85%)**:
+    If a new sentence is _similar_ to a previous one (e.g., "Hello world" vs "Hello there world"), the previous translation is retrieved and passed to the AI as context.
+    > _Context Prompt:_ "Previously, a similar phrase 'Hello world' was translated as 'Hola mundo'. Please maintain consistency."
+
+**Configuration:**
+
+```javascript
+vectorMemory: {
+    enabled: true,
+    // Use directly if similarity > 98%
+    exactMatchThreshold: 0.98,
+    // Use as context if similarity > 85%
+    similarityThreshold: 0.85,
+    // Uses local filesystem (no external DB required)
+    vectorDbPath: "./.localize-cache/vector-memory",
+}
+```
+
+**Benefits:**
+
+- **Cost Reduction**: Reduces AI calls for repetitive content.
+- **Consistency**: Ensures similar terminology is used across different parts of the app.
+- **Privacy**: Runs entirely locally using `vectra` (stores embeddings in `.localize-cache`).
+
 ## Development
 
 ```bash
@@ -618,7 +661,7 @@ src/
 ```javascript
 /**
  * Localization Tool Configuration
- * Version: 2.0.0
+ * Version: 2.1.0
  *
  * This configuration file controls all aspects of the localization tool
  * including API providers, performance settings, and quality controls.
@@ -626,7 +669,7 @@ src/
 
 export default {
 	// ===== BASIC CONFIGURATION =====
-	version: "2.0.0", // Configuration version
+	version: "2.1.0", // Configuration version
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],

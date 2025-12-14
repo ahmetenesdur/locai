@@ -80,6 +80,12 @@ export interface OrchestratorOptions {
 	[key: string]: any;
 }
 
+// Vector Memory Imports
+import { VectorStore } from "../services/vector-store.js";
+import { EmbeddingProvider } from "../services/embedding-provider.js";
+import { VectorCacheReadStep, VectorMemoryStats } from "./pipeline/steps/VectorCacheReadStep.js";
+import { VectorCacheWriteStep } from "./pipeline/steps/VectorCacheWriteStep.js";
+
 interface AdvancedSettings {
 	timeoutMs: number;
 	maxKeyLength: number;
@@ -97,9 +103,6 @@ interface TranslationItem {
 	[key: string]: any;
 }
 
-/**
- * Orchestrator class manages the end-to-end translation process using a Pipeline pattern.
- */
 class Orchestrator {
 	private options: OrchestratorOptions;
 	private contextProcessor: ContextProcessor;
@@ -111,6 +114,12 @@ class Orchestrator {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	public translationCache: LRUCache<string, any> | null;
 	public cacheStats: CacheStats;
+
+	// Vector Memory
+	public vectorStore: VectorStore;
+	public embeddingProvider: EmbeddingProvider;
+	public vectorStats: VectorMemoryStats;
+
 	public confidenceSettings: ConfidenceSettings;
 	private concurrencyLimit: number;
 	private pipeline: Pipeline;
@@ -226,6 +235,33 @@ class Orchestrator {
 		};
 		gracefulShutdown.registerCallback(this._shutdownCallback);
 
+		// Vector Memory Initialization
+		this.vectorStore = new VectorStore(
+			options.vectorMemory || {
+				enabled: false,
+				vectorDbPath: "./.localize-cache/vector-memory",
+			}
+		);
+		this.embeddingProvider = new EmbeddingProvider({
+			provider: options.vectorMemory?.embeddingProvider,
+			model: options.vectorMemory?.embeddingModel,
+		});
+
+		this.vectorStats = {
+			hits: 0,
+			contextUsed: 0,
+			misses: 0,
+		};
+
+		// Initialize vector store (non-blocking)
+		if (options.vectorMemory?.enabled) {
+			this.vectorStore.initialize().catch((err) => {
+				if (this.advanced.debug) {
+					console.warn("Vector store initialization failed:", err.message);
+				}
+			});
+		}
+
 		if (this.advanced.debug) {
 			log("Orchestrator initialized with options:", true);
 			// ...
@@ -245,11 +281,34 @@ class Orchestrator {
 			);
 		}
 
+		// 2.5 Vector Cache Read
+		if (this.options.vectorMemory?.enabled) {
+			this.pipeline.use(
+				new VectorCacheReadStep(
+					this.vectorStore,
+					this.embeddingProvider,
+					this.vectorStats,
+					this.options.vectorMemory
+				)
+			);
+		}
+
 		// 3. Glossary Pre-processing
 		this.pipeline.use(new GlossaryPreStep(this.glossaryManager));
 
 		// 4. Translation
 		this.pipeline.use(new TranslationStep(this.options, this.confidenceSettings));
+
+		// 4.5 Vector Cache Write (save new translations)
+		if (this.options.vectorMemory?.enabled) {
+			this.pipeline.use(
+				new VectorCacheWriteStep(
+					this.vectorStore,
+					this.embeddingProvider,
+					this.options.vectorMemory
+				)
+			);
+		}
 
 		// 5. Glossary Post-processing
 		this.pipeline.use(new GlossaryPostStep(this.glossaryManager));

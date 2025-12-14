@@ -148,6 +148,70 @@ class OpenAIProvider extends BaseProvider {
 			}
 		);
 	}
+	async embed(text: string, options: ProviderConfig = {}): Promise<number[]> {
+		const config = this.getConfig({
+			model: options.model || "text-embedding-3-small",
+		});
+
+		return RetryHelper.withRetry(
+			async () => {
+				try {
+					const response = await this.client.post("/embeddings", {
+						model: config.model,
+						input: text,
+					});
+
+					if (response.data && response.data.data && response.data.data[0]) {
+						return response.data.data[0].embedding;
+					}
+					return [];
+				} catch (error: any) {
+					this.handleApiError(error, this.name);
+					throw error;
+				}
+			},
+			{
+				maxRetries: options.maxRetries || 2,
+				initialDelay: options.initialDelay || 1000,
+				context: "OpenAI Provider Embed",
+			}
+		);
+	}
+
+	async embedBatch(texts: string[], options: ProviderConfig = {}): Promise<number[][]> {
+		const config = this.getConfig({
+			model: options.model || "text-embedding-3-small",
+		});
+
+		return RetryHelper.withRetry(
+			async () => {
+				try {
+					// OpenAI suggests replacing newlines for best results
+					const cleanTexts = texts.map((t) => t.replace(/\n/g, " "));
+
+					const response = await this.client.post("/embeddings", {
+						model: config.model,
+						input: cleanTexts,
+					});
+
+					if (response.data && response.data.data) {
+						return response.data.data
+							.sort((a: any, b: any) => a.index - b.index)
+							.map((item: any) => item.embedding);
+					}
+					return [];
+				} catch (error: any) {
+					this.handleApiError(error, this.name);
+					throw error;
+				}
+			},
+			{
+				maxRetries: options.maxRetries || 2,
+				initialDelay: options.initialDelay || 1000,
+				context: "OpenAI Provider Embed Batch",
+			}
+		);
+	}
 }
 
 // Lazy singleton - created on first use
@@ -178,4 +242,12 @@ async function chat(messages: any[], options: ProviderConfig = {}): Promise<stri
 	return getProvider().chat(messages, options);
 }
 
-export { translate, analyze, chat, OpenAIProvider };
+async function embed(text: string, options: ProviderConfig = {}): Promise<number[]> {
+	return getProvider().embed(text, options);
+}
+
+async function embedBatch(texts: string[], options: ProviderConfig = {}): Promise<number[][]> {
+	return getProvider().embedBatch(texts, options);
+}
+
+export { translate, analyze, chat, embed, embedBatch, OpenAIProvider };

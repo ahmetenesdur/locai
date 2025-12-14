@@ -11,6 +11,11 @@ export interface PromptOptions {
 		confidence?: number;
 		prompt?: string;
 		existingTranslation?: string;
+		similarTranslation?: {
+			source: string;
+			target: string;
+			similarity: number;
+		};
 	};
 	styleGuide?: {
 		formality?: string;
@@ -24,6 +29,7 @@ export interface PromptOptions {
 }
 
 const getLengthInstructions = (options: PromptOptions): string => {
+	// ... existing getLengthInstructions ...
 	if (!options || typeof options !== "object") {
 		console.warn("Invalid options provided to getLengthInstructions, using defaults");
 		options = {};
@@ -130,6 +136,7 @@ const baseTranslationPromptTemplate = (
 		confidence: typeof context.confidence === "number" ? context.confidence : 1.0,
 		prompt: context.prompt || "Provide a natural translation",
 		existingTranslation: context.existingTranslation,
+		similarTranslation: context.similarTranslation,
 	};
 
 	const lengthInstructions = getLengthInstructions({
@@ -145,6 +152,13 @@ const baseTranslationPromptTemplate = (
 				? safeContext.existingTranslation.substring(0, 200) + "..."
 				: safeContext.existingTranslation;
 		additionalInstructions = `\nREVISION REQUEST: The existing translation "${truncatedTranslation}" has length issues. Please provide a corrected version that matches the source text length requirements.`;
+	} else if (safeContext.similarTranslation) {
+		const { source, target, similarity } = safeContext.similarTranslation;
+		const simPercent = Math.round(similarity * 100);
+		additionalInstructions = `\nREFERENCE CONTEXT (${simPercent}% Match):
+Previously, a similar phrase: "${source}"
+Was translated as: "${target}"
+Please maintain consistency with this style and vocabulary where appropriate.`;
 	}
 
 	const formality = options.styleGuide?.formality || "neutral";

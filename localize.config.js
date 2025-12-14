@@ -1,11 +1,11 @@
 /**
  * Localization Tool Configuration
- * Version: 2.0.0 - ES Module format
+ * Version: 2.1.0 - ES Module format
  * Controls API providers, performance settings, and quality controls
  */
 
 export default {
-	version: "2.0.0",
+	version: "2.1.0",
 	localesDir: "./locales",
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
@@ -50,6 +50,17 @@ export default {
 	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
 	allowStaleCache: true, // Allow returning stale cache while refreshing
 	staleWhileRevalidate: true, // Serve stale content while revalidating in background
+
+	// Vector Memory (Infinite Memory)
+	// Semantic caching using embeddings to find similar translations
+	vectorMemory: {
+		enabled: true,
+		similarityThreshold: 0.85, // Minimum similarity to use as context
+		exactMatchThreshold: 0.98, // Minimum similarity to use directly as translation
+		vectorDbPath: "./.localize-cache/vector-memory",
+		embeddingProvider: "openai", // Provider for generating embeddings
+		embeddingModel: "text-embedding-3-small",
+	},
 
 	// Rate Limiter Configuration
 	rateLimiter: {

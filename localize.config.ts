@@ -4,7 +4,9 @@
  * Controls API providers, performance settings, and quality controls
  */
 
-export default {
+import { defineConfig } from "./src/config/index.js";
+
+export default defineConfig({
 	version: "2.1.0",
 	localesDir: "./locales",
 	source: "en",
@@ -274,6 +276,7 @@ export default {
 
 	// File Operations
 	fileOperations: {
+		backupFiles: false, // Create backups of existing files before overwriting/deleting
 		backupDir: "./backups", // Directory for backup files
 		atomic: true, // Use atomic write operations
 		createMissingDirs: true, // Automatically create missing directories
@@ -352,4 +355,4 @@ export default {
 			// Example: "YourProduct": "YourProduct",
 		},
 	},
-};
+});

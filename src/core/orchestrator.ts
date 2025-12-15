@@ -222,19 +222,6 @@ class Orchestrator {
 			this._applyAutoOptimizations();
 		}
 
-		// Initialize Pipeline
-		this.pipeline = new Pipeline();
-		this._buildPipeline();
-
-		this._shutdownCallback = async () => {
-			if (this.translationCache && this.translationCache.size > 0) {
-				console.log(`Flushing ${this.translationCache.size} cache entries...`);
-				this.translationCache.clear();
-			}
-			this.resetCacheStats();
-		};
-		gracefulShutdown.registerCallback(this._shutdownCallback);
-
 		// Vector Memory Initialization
 		this.vectorStore = new VectorStore(
 			options.vectorMemory || {
@@ -261,6 +248,19 @@ class Orchestrator {
 				}
 			});
 		}
+
+		// Initialize Pipeline
+		this.pipeline = new Pipeline();
+		this._buildPipeline();
+
+		this._shutdownCallback = async () => {
+			if (this.translationCache && this.translationCache.size > 0) {
+				console.log(`Flushing ${this.translationCache.size} cache entries...`);
+				this.translationCache.clear();
+			}
+			this.resetCacheStats();
+		};
+		gracefulShutdown.registerCallback(this._shutdownCallback);
 
 		if (this.advanced.debug) {
 			log("Orchestrator initialized with options:", true);

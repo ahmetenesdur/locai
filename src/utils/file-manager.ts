@@ -600,7 +600,4 @@ class SyncFileManager {
 	}
 }
 
-// Initialize options with defaults
-SyncFileManager.configure({});
-
 export { FileManager, SyncFileManager };

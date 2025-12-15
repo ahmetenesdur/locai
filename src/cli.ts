@@ -19,6 +19,7 @@ import InputValidator from "./utils/input-validator.js";
 import ErrorHelper from "./utils/error-helper.js";
 import { getLogger } from "./utils/logger.js";
 import { TranslationOptions } from "./services/translation-service.js";
+import { loadConfig } from "./config/index.js";
 
 // Use createRequire to load package.json in ESM context
 const require = createRequire(import.meta.url);
@@ -65,80 +66,7 @@ const loadEnvironmentVariables = async () => {
 	}
 };
 
-/**
- * Load configuration from localize.config.js or similar files.
- * @returns {Promise<any>} - Loaded configuration object.
- */
-const loadConfig = async (): Promise<any> => {
-	try {
-		const configPaths = [
-			path.resolve(process.cwd(), "localize.config.js"),
-			path.resolve(process.cwd(), "localize.config.cjs"),
-			path.resolve(process.cwd(), "../localize.config.js"),
-			path.resolve(process.cwd(), "../localize.config.cjs"),
-			path.resolve(process.cwd(), "../../localize.config.js"),
-			path.resolve(process.cwd(), "../../localize.config.cjs"),
-		];
-
-		let configFile: string | null = null;
-		for (const configPath of configPaths) {
-			try {
-				await fs.access(configPath);
-				configFile = configPath;
-				break;
-			} catch (_e) {
-				// Silent fail used for fallback mechanism
-			}
-		}
-
-		if (!configFile) {
-			const error = ErrorHelper.configNotFoundError();
-			console.error(ErrorHelper.formatError(error, { showDebug: false }));
-			throw error;
-		}
-
-		console.log(`Loading config from: ${path.relative(process.cwd(), configFile)}`);
-
-		try {
-			// Use dynamic import for ESM
-			const configUrl = `file://${configFile.replace(/\\/g, "/")}?t=${Date.now()}`;
-			const configModule = await import(configUrl);
-			const config = configModule.default || configModule;
-
-			if (!config || typeof config !== "object") {
-				throw new Error("Config file does not export a valid configuration object");
-			}
-
-			return config;
-		} catch (importError: any) {
-			console.warn(
-				`Warning: Both CommonJS and ES module loading failed: ${importError.message}`
-			);
-			throw importError;
-		}
-	} catch (error: any) {
-		console.warn(`Warning: Could not load config file: ${error.message}`);
-		return {
-			source: "en",
-			targets: [],
-			localesDir: "./locales",
-			concurrencyLimit: 5,
-			cacheEnabled: true,
-			retryOptions: {
-				maxRetries: 2,
-				initialDelay: 1000,
-				maxDelay: 10000,
-			},
-			context: {
-				enabled: true,
-				detection: { threshold: 2, minConfidence: 0.6 },
-				useAI: false,
-				minTextLength: 50,
-				debug: false,
-			},
-		};
-	}
-};
+// Local config loader replaced by src/config/index.ts
 
 /**
  * Configure global components (logger, rate limiter, etc.).
@@ -784,6 +712,7 @@ const configureCLI = async (defaultConfig: any): Promise<any> => {
 					defaultConfig.debug = originalDebug;
 					defaultConfig.verbose = originalVerbose;
 				}
+				process.exit(0);
 			} catch (error: any) {
 				console.error("\nConfiguration Validation Failed:\n");
 				console.error(error.message);
@@ -910,7 +839,27 @@ const displayPerformanceTips = async (options: any) => {
 
 try {
 	await loadEnvironmentVariables();
-	const defaultConfig = await loadConfig();
+	let defaultConfig: any;
+
+	try {
+		const { config, configFile } = await loadConfig();
+		defaultConfig = config;
+
+		if (configFile) {
+			console.log(`Loaded config from: ${path.relative(process.cwd(), configFile)}`);
+		} else {
+			console.log("No config file found, using defaults");
+		}
+	} catch (err: any) {
+		console.warn(`Warning: Could not load config: ${err.message}`);
+		// Fallback defaults if logic fails totally (shouldn't with c12 defaults)
+		defaultConfig = {
+			source: "en",
+			targets: [],
+			concurrencyLimit: 5,
+		};
+	}
+
 	await configureCLI(defaultConfig);
 } catch (error: any) {
 	console.error(`\nError: ${error.message}`);

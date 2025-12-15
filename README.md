@@ -49,137 +49,50 @@ npx ai-localization-tool
 
 ## Configuration
 
-### Step 1: Create Config File
+The tool uses `c12` for configuration loading, supporting `.js`, `.ts`, and `.json` files.
 
-Create `localize.config.js` in your project root:
+### 1. Zero-Install Usage (Recommended for `npx`)
+
+If you are running the tool via `npx` and don't want to install it as a dependency, use a standard `localize.config.js` file.
 
 ```javascript
+// localize.config.js
 export default {
-	// Basic Settings
-	localesDir: "./locales",
 	source: "en",
-	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
-
-	// AI Provider
+	targets: ["tr", "es", "de"],
 	apiProvider: "openai",
-	useFallback: true,
-	fallbackOrder: ["openai", "dashscope", "deepseek", "gemini", "xai"],
+	localesDir: "./locales",
 
-	// Performance
-	concurrencyLimit: 1,
-	cacheEnabled: true,
-	cacheTTL: 24 * 60 * 60 * 1000,
-	cacheSize: 2000,
-
-	// Infinite Memory (Vector Cache)
-	vectorMemory: {
-		enabled: true,
-		similarityThreshold: 0.85,
-		exactMatchThreshold: 0.98,
-		vectorDbPath: "./.localize-cache/vector-memory",
-		embeddingProvider: "openai",
-		embeddingModel: "text-embedding-3-small",
-	},
-
-	// Quality Confidence Scoring
-	confidenceScoring: {
-		enabled: false,
-		minConfidence: 0.7,
-		saveReviewQueue: false,
-	},
-
-	// Glossary/Terminology Management
-	glossary: {
-		enabled: true,
-		caseSensitive: false,
-		preserveFormatting: true,
-		glossary: {
-			API: "API",
-			SDK: "SDK",
-			OAuth: "OAuth",
-			DeFi: { translation: "DeFi", caseSensitive: true },
-			Dashboard: {
-				en: "Dashboard",
-				tr: "Kontrol Paneli",
-				de: "Dashboard",
-			},
+	// Optional: API specific settings
+	apiConfig: {
+		openai: {
+			model: "gpt-4",
 		},
-	},
-
-	// Context Detection
-	context: {
-		enabled: true,
-		useAI: true,
-		aiProvider: "openai",
-		minTextLength: 200,
-		analysisOptions: {
-			model: "gpt-4o",
-			temperature: 0.2,
-			maxTokens: 1000,
-		},
-		categories: {
-			technical: {
-				keywords: ["API", "backend", "database", "server", "endpoint"],
-				prompt: "Preserve technical terms and variable names",
-				weight: 1.3,
-			},
-			defi: {
-				keywords: ["DeFi", "staking", "yield", "liquidity", "token"],
-				prompt: "Keep DeFi terms in English",
-				weight: 1.2,
-			},
-			marketing: {
-				keywords: ["brand", "campaign", "customer", "audience"],
-				prompt: "Use persuasive and engaging language",
-				weight: 1.1,
-			},
-			legal: {
-				keywords: ["terms", "conditions", "privacy", "policy"],
-				prompt: "Maintain formal tone and precise legal terminology",
-				weight: 1.4,
-			},
-			ui: {
-				keywords: ["button", "click", "menu", "screen", "page"],
-				prompt: "Keep UI terms consistent and clear",
-				weight: 1.2,
-			},
-		},
-	},
-
-	// Quality Checks
-	qualityChecks: {
-		enabled: true,
-		rules: {
-			placeholderConsistency: true,
-			htmlTagsConsistency: true,
-			punctuationCheck: true,
-			quoteBalanceCheck: true, // Prevents missing quotes in translations
-			lengthValidation: true,
-		},
-		autoFix: true,
-	},
-
-	// Style Guide & Tone Verification
-	styleGuide: {
-		toneOfVoice: "professional", // professional, friendly, casual, technical
-		toneProvider: "openai", // Provider for tone verification
-		enforceTone: true, // Verify translation tone with AI
-		conventions: {
-			useOxfordComma: true,
-			useSentenceCase: true,
-		},
-	},
-
-	// Advanced Settings
-	advanced: {
-		timeoutMs: 15000,
-		maxKeyLength: 10000,
-		maxBatchSize: 30,
-		autoOptimize: true,
-		debug: false,
 	},
 };
 ```
+
+### 2. TypeScript Usage (Enhanced)
+
+If you have installed the package (`pnpm add -D ai-localization-tool`), you can use the `defineConfig` helper for full type safety and autocompletion.
+
+```typescript
+// localize.config.ts
+import { defineConfig } from "ai-localization-tool";
+
+export default defineConfig({
+	source: "en",
+	targets: ["tr", "es", "de"],
+	apiProvider: "openai",
+	localesDir: "./locales",
+});
+```
+
+### 3. Setup API Keys
+
+Set your API key in a `.env` file (recommended) or pass it via environment variables:
+
+The tool also supports `.js`, `.cjs`, `.mjs`, and `.json` configuration files.
 
 ### Step 2: Set API Keys
 
@@ -934,6 +847,14 @@ export default {
 			maxFiles: 5, // Maximum log files to keep
 			maxSize: "10MB", // Maximum log file size
 		},
+	},
+
+	// ===== FILE OPERATIONS =====
+	fileOperations: {
+		backupFiles: true, // Create backups of existing files before overwriting
+		backupDir: "./backups", // Directory for backup files
+		atomic: true, // Use atomic writes to prevent corruption
+		createMissingDirs: true, // Automatically create missing directories
 	},
 
 	// ===== SYNCHRONIZATION =====

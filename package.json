@@ -47,8 +47,10 @@
 	},
 	"dependencies": {
 		"axios": "1.13.1",
+		"c12": "^3.3.2",
 		"commander": "^14.0.2",
 		"dotenv": "^17.2.3",
+		"jiti": "^2.6.1",
 		"lru-cache": "^11.2.2",
 		"p-limit": "^7.2.0",
 		"vectra": "^0.11.1"

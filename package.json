@@ -8,6 +8,7 @@
 		"dist": "dist"
 	},
 	"bin": {
+		"ai-localization-tool": "./dist/cli.js",
 		"localize": "./dist/cli.js"
 	},
 	"scripts": {
@@ -21,7 +22,8 @@
 		"format:check": "prettier --check \"**/*.{js,json,md,jsx,ts,tsx,css}\"",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"prepublishOnly": "pnpm build"
 	},
 	"keywords": [
 		"translation",
@@ -73,7 +75,6 @@
 		"vitest": "^4.0.15"
 	},
 	"files": [
-		"dist/",
-		"src/"
+		"dist/"
 	]
 }

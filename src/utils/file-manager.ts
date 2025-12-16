@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
-import fsSync from "fs";
 import path from "path";
+import { FormatFactory } from "../core/adapters/factory.js";
 
 export interface FileOptions {
 	atomic?: boolean;
@@ -11,6 +11,7 @@ export interface FileOptions {
 	jsonIndent?: number;
 	compact?: boolean;
 	indent?: number;
+	format?: string; // Explicit format override
 }
 
 export interface ValidationResult {
@@ -28,13 +29,13 @@ export interface ValidationResult {
 
 /**
  * FileManager - Modern asynchronous file operations
- * This is the preferred class for all file operations.
+ * Handles multiple file formats via Adapter pattern.
  */
 class FileManager {
 	/**
 	 * Default options for file operations
 	 */
-	static defaultOptions: Required<Omit<FileOptions, "compact" | "indent">> = {
+	static defaultOptions: Required<Omit<FileOptions, "compact" | "indent" | "format">> = {
 		atomic: true,
 		createMissingDirs: true,
 		backupFiles: true,
@@ -74,54 +75,61 @@ class FileManager {
 	 */
 	static async findLocaleFiles(localesDir: string, sourceLang: string): Promise<string[]> {
 		try {
-			const sourceFile = path.join(localesDir, `${sourceLang}.json`);
+			// Find any file with the source language name (ignoring extension)
+			const files = await fs.readdir(localesDir);
+			const sourceFiles = files
+				.filter((file) => file.startsWith(`${sourceLang}.`))
+				.map((file) => path.join(localesDir, file));
 
-			// Check if source file exists
-			await fs.access(sourceFile);
-			return [sourceFile];
+			if (sourceFiles.length === 0) {
+				throw new Error(
+					`Source language file not found for '${sourceLang}' in ${localesDir}`
+				);
+			}
+
+			// Return the first match, or maybe prioritize JSON?
+			// For now, return all matches, but usually there's only one.
+			return sourceFiles;
 		} catch (err: any) {
-			throw new Error(`Source language file not found: ${err.message}`);
+			if (err.code === "ENOENT") {
+				throw new Error(`Locales directory not found: ${localesDir}`);
+			}
+			throw new Error(`Source language file search error: ${err.message}`);
 		}
 	}
 
 	/**
-	 * Read JSON file asynchronously
-	 * @param filePath - Path to the JSON file
+	 * Read structured data file asynchronously (JSON, YAML, etc.)
+	 * @param filePath - Path to the file
 	 * @param options - Options for reading
-	 * @returns Parsed JSON data
+	 * @returns Parsed data
 	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static async readJSON(filePath: string, options: FileOptions = {}): Promise<any> {
+	static async readFile(filePath: string, options: FileOptions = {}): Promise<any> {
 		const config = { ...this.getConfig(), ...options };
 
 		try {
 			const content = await fs.readFile(filePath, config.encoding);
-			return JSON.parse(content as string);
+			const adapter =
+				options.format && options.format !== "auto"
+					? FormatFactory.getAdapterByFormat(options.format)
+					: FormatFactory.getAdapter(filePath);
+
+			return await adapter.parse(content as string);
 		} catch (err: any) {
 			throw new Error(`File read error (${filePath}): ${err.message}`);
 		}
 	}
 
 	/**
-	 * Generate a unique temporary file path to prevent collisions
-	 * @param filePath - Original file path
-	 * @returns Unique temporary file path
-	 */
-	static _generateTempFilePath(filePath: string): string {
-		const timestamp = Date.now();
-		const random = Math.random().toString(36).substring(2, 8);
-		return `${filePath}.tmp.${timestamp}.${random}`;
-	}
-
-	/**
-	 * Write data to JSON file asynchronously
+	 * Write data to file asynchronously
 	 * @param filePath - Path to write the file
 	 * @param data - Data to write
 	 * @param options - Options for writing
 	 * @returns Success status
 	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static async writeJSON(
+	static async writeFile(
 		filePath: string,
 		data: any,
 		options: FileOptions = {}
@@ -140,7 +148,7 @@ class FileManager {
 				await this.ensureDir(config.backupDir);
 			}
 
-			// Create backup of existing file if it exists and backups are enabled
+			// Create backup of existing file
 			if (config.backupFiles && config.backupDir) {
 				try {
 					await fs.access(filePath);
@@ -150,16 +158,23 @@ class FileManager {
 					);
 					await fs.copyFile(filePath, backupPath);
 				} catch (err: any) {
-					console.error(`Backup failed (${filePath}): ${err.message}`);
+					// Ignore if file doesn't exist
+					if (err.code !== "ENOENT") {
+						console.error(`Backup failed (${filePath}): ${err.message}`);
+					}
 				}
 			}
 
-			// Format JSON with optional formatting
-			const jsonString = JSON.stringify(
-				data,
-				null,
-				config.compact ? 0 : options.indent || config.jsonIndent
-			);
+			// Serialize content
+			const adapter =
+				options.format && options.format !== "auto"
+					? FormatFactory.getAdapterByFormat(options.format)
+					: FormatFactory.getAdapter(filePath);
+
+			const content = await adapter.serialize(data, {
+				indent: options.indent || config.jsonIndent,
+				compact: config.compact,
+			});
 
 			// Use atomic write if configured
 			if (config.atomic) {
@@ -167,48 +182,56 @@ class FileManager {
 				let tempFileCreated = false;
 
 				try {
-					// Write to temporary file first
-					await fs.writeFile(tempFile, jsonString, config.encoding);
+					await fs.writeFile(tempFile, content, config.encoding);
 					tempFileCreated = true;
-
-					// Atomically replace the target file
 					await fs.rename(tempFile, filePath);
-
-					// Success - temp file has been renamed, no cleanup needed
 					tempFileCreated = false;
 				} catch (renameError: any) {
 					if (tempFileCreated) {
 						try {
 							await fs.unlink(tempFile);
-						} catch (cleanupError: any) {
-							// Log cleanup failure but don't throw - original error is more important
-							console.warn(
-								`Warning: Failed to clean up temporary file ${tempFile}: ${cleanupError.message}`
-							);
+						} catch {
+							/* ignore cleanup error */
 						}
 					}
-
-					// Re-throw the original error with better context
-					throw new Error(
-						`Atomic write failed during rename operation (${filePath}): ${renameError.message}. ` +
-							`Temp file cleanup ${tempFileCreated ? "attempted" : "not needed"}.`
-					);
+					throw new Error(`Atomic write failed (${filePath}): ${renameError.message}`);
 				}
 			} else {
-				// Direct write
-				await fs.writeFile(filePath, jsonString, config.encoding);
+				await fs.writeFile(filePath, content, config.encoding);
 			}
 
 			return true;
 		} catch (err: any) {
-			const operation = config.atomic ? "atomic write" : "direct write";
-			throw new Error(`File ${operation} error (${filePath}): ${err.message}`);
+			throw new Error(`File write error (${filePath}): ${err.message}`);
 		}
 	}
 
+	// Legacy method aliases for backward compatibility
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	static async readJSON(filePath: string, options: FileOptions = {}): Promise<any> {
+		return this.readFile(filePath, { ...options, format: "json" });
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	static async writeJSON(
+		filePath: string,
+		data: any,
+		options: FileOptions = {}
+	): Promise<boolean> {
+		return this.writeFile(filePath, data, { ...options, format: "json" });
+	}
+
 	/**
-	 * Ensure directory exists, create it if it doesn't
-	 * @param dir - Directory path
+	 * Generate a unique temporary file path
+	 */
+	static _generateTempFilePath(filePath: string): string {
+		const timestamp = Date.now();
+		const random = Math.random().toString(36).substring(2, 8);
+		return `${filePath}.tmp.${timestamp}.${random}`;
+	}
+
+	/**
+	 * Ensure directory exists
 	 */
 	static async ensureDir(dir: string): Promise<void> {
 		try {
@@ -221,12 +244,9 @@ class FileManager {
 	}
 
 	/**
-	 * Scan for locale files with pattern matching
-	 * @param localesDir - Directory to scan
-	 * @param pattern - File pattern to match
-	 * @returns Array of matching file paths
+	 * Scan for locale files
 	 */
-	static async scanLocaleFiles(localesDir: string, pattern = /\.json$/): Promise<string[]> {
+	static async scanLocaleFiles(localesDir: string, pattern = /.*/): Promise<string[]> {
 		try {
 			const files = await fs.readdir(localesDir);
 			return files
@@ -239,8 +259,6 @@ class FileManager {
 
 	/**
 	 * Get file modification time
-	 * @param filePath - Path to the file
-	 * @returns Modification time
 	 */
 	static async getModifiedTime(filePath: string): Promise<Date> {
 		try {
@@ -253,8 +271,6 @@ class FileManager {
 
 	/**
 	 * Check if file exists
-	 * @param filePath - Path to the file
-	 * @returns True if exists
 	 */
 	static async exists(filePath: string): Promise<boolean> {
 		try {
@@ -264,7 +280,6 @@ class FileManager {
 			return false;
 		}
 	}
-
 	/**
 	 * Delete file
 	 * @param filePath - Path to the file
@@ -405,199 +420,4 @@ class FileManager {
 	}
 }
 
-// Initialize options with defaults
-FileManager.configure({});
-
-/**
- * SyncFileManager - Synchronous file operations
- * Used for backward compatibility. New code should use FileManager instead.
- * @deprecated Use the async FileManager for better performance
- * PERFORMANCE WARNING: This class blocks the event loop and should be avoided
- */
-class SyncFileManager {
-	/**
-	 * Default options for file operations
-	 */
-	static defaultOptions: Required<Omit<FileOptions, "compact" | "indent">> = {
-		atomic: false,
-		createMissingDirs: true,
-		backupFiles: true,
-		backupDir: "./backups",
-		encoding: "utf8",
-		jsonIndent: 4,
-	};
-
-	private static options: FileOptions | null = null;
-
-	/**
-	 * Configure global options for file operations
-	 * @param options - File operation options
-	 * @deprecated Use FileManager.configure() instead for non-blocking operations
-	 */
-	static configure(options: FileOptions): void {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager is deprecated. Use async FileManager for better performance."
-		);
-
-		if (!options) return;
-
-		this.options = {
-			...this.defaultOptions,
-			...options,
-			atomic: false, // Always false for sync operations
-		};
-	}
-
-	/**
-	 * Get current configuration
-	 * @returns Current configuration
-	 * @deprecated Use FileManager.getConfig() instead
-	 */
-	static getConfig(): FileOptions {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager is deprecated. Use async FileManager for better performance."
-		);
-		return this.options || this.defaultOptions;
-	}
-
-	/**
-	 * Find locale files in the specified directory (sync)
-	 * @param localesDir - Directory containing locale files
-	 * @param sourceLang - Source language code
-	 * @returns Array of file paths
-	 * @deprecated Use FileManager.findLocaleFiles() instead for non-blocking operations
-	 */
-	static findLocaleFiles(localesDir: string, sourceLang: string): string[] {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager.findLocaleFiles() is deprecated. Use async FileManager.findLocaleFiles() for better performance."
-		);
-
-		const sourceFile = path.join(localesDir, `${sourceLang}.json`);
-
-		if (!fsSync.existsSync(sourceFile)) {
-			throw new Error(`Source language file not found: ${sourceFile}`);
-		}
-
-		return [sourceFile];
-	}
-
-	/**
-	 * Read JSON file synchronously
-	 * @param filePath - Path to the JSON file
-	 * @param options - Options for reading
-	 * @returns Parsed JSON data
-	 * @deprecated Use FileManager.readJSON() instead for non-blocking operations
-	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static readJSON(filePath: string, options: FileOptions = {}): any {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager.readJSON() is deprecated. Use async FileManager.readJSON() for better performance."
-		);
-
-		const config = { ...this.getConfig(), ...options };
-
-		try {
-			return JSON.parse(fsSync.readFileSync(filePath, config.encoding) as string);
-		} catch (err: any) {
-			throw new Error(`File read error (${filePath}): ${err.message}`);
-		}
-	}
-
-	/**
-	 * Write data to JSON file synchronously
-	 * @param filePath - Path to write the file
-	 * @param data - Data to write
-	 * @param options - Options for writing
-	 * @returns Success status
-	 * @deprecated Use FileManager.writeJSON() instead for non-blocking operations
-	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static writeJSON(filePath: string, data: any, options: FileOptions = {}): boolean {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager.writeJSON() is deprecated. Use async FileManager.writeJSON() for better performance."
-		);
-
-		const config = { ...this.getConfig(), ...options };
-
-		try {
-			// Create target directory if it doesn't exist
-			const dir = path.dirname(filePath);
-			if (config.createMissingDirs && !fsSync.existsSync(dir)) {
-				fsSync.mkdirSync(dir, { recursive: true });
-			}
-
-			// Create backup directory if needed
-			if (config.backupFiles && config.backupDir && !fsSync.existsSync(config.backupDir)) {
-				fsSync.mkdirSync(config.backupDir, { recursive: true });
-			}
-
-			// Create backup of existing file if it exists and backups are enabled
-			if (config.backupFiles && config.backupDir && fsSync.existsSync(filePath)) {
-				const backupPath = path.join(
-					config.backupDir,
-					`${path.basename(filePath)}.${Date.now()}.bak`
-				);
-				fsSync.copyFileSync(filePath, backupPath);
-			}
-
-			// Format JSON with optional formatting
-			const jsonString = JSON.stringify(
-				data,
-				null,
-				config.compact ? 0 : options.indent || config.jsonIndent
-			);
-
-			// Write file
-			fsSync.writeFileSync(filePath, jsonString, config.encoding);
-			return true;
-		} catch (err: any) {
-			throw new Error(`File write error (${filePath}): ${err.message}`);
-		}
-	}
-
-	/**
-	 * Check if file exists synchronously
-	 * @param filePath - Path to the file
-	 * @returns True if exists
-	 */
-	static exists(filePath: string): boolean {
-		return fsSync.existsSync(filePath);
-	}
-
-	/**
-	 * Delete file synchronously
-	 * @param filePath - Path to the file
-	 * @param options - Options for deletion
-	 * @returns Success status
-	 * @deprecated Use FileManager.deleteFile() instead for non-blocking operations
-	 */
-	static deleteFile(filePath: string, options: FileOptions = {}): boolean {
-		console.warn(
-			"DEPRECATION WARNING: SyncFileManager.deleteFile() is deprecated. Use async FileManager.deleteFile() for better performance."
-		);
-
-		const config = { ...this.getConfig(), ...options };
-
-		try {
-			// Create backup before deletion if backups are enabled
-			if (config.backupFiles && config.backupDir && fsSync.existsSync(filePath)) {
-				if (!fsSync.existsSync(config.backupDir)) {
-					fsSync.mkdirSync(config.backupDir, { recursive: true });
-				}
-
-				const backupPath = path.join(
-					config.backupDir,
-					`${path.basename(filePath)}.deleted.${Date.now()}.bak`
-				);
-				fsSync.copyFileSync(filePath, backupPath);
-			}
-
-			fsSync.unlinkSync(filePath);
-			return true;
-		} catch (err: any) {
-			throw new Error(`File deletion error (${filePath}): ${err.message}`);
-		}
-	}
-}
-
-export { FileManager, SyncFileManager };
+export { FileManager };

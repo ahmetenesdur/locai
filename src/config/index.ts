@@ -67,12 +67,24 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	 */
 	minConfidence?: number;
 
-	/**
-	 * File extensions to process
-	 */
-	fileExtensions?: string[];
+	fileOperations?: {
+		/**
+		 * File format to use (json, yaml, po, properties, etc.)
+		 * @default "json"
+		 */
+		format?: "json" | "yaml" | "po" | "properties" | "arb" | "auto";
 
-	// Legacy options support
+		/**
+		 * File structure (flat, nested, namespaced)
+		 * @default "flat"
+		 */
+		fileStructure?: "flat" | "nested" | "namespaced" | "auto";
+
+		backupFiles?: boolean;
+		backupDir?: string;
+		atomic?: boolean;
+		createMissingDirs?: boolean;
+	};
 	useAi?: boolean;
 	contextProvider?: string;
 	contextThreshold?: number;
@@ -175,7 +187,10 @@ export async function loadConfig(cwd: string = process.cwd()) {
 				},
 			},
 			apiConfig: {},
-			fileOperations: {},
+			fileOperations: {
+				format: "json",
+				fileStructure: "flat",
+			},
 		},
 	});
 

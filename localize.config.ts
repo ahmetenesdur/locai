@@ -276,6 +276,8 @@ export default defineConfig({
 
 	// File Operations
 	fileOperations: {
+		// format: "json", // File format: json, yaml, po, properties, arb, auto
+		// fileStructure: "flat", // Directory structure: flat, nested, namespaced, auto
 		backupFiles: false, // Create backups of existing files before overwriting/deleting
 		backupDir: "./backups", // Directory for backup files
 		atomic: true, // Use atomic write operations

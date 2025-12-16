@@ -1,21 +1,37 @@
 # AI Localization Tool
 
-Enterprise-grade translation CLI for Next.js applications with intelligent synchronization, multi-provider support, and context-aware translations.
+**Global, Framework-Agnostic, AI-Powered Translation CLI.**
+
+Enterprise-grade localization tool that works with **any project** (Next.js, React, Vue, Flutter, Android, Python, etc.) and **any file format** (JSON, YAML, PO, Properties, ARB).
 
 ## Features
+
+**Framework Agnostic**
+
+- **ZERO Config:** Automatically detects your project type (Next.js, Vue, Flutter) and file structure.
+- **Universal Support:** Works with standard web frameworks, mobile apps (Flutter, React Native), and backend systems (Django, Spring).
+
+**Multi-Format Support**
+
+- **JSON (.json)**: Default for web apps (i18next, react-intl).
+- **YAML (.yaml/.yml)**: Concise config-style locales (Rails, refined DX).
+- **Gettext (.po/.pot)**: Industry standard for PHP/WordPress/Python.
+- **Properties (.properties)**: Java/Spring Boot and legacy systems.
+- **ARB (.arb)**: Flutter application resource bundles.
 
 **AI-Powered Translation**
 
 - Support for 5 AI providers: OpenAI (GPT-4o), Gemini, DeepSeek, Dashscope, XAI
-- Automatic provider fallback on failures
-- Context detection for technical, marketing, legal, DeFi, and UI content
+- **Context-Aware:** Detects if content is technical, marketing, legal, or UI and adjusts tone.
+- **Smart Sync:** Only translates changed or new keys (SHA-256 change detection).
+- **Vector Memory:** "Infinite Memory" reuses previous translations for 100% consistency and cost savings.
 
-**Performance & Quality**
+**Quality & Performance**
 
-- **Robust Architecture:** Pipeline-based processing with distinct validation, translation, and quality check steps
-- **Smart Sync:** SHA-256 change detection for incremental updates
-- Parallel processing with configurable rate limiting
-- LRU cache with stale-while-revalidate pattern
+- **Robust Validation:** Checks placeholders (`{name}`), HTML tags, and quote balancing.
+- **Style Guard:** Enforces tone (formal/informal) and conventions (Oxford comma).
+- **Parallel Processing:** Fast execution with configurable concurrency and rate limiting.
+- **Interactive Review:** TUI for reviewing low-confidence translations before saving.
 - Automated validation and fixing of placeholders, HTML tags, and length
 - Quality confidence scoring with interactive review workflow
 - **Style Guard:** Tone verification and style guide enforcement (Oxford comma, sentence case)
@@ -74,7 +90,7 @@ export default {
 
 ### 2. TypeScript Usage (Enhanced)
 
-If you have installed the package (`pnpm add -D ai-localization-tool`), you can use the `defineConfig` helper for full type safety and autocompletion.
+If you have installed the package (`pnpm add -D ai-localization-tool`), you can use the `defineConfig` helper for full type safety.
 
 ```typescript
 // localize.config.ts
@@ -84,17 +100,17 @@ export default defineConfig({
 	source: "en",
 	targets: ["tr", "es", "de"],
 	apiProvider: "openai",
-	localesDir: "./locales",
+
+	// Optional: Override auto-detection
+	localesDir: "./src/locales",
+	fileOperations: {
+		format: "yaml", // 'json', 'yaml', 'po', 'properties', 'arb', 'auto'
+		fileStructure: "flat", // 'flat' (en.json) or 'nested' (en/common.json)
+	},
 });
 ```
 
 ### 3. Setup API Keys
-
-Set your API key in a `.env` file (recommended) or pass it via environment variables:
-
-The tool also supports `.js`, `.cjs`, `.mjs`, and `.json` configuration files.
-
-### Step 2: Set API Keys
 
 Create a `.env` file with your provider credentials:
 

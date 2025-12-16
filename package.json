@@ -49,14 +49,18 @@
 		"axios": "1.13.1",
 		"c12": "^3.3.2",
 		"commander": "^14.0.2",
+		"dot-properties": "^1.1.0",
 		"dotenv": "^17.2.3",
+		"gettext-parser": "^8.0.0",
 		"jiti": "^2.6.1",
+		"js-yaml": "^4.1.1",
 		"lru-cache": "^11.2.2",
 		"p-limit": "^7.2.0",
 		"vectra": "^0.11.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
+		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^25.0.1",
 		"@vitest/coverage-v8": "^4.0.15",
 		"eslint": "^9.39.1",

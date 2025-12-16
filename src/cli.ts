@@ -19,6 +19,8 @@ import InputValidator from "./utils/input-validator.js";
 import ErrorHelper from "./utils/error-helper.js";
 import { getLogger } from "./utils/logger.js";
 import { TranslationOptions } from "./services/translation-service.js";
+import { FrameworkDetector } from "./core/detection/framework-detector.js";
+import { StructureDetector, LocaleStructure } from "./core/detection/structure-detector.js";
 import { loadConfig } from "./config/index.js";
 
 // Use createRequire to load package.json in ESM context
@@ -114,6 +116,52 @@ const configureComponents = (config: any) => {
  * @returns {Promise<any>} - Final configuration.
  */
 const configureCLI = async (defaultConfig: any): Promise<any> => {
+	// Auto-detect framework and configuration if not explicitly set
+	// This makes the tool framework-agnostic
+	const detected = await FrameworkDetector.detect(process.cwd());
+
+	if (detected) {
+		// Set locales directory if not configured
+		if (!defaultConfig.localesDir && detected.localesDir) {
+			defaultConfig.localesDir = detected.localesDir;
+			if (process.env.VERBOSE) {
+				console.log(`Auto-detected locales directory: ${detected.localesDir}`);
+			}
+		}
+
+		// Set file format if not configured
+		if (!defaultConfig.fileOperations) defaultConfig.fileOperations = {};
+		if (
+			(!defaultConfig.fileOperations.format ||
+				defaultConfig.fileOperations.format === "auto") &&
+			detected.fileFormat
+		) {
+			defaultConfig.fileOperations.format = detected.fileFormat;
+			if (process.env.VERBOSE) {
+				console.log(`Auto-detected file format: ${detected.fileFormat}`);
+			}
+		}
+	}
+
+	// Auto-detect file structure (flat vs nested)
+	if (!defaultConfig.fileOperations) defaultConfig.fileOperations = {};
+	if (
+		!defaultConfig.fileOperations.fileStructure ||
+		defaultConfig.fileOperations.fileStructure === "auto"
+	) {
+		const targetDir = defaultConfig.localesDir || "./locales";
+		const structure = await StructureDetector.detect(targetDir);
+		if (structure !== LocaleStructure.UNKNOWN) {
+			defaultConfig.fileOperations.fileStructure = structure;
+			if (process.env.VERBOSE) {
+				console.log(`Auto-detected file structure: ${structure}`);
+			}
+		} else {
+			// Default to flat if unknown
+			defaultConfig.fileOperations.fileStructure = LocaleStructure.FLAT;
+		}
+	}
+
 	configureComponents(defaultConfig);
 
 	// Use config version if available, otherwise use package.json version

@@ -1,8 +1,8 @@
-# locai 🌍
+# locai
 
-**Global, Framework-Agnostic, AI-Powered Translation CLI.**
+**The Universal AI Localization Engine.**
 
-Enterprise-grade localization tool that works with **any project** (Next.js, React, Vue, Flutter, Android, Python, etc.) and **any file format** (JSON, YAML, PO, Properties, ARB).
+`locai` is an enterprise-grade translation CLI that brings human-quality AI localization to **any project** (Next.js, Flutter, Android, iOS, Python) and **any file format**.
 
 ## Features
 

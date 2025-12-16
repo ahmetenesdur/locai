@@ -38,7 +38,8 @@
 		"url": "https://github.com/ahmetenesdur"
 	},
 	"license": "ISC",
-	"description": "CLI tool for translating Next.js locale files with advanced settings and multiple AI providers",
+	"description": "Global, AI-Powered Translation CLI for every project.",
+	"homepage": "https://github.com/ahmetenesdur/locai",
 	"engines": {
 		"node": ">=14.13.0"
 	},

@@ -375,8 +375,6 @@ class Orchestrator {
 			);
 		}
 
-		console.log(""); // Empty line for progress bar
-
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const allPromises: Promise<any>[] = [];
 

@@ -294,7 +294,13 @@ class TranslationService {
 
 		for (let i = 0; i < targetLanguages.length; i += languageConcurrency) {
 			const currentBatch = targetLanguages.slice(i, i + languageConcurrency);
-			const progressOptions = { logToConsole: false };
+			// Respect user's progress options, but default logToConsole to false for batch processing
+			// unless explicitly forced by the user in the config (not just inherited default)
+			const progressOptions = {
+				...options.progressOptions,
+				// If not explicitly set in options, default to false for batch mode to prevent garbled output
+				logToConsole: options.progressOptions?.logToConsole ?? false,
+			};
 
 			const batchResults = await Promise.all(
 				currentBatch.map((targetLang) => {

@@ -13,6 +13,11 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	targets?: string[];
 
 	/**
+	 * Filter by file extensions (e.g. ['.json', '.arb'])
+	 */
+	fileExtensions?: string[];
+
+	/**
 	 * Directory where localization files are stored
 	 * @default "./locales"
 	 */

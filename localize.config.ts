@@ -12,6 +12,9 @@ export default defineConfig({
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
 
+	// Optional: Filter by specific file extensions
+	// fileExtensions: [".json", ".arb"],
+
 	// API Provider Configuration
 	apiProvider: "openai",
 	useFallback: true,
@@ -276,12 +279,22 @@ export default defineConfig({
 
 	// File Operations
 	fileOperations: {
-		// format: "json", // File format: json, yaml, po, properties, arb, auto
-		// fileStructure: "flat", // Directory structure: flat, nested, namespaced, auto
-		backupFiles: false, // Create backups of existing files before overwriting/deleting
-		backupDir: "./backups", // Directory for backup files
-		atomic: true, // Use atomic write operations
-		createMissingDirs: true, // Automatically create missing directories
+		/**
+		 * File format to use (json, yaml, po, properties, etc.)
+		 * Set to "auto" to detect from file extension
+		 */
+		// format: "auto", // "json" | "yaml" | "po" | "properties" | "arb" | "auto"
+
+		/**
+		 * File structure (flat, nested, namespaced)
+		 * Set to "auto" to detect from content
+		 */
+		// fileStructure: "auto", // "flat" | "nested" | "namespaced" | "auto"
+
+		backupFiles: false,
+		backupDir: "./.backups",
+		atomic: true,
+		createMissingDirs: true,
 	},
 
 	// Synchronization

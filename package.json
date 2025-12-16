@@ -1,5 +1,5 @@
 {
-	"name": "ai-localization-tool",
+	"name": "locai",
 	"version": "2.1.0",
 	"type": "module",
 	"main": "dist/core/orchestrator.js",
@@ -8,7 +8,7 @@
 		"dist": "dist"
 	},
 	"bin": {
-		"ai-localization-tool": "./dist/cli.js",
+		"locai": "./dist/cli.js",
 		"localize": "./dist/cli.js"
 	},
 	"scripts": {

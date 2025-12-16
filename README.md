@@ -1,4 +1,4 @@
-# AI Localization Tool
+# locai 🌍
 
 **Global, Framework-Agnostic, AI-Powered Translation CLI.**
 
@@ -51,11 +51,12 @@ Enterprise-grade localization tool that works with **any project** (Next.js, Rea
 ### Installation
 
 ```bash
-# Global installation
-npm install -g ai-localization-tool
+# Run directly without installation
+npx locai translate --source en --targets tr,es,de
 
-# Or use with npx (no installation)
-npx ai-localization-tool
+# Or install globally
+npm install -g locai
+locai translate
 ```
 
 ### Prerequisites

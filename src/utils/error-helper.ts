@@ -118,10 +118,10 @@ class ErrorHelper {
 
 		// Help section
 		output.push("Need Help?");
-		output.push("   • Documentation: https://github.com/ahmetenesdur/ai-localization-tool");
-		output.push(
-			"   • Report issue: https://github.com/ahmetenesdur/ai-localization-tool/issues"
-		);
+		output.push("   • Documentation: https://github.com/ahmetenesdur/locai");
+		if (error.code) {
+			output.push("   • Report issue: https://github.com/ahmetenesdur/locai/issues");
+		}
 		output.push("");
 
 		return output.join("\n");
@@ -255,7 +255,7 @@ class ErrorHelper {
 				solutions: [
 					"Create localize.config.js in your project root",
 					"Run the command from your project root directory",
-					"Copy example config: npx ai-localization-tool init (if available)",
+					"Copy example config: npx locai init (if available)",
 					"Check the README for configuration examples",
 				],
 			},

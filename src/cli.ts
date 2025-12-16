@@ -168,7 +168,7 @@ const configureCLI = async (defaultConfig: any): Promise<any> => {
 	const toolVersion = defaultConfig.version || version;
 
 	program
-		.name("localize")
+		.name("locai")
 		.description("AI-powered localization tool for Next.js projects")
 		.version(toolVersion);
 

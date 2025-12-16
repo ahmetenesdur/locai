@@ -59,7 +59,7 @@ class BaseProvider {
 
 		this.commonHeaders = {
 			"Content-Type": "application/json",
-			"User-Agent": "ai-localization-tool/1.0",
+			"User-Agent": "locai/1.0",
 		};
 	}
 

@@ -577,7 +577,7 @@ class TranslationService {
 					}
 				});
 
-				savedMessage = `\n\ud83d\udcbe Translations saved: ${safeTargetLang}.json`;
+				savedMessage = `Translations saved: ${safeTargetLang}.json`;
 			}
 
 			globalStats.languages[safeTargetLang].timeMs = Date.now() - langStartTime;

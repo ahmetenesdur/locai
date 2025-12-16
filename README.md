@@ -591,7 +591,7 @@ src/
 ```javascript
 /**
  * Localization Tool Configuration
- * Version: 2.1.0
+ * Version: 2.1.1
  *
  * This configuration file controls all aspects of the localization tool
  * including API providers, performance settings, and quality controls.
@@ -599,7 +599,7 @@ src/
 
 export default {
 	// ===== BASIC CONFIGURATION =====
-	version: "2.1.0", // Configuration version
+	version: "2.1.1", // Configuration version
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],

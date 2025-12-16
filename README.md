@@ -91,11 +91,11 @@ export default {
 
 ### 2. TypeScript Usage (Enhanced)
 
-If you have installed the package (`pnpm add -D ai-localization-tool`), you can use the `defineConfig` helper for full type safety.
+If you have installed the package (`pnpm add -D locai`), you can use the `defineConfig` helper for full type safety.
 
 ```typescript
 // localize.config.ts
-import { defineConfig } from "ai-localization-tool";
+import { defineConfig } from "locai";
 
 export default defineConfig({
 	source: "en",
@@ -131,32 +131,32 @@ XAI_API_KEY=xai-...
 
 ```bash
 # Validate configuration
-localize validate-config
+locai validate-config
 
 # Translate with config settings
-localize
+locai
 
 # Override target languages
-localize -t tr,es,de
+locai -t tr,es,de
 
 # Force update existing translations
-localize translate --force
+locai translate --force
 
 # Fix translation issues
-localize fix
+locai fix
 
 # Enable confidence scoring (0-1 scale)
-localize translate --min-confidence 0.8 --save-review-queue
+locai translate --min-confidence 0.8 --save-review-queue
 
 # Interactive review of low-confidence translations
-localize review
+locai review
 
 # Export review queue
-localize review --export json
-localize review --export csv
+locai review --export json
+locai review --export csv
 
 # Debug mode
-localize --debug
+locai --debug
 ```
 
 ### Smart Synchronization
@@ -166,7 +166,7 @@ The tool uses SHA-256 hashing to detect changes:
 **First run:**
 
 ```bash
-localize
+locai
 # First run - will process all keys
 # Translates all 500 keys across 13 languages
 ```
@@ -174,7 +174,7 @@ localize
 **Subsequent runs:**
 
 ```bash
-localize
+locai
 # Sync Analysis:
 #    New keys: 3
 #    Modified keys: 1
@@ -195,10 +195,10 @@ Validate your configuration before running translations:
 
 ```bash
 # Quick validation
-localize validate-config
+locai validate-config
 
 # Show warnings too
-localize validate-config --show-warnings
+locai validate-config --show-warnings
 ```
 
 **Example Output:**
@@ -450,10 +450,10 @@ See `glossary.example.json` for a complete example.
 
 ```bash
 # Enable confidence scoring
-localize translate --min-confidence 0.8 --save-review-queue
+locai translate --min-confidence 0.8 --save-review-queue
 
 # Start interactive review
-localize review
+locai review
 ```
 
 **Review Interface:**
@@ -483,10 +483,10 @@ Your choice:
 
 ```bash
 # Export to JSON
-localize review --export json
+locai review --export json
 
 # Export to CSV for spreadsheet tools
-localize review --export csv
+locai review --export csv
 ```
 
 ### Progress Tracking

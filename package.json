@@ -1,6 +1,6 @@
 {
 	"name": "locai",
-	"version": "2.1.1",
+	"version": "2.1.2",
 	"type": "module",
 	"main": "dist/core/orchestrator.js",
 	"directories": {
@@ -37,9 +37,16 @@
 		"email": "ahmetenesdur@gmail.com",
 		"url": "https://github.com/ahmetenesdur"
 	},
-	"license": "ISC",
+	"license": "MIT",
 	"description": "Global, AI-Powered Translation CLI for every project.",
-	"homepage": "https://github.com/ahmetenesdur/locai",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ahmetenesdur/localization-tool.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ahmetenesdur/localization-tool/issues"
+	},
+	"homepage": "https://github.com/ahmetenesdur/localization-tool#readme",
 	"engines": {
 		"node": ">=14.13.0"
 	},

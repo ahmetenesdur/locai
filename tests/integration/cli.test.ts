@@ -11,7 +11,7 @@ describe("CLI Integration", () => {
 		// Since we are in dev, let's try running via tsx
 		const { stdout } = await execAsync("npx tsx src/cli.ts --help");
 
-		expect(stdout).toContain("Usage: localize [options] [command]");
+		expect(stdout).toContain("Usage: locai [options] [command]");
 		expect(stdout).toContain("AI-powered localization tool");
 	}, 10000); // Increase timeout for CLI execution
 });

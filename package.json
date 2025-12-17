@@ -3,6 +3,7 @@
 	"version": "2.1.2",
 	"type": "module",
 	"main": "dist/core/orchestrator.js",
+	"types": "dist/core/orchestrator.d.ts",
 	"directories": {
 		"src": "src",
 		"dist": "dist"
@@ -30,7 +31,14 @@
 		"localization",
 		"i18n",
 		"nextjs",
-		"ai-translation"
+		"ai-translation",
+		"cli",
+		"automation",
+		"llm",
+		"openai",
+		"gemini",
+		"deepseek",
+		"developer-tools"
 	],
 	"author": {
 		"name": "Ahmet Enes Dur",
@@ -41,12 +49,12 @@
 	"description": "Global, AI-Powered Translation CLI for every project.",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ahmetenesdur/localization-tool.git"
+		"url": "git+https://github.com/ahmetenesdur/locai.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ahmetenesdur/localization-tool/issues"
+		"url": "https://github.com/ahmetenesdur/locai/issues"
 	},
-	"homepage": "https://github.com/ahmetenesdur/localization-tool#readme",
+	"homepage": "https://github.com/ahmetenesdur/locai#readme",
 	"engines": {
 		"node": ">=14.13.0"
 	},

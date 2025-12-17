@@ -14,9 +14,9 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 ## I Have a Question
 
-If you want to ask a question, we assume that you have read the available [Documentation](https://github.com/ahmetenesdur/localization-tool#readme).
+If you want to ask a question, we assume that you have read the available [Documentation](https://github.com/ahmetenesdur/locai#readme).
 
-Before you ask a question, it is best to search for existing [Issues](https://github.com/ahmetenesdur/localization-tool/issues) that might help you. In case you've found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
+Before you ask a question, it is best to search for existing [Issues](https://github.com/ahmetenesdur/locai/issues) that might help you. In case you've found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
 
 ## I Want To Contribute
 
@@ -34,7 +34,7 @@ Before you ask a question, it is best to search for existing [Issues](https://gi
 ### Your First Code Contribution
 
 1. Fork the repository.
-2. Clone your fork (`git clone https://github.com/your-username/localization-tool.git`).
+2. Clone your fork (`git clone https://github.com/your-username/locai.git`).
 3. Install dependencies (`pnpm install`).
 4. Create a new branch (`git checkout -b feature/amazing-feature`).
 5. Make your changes.

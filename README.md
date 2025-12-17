@@ -257,7 +257,7 @@ Context-aware errors with actionable solutions and error codes (API 1xxx, Config
 | `translate`       | Translate missing strings                  |
 | `fix`             | Fix issues in existing translations        |
 | `review`          | Interactive review of low-confidence items |
-| `analyze`         | Analyze context patterns                   |
+| `analyze`         | Analyze context patterns (Experimental)    |
 | `validate-config` | Validate configuration file                |
 | `advanced`        | Advanced configuration options             |
 
@@ -426,9 +426,6 @@ export default {
 4. **UI Components**: Define consistent translations for Dashboard, Settings, Profile, etc.
 5. **Start Small**: Begin with 10-20 critical terms, expand as needed
 
-See `glossary.example.json` for a complete example.
-| **Auto-Fix** | Corrects common issues automatically |
-
 ### Confidence Scoring System
 
 **Multi-Factor Quality Assessment:**
@@ -519,15 +516,18 @@ The tool includes a vector-based semantic cache ("Infinite Memory") that goes be
 **Configuration:**
 
 ```javascript
-vectorMemory: {
-    enabled: true,
-    // Use directly if similarity > 98%
-    exactMatchThreshold: 0.98,
-    // Use as context if similarity > 85%
-    similarityThreshold: 0.85,
-    // Uses local filesystem (no external DB required)
-    vectorDbPath: "./.localize-cache/vector-memory",
-}
+// localize.config.js
+export default {
+	vectorMemory: {
+		enabled: true,
+		// Use directly if similarity > 98%
+		exactMatchThreshold: 0.98,
+		// Use as context if similarity > 85%
+		similarityThreshold: 0.85,
+		// Uses local filesystem (no external DB required)
+		vectorDbPath: "./.localize-cache/vector-memory",
+	},
+};
 ```
 
 **Benefits:**

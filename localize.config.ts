@@ -18,7 +18,7 @@ export default defineConfig({
 	// API Provider Configuration
 	apiProvider: "openai",
 	useFallback: true,
-	fallbackOrder: ["openai", "dashscope", "deepseek", "gemini", "xai"],
+	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"],
 	apiConfig: {
 		dashscope: {
 			model: "qwen-plus",
@@ -31,7 +31,7 @@ export default defineConfig({
 			maxTokens: 2000,
 		},
 		openai: {
-			model: "gpt-4o",
+			model: "gpt-5.2-chat-latest",
 			temperature: 0.3,
 			maxTokens: 2000,
 		},
@@ -41,9 +41,14 @@ export default defineConfig({
 			maxTokens: 2000,
 		},
 		gemini: {
-			model: "gemini-2.0-flash-exp",
+			model: "gemini-3-flash",
 			temperature: 0.3,
 			maxTokens: 2000,
+		},
+		anthropic: {
+			model: "claude-haiku-4-5-20251001",
+			temperature: 0.3,
+			maxTokens: 4096,
 		},
 	},
 
@@ -76,6 +81,7 @@ export default defineConfig({
 			openai: { rpm: 1000, concurrency: 15 },
 			deepseek: { rpm: 200, concurrency: 8 },
 			gemini: { rpm: 500, concurrency: 12 },
+			anthropic: { rpm: 50, concurrency: 5 },
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
@@ -91,6 +97,7 @@ export default defineConfig({
 		perProviderRetry: {
 			dashscope: { maxRetries: 3 },
 			openai: { maxRetries: 2 },
+			anthropic: { maxRetries: 2 },
 		},
 	},
 
@@ -103,7 +110,7 @@ export default defineConfig({
 		allowNewCategories: true,
 		debug: false,
 		analysisOptions: {
-			model: "gpt-4o",
+			model: "gpt-5.2-chat-latest",
 			temperature: 0.2,
 			maxTokens: 1000,
 		},
@@ -218,7 +225,7 @@ export default defineConfig({
 		toneProvider: "openai", // Provider for tone verification (e.g., openai, gemini)
 		enforceTone: true, // Validate tone with AI (Smart Stylist)
 		analysisOptions: {
-			model: "gpt-4o",
+			model: "gpt-5.2-chat-latest",
 			temperature: 0.1,
 		},
 		conventions: {

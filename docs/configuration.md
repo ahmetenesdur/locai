@@ -54,19 +54,22 @@ export default defineConfig({
 	targets: ["tr", "de", "es"], // Target language codes
 
 	// ===== API PROVIDERS =====
-	apiProvider: "openai", // 'openai' | 'gemini' | 'deepseek' | 'xai' | 'dashscope'
+	apiProvider: "openai", // 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'xai' | 'dashscope'
 	useFallback: true, // Automatically switch providers if one fails
-	fallbackOrder: ["openai", "dashscope", "deepseek", "gemini", "xai"], // Priority order
+	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"], // Priority order
 
 	// Provider-specific configs (overrides defaults)
 	apiConfig: {
 		openai: {
-			model: "gpt-4o",
+			model: "gpt-5.2-chat-latest",
 			temperature: 0.3,
 			maxTokens: 2000,
 		},
 		gemini: {
-			model: "gemini-2.0-flash-exp",
+			model: "gemini-3-flash",
+		},
+		anthropic: {
+			model: "claude-haiku-4-5-20251001",
 		},
 		// ... (see docs/providers.md for full list)
 	},
@@ -85,6 +88,7 @@ export default defineConfig({
 			openai: { rpm: 1000, concurrency: 15 },
 			deepseek: { rpm: 200, concurrency: 8 },
 			gemini: { rpm: 500, concurrency: 12 },
+			anthropic: { rpm: 50, concurrency: 5 },
 		},
 	},
 
@@ -96,7 +100,7 @@ export default defineConfig({
 		useAI: true, // Use AI to analyze context (Technical, Marketing, etc.)
 		minTextLength: 200, // Only analyze longer texts to save tokens
 		analysisOptions: {
-			model: "gpt-4o", // Use a smart model for analysis
+			model: "gpt-5.2-chat-latest", // Use a smart model for analysis
 		},
 		categories: {
 			// Custom categories

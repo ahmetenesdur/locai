@@ -1,6 +1,7 @@
 import * as deepseekProvider from "../providers/deepseek.js";
 import * as geminiProvider from "../providers/gemini.js";
 import * as openaiProvider from "../providers/openai.js";
+import * as anthropicProvider from "../providers/anthropic.js";
 import * as dashscopeProvider from "../providers/dashscope.js";
 import * as xaiProvider from "../providers/xai.js";
 import FallbackProvider, { ProviderWrapper, ProviderModule } from "./fallback-provider.js";
@@ -41,6 +42,7 @@ class ProviderFactory {
 			dashscope: dashscopeProvider,
 			xai: xaiProvider,
 			openai: openaiProvider,
+			anthropic: anthropicProvider,
 			deepseek: deepseekProvider,
 			gemini: geminiProvider,
 		};
@@ -161,6 +163,7 @@ class ProviderFactory {
 			dashscope: process.env.DASHSCOPE_API_KEY,
 			xai: process.env.XAI_API_KEY,
 			openai: process.env.OPENAI_API_KEY,
+			anthropic: process.env.ANTHROPIC_API_KEY,
 			deepseek: process.env.DEEPSEEK_API_KEY,
 			gemini: process.env.GEMINI_API_KEY,
 		};
@@ -194,6 +197,7 @@ class ProviderFactory {
 			dashscope: "DASHSCOPE_API_KEY",
 			xai: "XAI_API_KEY",
 			openai: "OPENAI_API_KEY",
+			anthropic: "ANTHROPIC_API_KEY",
 			deepseek: "DEEPSEEK_API_KEY",
 			gemini: "GEMINI_API_KEY",
 		};

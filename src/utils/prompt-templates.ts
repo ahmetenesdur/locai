@@ -302,6 +302,16 @@ Original Text: "${text}"`,
 		],
 	}),
 
+	anthropic: (sourceLang: string, targetLang: string, text: string, options: PromptOptions) => ({
+		system: baseTranslationPromptTemplate(sourceLang, targetLang, text, options),
+		messages: [
+			{
+				role: "user",
+				content: text,
+			},
+		],
+	}),
+
 	deepseek: (sourceLang: string, targetLang: string, text: string, options: PromptOptions) => ({
 		messages: [
 			{
@@ -389,6 +399,16 @@ const analysisPrompts: Record<string, any> = {
 			temperature: options.temperature || 0.2,
 			max_tokens: options.maxTokens || 1000,
 		},
+	}),
+
+	anthropic: (text: string, options: PromptOptions) => ({
+		system: "You are a context analysis assistant that helps identify the category and context of text.",
+		messages: [
+			{
+				role: "user",
+				content: baseAnalysisPromptTemplate(text, options),
+			},
+		],
 	}),
 
 	deepseek: (text: string, options: PromptOptions) => ({

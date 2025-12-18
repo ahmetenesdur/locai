@@ -32,7 +32,7 @@ class GeminiProvider extends BaseProvider {
 	}
 
 	getEndpoint(model?: string): string {
-		return `/models/${model || "gemini-2.0-flash-exp"}:generateContent`;
+		return `/models/${model || "gemini-3-flash"}:generateContent`;
 	}
 
 	/**
@@ -47,7 +47,7 @@ class GeminiProvider extends BaseProvider {
 		this.validateRequest(text, sourceLang, targetLang);
 
 		const config = this.getConfig(options.apiConfig?.gemini);
-		const model = config.model || "gemini-2.0-flash-exp";
+		const model = config.model || "gemini-3-flash";
 		const apiKey = this.getApiKey();
 
 		if (!apiKey) {
@@ -102,7 +102,7 @@ class GeminiProvider extends BaseProvider {
 
 	async analyze(prompt: string, options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
-			model: options.model || "gemini-2.0-flash-exp",
+			model: options.model || "gemini-3-flash",
 			temperature: options.temperature || 0.2,
 			maxTokens: options.maxTokens || 1000,
 		});

@@ -4,13 +4,14 @@ Locai supports multiple industry-leading AI providers, allowing you to balance c
 
 ## Supported Models
 
-| Provider      | Default Model          | RPM Limit | Concurrency | Context Limit |
-| ------------- | ---------------------- | --------- | ----------- | ------------- |
-| **OpenAI**    | `gpt-4o`               | 1000      | 15          | 16K           |
-| **Dashscope** | `qwen-plus`            | 200       | 8           | 8K            |
-| **DeepSeek**  | `deepseek-chat`        | 200       | 8           | 8K            |
-| **Gemini**    | `gemini-2.0-flash-exp` | 500       | 12          | 16K           |
-| **XAI**       | `grok-4`               | 300       | 10          | 8K            |
+| Provider      | Default Model               | RPM Limit | Concurrency | Context Limit |
+| ------------- | --------------------------- | --------- | ----------- | ------------- |
+| **OpenAI**    | `gpt-5.2-chat-latest`       | 1000      | 15          | 16K           |
+| **Dashscope** | `qwen-plus`                 | 200       | 8           | 8K            |
+| **DeepSeek**  | `deepseek-chat`             | 200       | 8           | 8K            |
+| **Gemini**    | `gemini-3-flash`            | 500       | 12          | 16K           |
+| **Anthropic** | `claude-haiku-4-5-20251001` | 50        | 5           | 200K          |
+| **XAI**       | `grok-4`                    | 300       | 10          | 8K            |
 
 > **Note:** These are the default limits when using the configuration shown in [`localize.config.ts`](../localize.config.ts). Limits are configurable via `rateLimiter` in your configuration.
 
@@ -25,6 +26,11 @@ Locai supports multiple industry-leading AI providers, allowing you to balance c
 
 1. Get key from [aistudio.google.com](https://aistudio.google.com/)
 2. Add to `.env`: `GEMINI_API_KEY=AIza...`
+
+### Anthropic (Claude)
+
+1. Get key from [console.anthropic.com](https://console.anthropic.com/)
+2. Add to `.env`: `ANTHROPIC_API_KEY=sk-ant-...`
 
 ### DeepSeek
 
@@ -46,7 +52,7 @@ Locai supports multiple industry-leading AI providers, allowing you to balance c
 Locai implements a robust **Fallback Chain**. If your primary provider fails or hits a rate limit, the tool automatically switches to the next available provider.
 
 **Default Chain:**
-`OpenAI` → `Dashscope` → `DeepSeek` → `Gemini` → `XAI`
+`OpenAI` → `Anthropic` → `Dashscope` → `DeepSeek` → `Gemini` → `XAI`
 
 **Configuring Fallback:**
 
@@ -54,6 +60,6 @@ Locai implements a robust **Fallback Chain**. If your primary provider fails or 
 // localize.config.ts
 export default {
 	useFallback: true,
-	fallbackOrder: ["openai", "dashscope", "deepseek", "gemini", "xai"],
+	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"],
 };
 ```

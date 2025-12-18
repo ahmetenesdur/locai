@@ -379,6 +379,7 @@ class ErrorHelper {
 			deepseek: "DEEPSEEK_API_KEY",
 			dashscope: "DASHSCOPE_API_KEY",
 			xai: "XAI_API_KEY",
+			anthropic: "ANTHROPIC_API_KEY",
 		};
 		return envMap[provider?.toLowerCase()] || `${provider?.toUpperCase()}_API_KEY`;
 	}
@@ -393,6 +394,7 @@ class ErrorHelper {
 			deepseek: "https://platform.deepseek.com/api-keys",
 			dashscope: "https://dashscope.console.aliyun.com/",
 			xai: "https://console.x.ai/",
+			anthropic: "https://console.anthropic.com/settings/keys",
 		};
 		return urlMap[provider?.toLowerCase()] || "provider console";
 	}
@@ -401,7 +403,7 @@ class ErrorHelper {
 	 * Suggest fallback provider
 	 */
 	private static _suggestFallbackProvider(currentProvider: string): string {
-		const fallbackOrder = ["openai", "gemini", "deepseek", "dashscope", "xai"];
+		const fallbackOrder = ["openai", "anthropic", "gemini", "deepseek", "dashscope", "xai"];
 		const current = currentProvider?.toLowerCase();
 		const index = fallbackOrder.indexOf(current);
 

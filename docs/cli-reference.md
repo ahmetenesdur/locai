@@ -29,7 +29,7 @@ locai
 **Options:**
 | Option | Description |
 |--------|-------------|
-| `--provider <name>` | Override API provider (e.g., `gemini`) |
+| `--provider <name>` | Override API provider (e.g., `gemini`, `anthropic`) |
 | `--concurrency <num>` | Number of parallel requests (Max 20) |
 | `--force` | Re-translate all keys, ignoring cache |
 | `--no-cache` | Disable read/write to cache |

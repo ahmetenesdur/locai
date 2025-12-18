@@ -4,23 +4,24 @@ import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
 /**
- * Provider implementation for OpenAI (GPT) models.
+ * Provider implementation for Anthropic (Claude) models.
  */
-class OpenAIProvider extends BaseProvider {
+class AnthropicProvider extends BaseProvider {
 	private client: AxiosInstance;
 
 	/**
-	 * Create a new OpenAIProvider instance.
+	 * Create a new AnthropicProvider instance.
 	 * @param {ProviderConfig} config - Provider configuration.
 	 */
 	constructor(config: ProviderConfig = {}) {
-		super("openai", config);
+		super("anthropic", config);
 
 		this.client = axios.create({
-			baseURL: "https://api.openai.com/v1",
+			baseURL: "https://api.anthropic.com/v1",
 			headers: {
 				...this.commonHeaders,
-				Authorization: `Bearer ${this.getApiKey()}`,
+				"x-api-key": this.getApiKey(),
+				"anthropic-version": "2023-06-01",
 			},
 			timeout: 30000,
 			maxRedirects: 0,
@@ -29,15 +30,15 @@ class OpenAIProvider extends BaseProvider {
 	}
 
 	getApiKey(): string | undefined {
-		return process.env.OPENAI_API_KEY;
+		return process.env.ANTHROPIC_API_KEY;
 	}
 
 	getEndpoint(): string {
-		return "/chat/completions";
+		return "/messages";
 	}
 
 	/**
-	 * Translate text using OpenAI.
+	 * Translate text using Anthropic.
 	 */
 	async translate(
 		text: string,
@@ -47,17 +48,21 @@ class OpenAIProvider extends BaseProvider {
 	): Promise<string> {
 		this.validateRequest(text, sourceLang, targetLang);
 
-		const config = this.getConfig(options.apiConfig?.openai);
-		const promptData = getPrompt("openai", sourceLang, targetLang, text, options);
+		// Prioritize user config > options config > default model
+		// Anthropic models: claude-3-5-sonnet-latest, claude-3-5-haiku-latest, claude-3-opus-latest
+		const config = this.getConfig(options.apiConfig?.anthropic);
+		const model = config.model || "claude-haiku-4-5-20251001";
+
+		const promptData = getPrompt("anthropic", sourceLang, targetLang, text, options);
 
 		return RetryHelper.withRetry(
 			async () => {
 				try {
 					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model || "gpt-5.2-chat-latest",
-						...promptData,
+						model: model,
+						...promptData, // Contains { system: "...", messages: [...] }
+						max_tokens: config.maxTokens || 4096,
 						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
 					});
 
 					this.validateResponse(response, this.name);
@@ -65,13 +70,13 @@ class OpenAIProvider extends BaseProvider {
 					return this.sanitizeTranslation(translation);
 				} catch (error: any) {
 					this.handleApiError(error, this.name);
-					throw error; // handleApiError throws, but TS might need this
+					throw error;
 				}
 			},
 			{
 				maxRetries: options.retryOptions?.maxRetries || 2,
 				initialDelay: options.retryOptions?.initialDelay || 1000,
-				context: "OpenAI Provider",
+				context: "Anthropic Provider",
 				logContext: {
 					source: sourceLang,
 					target: targetLang,
@@ -82,12 +87,12 @@ class OpenAIProvider extends BaseProvider {
 
 	async analyze(prompt: string, options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
-			model: options.model || "gpt-5.2-chat-latest",
+			model: options.model || "claude-3-5-sonnet-latest",
 			temperature: options.temperature || 0.2,
 			maxTokens: options.maxTokens || 1000,
 		});
 
-		const promptData = getAnalysisPrompt("openai", prompt, options);
+		const promptData = getAnalysisPrompt("anthropic", prompt, options);
 
 		return RetryHelper.withRetry(
 			async () => {
@@ -95,8 +100,8 @@ class OpenAIProvider extends BaseProvider {
 					const response = await this.client.post(this.getEndpoint(), {
 						model: config.model,
 						...promptData,
+						max_tokens: config.maxTokens,
 						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
 					});
 
 					this.validateResponse(response, this.name);
@@ -110,28 +115,46 @@ class OpenAIProvider extends BaseProvider {
 			{
 				maxRetries: options.maxRetries || 2,
 				initialDelay: options.initialDelay || 1000,
-				context: "OpenAI Provider Analysis",
+				context: "Anthropic Provider Analysis",
 			}
 		);
 	}
 
 	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
-			model: options.model || "gpt-5.2-chat-latest",
+			model: options.model || "claude-3-5-sonnet-latest",
 			temperature: options.temperature || 0.3,
-			maxTokens: options.maxTokens || 2000,
+			maxTokens: options.maxTokens || 4096,
+		});
+
+		// Anthropic requires system prompt to be top-level, separate from messages array
+		// Note: This simple implementation assumes messages passed in might be mixed.
+		// Ideally, the caller should separate system prompt, but we can do a quick check here.
+
+		let systemPrompt: string | undefined = undefined;
+		const cleanMessages = messages.filter((msg) => {
+			if (msg.role === "system") {
+				systemPrompt = msg.content;
+				return false;
+			}
+			return true;
 		});
 
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
+					const payload: any = {
 						model: config.model,
-						messages: messages,
+						messages: cleanMessages,
+						max_tokens: config.maxTokens,
 						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
-						response_format: options.json ? { type: "json_object" } : undefined,
-					});
+					};
+
+					if (systemPrompt) {
+						payload.system = systemPrompt;
+					}
+
+					const response = await this.client.post(this.getEndpoint(), payload);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
@@ -144,84 +167,41 @@ class OpenAIProvider extends BaseProvider {
 			{
 				maxRetries: options.maxRetries || 2,
 				initialDelay: options.initialDelay || 1000,
-				context: "OpenAI Provider Chat",
-			}
-		);
-	}
-	async embed(text: string, options: ProviderConfig = {}): Promise<number[]> {
-		const config = this.getConfig({
-			model: options.model || "text-embedding-3-small",
-		});
-
-		return RetryHelper.withRetry(
-			async () => {
-				try {
-					const response = await this.client.post("/embeddings", {
-						model: config.model,
-						input: text,
-					});
-
-					if (response.data && response.data.data && response.data.data[0]) {
-						return response.data.data[0].embedding;
-					}
-					return [];
-				} catch (error: any) {
-					this.handleApiError(error, this.name);
-					throw error;
-				}
-			},
-			{
-				maxRetries: options.maxRetries || 2,
-				initialDelay: options.initialDelay || 1000,
-				context: "OpenAI Provider Embed",
+				context: "Anthropic Provider Chat",
 			}
 		);
 	}
 
-	async embedBatch(texts: string[], options: ProviderConfig = {}): Promise<number[][]> {
-		const config = this.getConfig({
-			model: options.model || "text-embedding-3-small",
-		});
+	// Override extractTranslation to handle Anthropic's specific response structure
+	extractTranslation(response: any, providerName: string): string {
+		// Check for error response first
+		if (response.error) {
+			const errorMsg =
+				response.error.message || response.error.error || JSON.stringify(response.error);
+			throw new Error(`api: ${providerName} - ${errorMsg}`);
+		}
 
-		return RetryHelper.withRetry(
-			async () => {
-				try {
-					// OpenAI suggests replacing newlines for best results
-					const cleanTexts = texts.map((t) => t.replace(/\n/g, " "));
-
-					const response = await this.client.post("/embeddings", {
-						model: config.model,
-						input: cleanTexts,
-					});
-
-					if (response.data && response.data.data) {
-						return response.data.data
-							.sort((a: any, b: any) => a.index - b.index)
-							.map((item: any) => item.embedding);
-					}
-					return [];
-				} catch (error: any) {
-					this.handleApiError(error, this.name);
-					throw error;
-				}
-			},
-			{
-				maxRetries: options.maxRetries || 2,
-				initialDelay: options.initialDelay || 1000,
-				context: "OpenAI Provider Embed Batch",
+		// Anthropic format: { content: [{ type: 'text', text: '...' }] }
+		if (response.content && Array.isArray(response.content) && response.content.length > 0) {
+			const textBlock = response.content.find((block: any) => block.type === "text");
+			if (textBlock && textBlock.text) {
+				return textBlock.text.trim();
 			}
-		);
+		}
+
+		// Fallback to base implementation for other structures (though unlikely for Anthropic)
+		return super.extractTranslation(response, providerName);
 	}
 }
 
 // Lazy singleton - created on first use
-let openaiProvider: OpenAIProvider | null = null;
+let anthropicProvider: AnthropicProvider | null = null;
 
-function getProvider(): OpenAIProvider {
-	if (!openaiProvider) {
-		openaiProvider = new OpenAIProvider();
+function getProvider(): AnthropicProvider {
+	if (!anthropicProvider) {
+		anthropicProvider = new AnthropicProvider();
 	}
-	return openaiProvider;
+	return anthropicProvider;
 }
 
 // Export both class and legacy functions
@@ -242,12 +222,4 @@ async function chat(messages: any[], options: ProviderConfig = {}): Promise<stri
 	return getProvider().chat(messages, options);
 }
 
-async function embed(text: string, options: ProviderConfig = {}): Promise<number[]> {
-	return getProvider().embed(text, options);
-}
-
-async function embedBatch(texts: string[], options: ProviderConfig = {}): Promise<number[][]> {
-	return getProvider().embedBatch(texts, options);
-}
-
-export { translate, analyze, chat, embed, embedBatch, OpenAIProvider };
+export { translate, analyze, chat, AnthropicProvider };

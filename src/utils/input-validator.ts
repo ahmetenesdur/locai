@@ -80,7 +80,14 @@ export interface AppConfig {
 
 class InputValidator {
 	static LANGUAGE_CODE_PATTERN: RegExp = /^[a-z]{2}(-[a-z]{2})?$/;
-	static VALID_PROVIDERS: string[] = ["dashscope", "xai", "openai", "deepseek", "gemini"];
+	static VALID_PROVIDERS: string[] = [
+		"dashscope",
+		"xai",
+		"openai",
+		"deepseek",
+		"gemini",
+		"anthropic",
+	];
 	static MAX_TEXT_LENGTH: number = 10000;
 	static MAX_KEY_LENGTH: number = 500;
 	static MAX_PATH_LENGTH: number = 1000;

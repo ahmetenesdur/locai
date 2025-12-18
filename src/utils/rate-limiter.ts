@@ -97,6 +97,12 @@ class RateLimiter {
 				lastReset: performance.now(),
 				maxConcurrent: 8,
 			},
+			anthropic: {
+				requestsPerMinute: 50,
+				currentRequests: 0,
+				lastReset: performance.now(),
+				maxConcurrent: 5,
+			},
 		};
 
 		this._processingLocks = {};

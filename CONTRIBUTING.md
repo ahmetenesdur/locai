@@ -33,30 +33,15 @@ Before you ask a question, it is best to search for existing [Issues](https://gi
 
 ### Your First Code Contribution
 
+Please read our [Development Guide](./docs/development.md) for detailed instructions on setting up your environment, running tests, and understanding the project structure.
+
 1. Fork the repository.
-2. Clone your fork (`git clone https://github.com/your-username/locai.git`).
-3. Install dependencies (`pnpm install`).
-4. Create a new branch (`git checkout -b feature/amazing-feature`).
+2. Clone your fork.
+3. Install dependencies.
+4. Create a new branch.
 5. Make your changes.
-6. Run tests (`pnpm test`).
-7. Commit your changes (`git commit -m 'Add some amazing feature'`).
-8. Push to the branch (`git push origin feature/amazing-feature`).
-9. Open a Pull Request.
-
-## Development
-
-This project uses **pnpm** for package management.
-
-```bash
-# Install dependencies
-pnpm install
-
-# Run in development mode
-pnpm dev
-
-# Build the project
-pnpm build
-
-# Run tests
-pnpm test
-```
+6. Run tests.
+7. Format code (`pnpm format`).
+8. Commit your changes.
+9. Push to the branch.
+10. Open a Pull Request.

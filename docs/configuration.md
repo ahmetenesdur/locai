@@ -48,7 +48,7 @@ Below is the full list of available options, including advanced performance, qua
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.1.1",
+	version: "2.1.3",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es"], // Target language codes
@@ -114,8 +114,13 @@ export default defineConfig({
 		rules: {
 			placeholderConsistency: true, // Ensure {{name}} is preserved
 			htmlTagsConsistency: true, // Ensure <b>tags</b> are preserved
+			punctuationCheck: true, // Check punctuation
 			quoteBalanceCheck: true, // Fix invalid JSON quotes
 			lengthValidation: true, // Warn if translation is too long/short
+			sanitizeOutput: true, // Clean output text
+			markdownPreservation: true, // Preserve markdown
+			specialCharacters: true, // Maintain special characters
+			codeBlockPreservation: true, // Preserve code blocks
 		},
 	},
 

@@ -12,8 +12,9 @@ Want to contribute to Locai? Here is everything you need to know to set up your 
     ```
 
 2.  **Install dependencies:**
+
     ```bash
-    pnpm install
+    pnpm install (recommended)
     # or
     npm install
     ```

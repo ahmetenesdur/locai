@@ -4,6 +4,8 @@ import { JsonAdapter } from "./json-adapter.js";
 import { YamlAdapter } from "./yaml-adapter.js";
 import { PoAdapter } from "./po-adapter.js";
 import { PropertiesAdapter } from "./properties-adapter.js";
+import { AndroidAdapter } from "./android-adapter.js";
+import { IosAdapter } from "./ios-adapter.js";
 
 /**
  * Factory class to manage file format adapters
@@ -14,6 +16,8 @@ export class FormatFactory {
 		new YamlAdapter(),
 		new PoAdapter(),
 		new PropertiesAdapter(),
+		new AndroidAdapter(),
+		new IosAdapter(),
 	];
 
 	/**

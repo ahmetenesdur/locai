@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ToneVerifier } from "../tone-verifier.js";
-import ProviderFactory from "../../../core/provider-factory.js";
+import { ToneVerifier } from "../../../../src/utils/quality/tone-verifier.js";
+import ProviderFactory from "../../../../src/core/provider-factory.js";
 
 // Mock ProviderFactory
-vi.mock("../../../core/provider-factory.js", () => {
+vi.mock("../../../../src/core/provider-factory.js", () => {
 	const mockProvider = {
 		chat: vi.fn(),
 		analyze: vi.fn(),

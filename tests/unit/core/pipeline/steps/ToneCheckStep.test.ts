@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ToneCheckStep } from "../ToneCheckStep.js";
-import { ToneVerifier } from "../../../../utils/quality/tone-verifier.js";
+import { ToneCheckStep } from "../../../../../src/core/pipeline/steps/ToneCheckStep.js";
+import { ToneVerifier } from "../../../../../src/utils/quality/tone-verifier.js";
 
 // Mock ToneVerifier
-vi.mock("../../../../utils/quality/tone-verifier.js", () => {
+vi.mock("../../../../../src/utils/quality/tone-verifier.js", () => {
 	return {
 		ToneVerifier: class {
 			verify = vi.fn();

@@ -776,6 +776,7 @@ const configureCLI = async (defaultConfig: any): Promise<any> => {
 		.action(async (options) => {
 			try {
 				const ReviewCommand = (await import("../src/commands/review.js")).default;
+
 				const review = new ReviewCommand(defaultConfig);
 
 				if (options.export) {

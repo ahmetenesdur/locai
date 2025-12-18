@@ -1,13 +1,13 @@
 /**
  * Localization Tool Configuration
- * Version: 2.2.0 - ES Module format
+ * Version: 2.3.0 - ES Module format
  * Controls API providers, performance settings, and quality controls
  */
 
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.2.0",
+	version: "2.3.0",
 	localesDir: "./locales",
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
@@ -31,7 +31,7 @@ export default defineConfig({
 			maxTokens: 2000,
 		},
 		openai: {
-			model: "gpt-5.2-chat-latest",
+			model: "gpt-4o",
 			temperature: 0.3,
 			maxTokens: 2000,
 		},
@@ -110,7 +110,7 @@ export default defineConfig({
 		allowNewCategories: true,
 		debug: false,
 		analysisOptions: {
-			model: "gpt-5.2-chat-latest",
+			model: "gpt-4o",
 			temperature: 0.2,
 			maxTokens: 1000,
 		},
@@ -225,7 +225,7 @@ export default defineConfig({
 		toneProvider: "openai", // Provider for tone verification (e.g., openai, gemini)
 		enforceTone: true, // Validate tone with AI (Smart Stylist)
 		analysisOptions: {
-			model: "gpt-5.2-chat-latest",
+			model: "gpt-4o",
 			temperature: 0.1,
 		},
 		conventions: {

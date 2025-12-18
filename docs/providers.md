@@ -6,7 +6,7 @@ Locai supports multiple industry-leading AI providers, allowing you to balance c
 
 | Provider      | Default Model               | RPM Limit | Concurrency | Context Limit |
 | ------------- | --------------------------- | --------- | ----------- | ------------- |
-| **OpenAI**    | `gpt-5.2-chat-latest`       | 1000      | 15          | 16K           |
+| **OpenAI**    | `gpt-4o`                    | 1000      | 15          | 16K           |
 | **Dashscope** | `qwen-plus`                 | 200       | 8           | 8K            |
 | **DeepSeek**  | `deepseek-chat`             | 200       | 8           | 8K            |
 | **Gemini**    | `gemini-3-flash`            | 500       | 12          | 16K           |

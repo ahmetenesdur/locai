@@ -54,7 +54,7 @@ class OpenAIProvider extends BaseProvider {
 			async () => {
 				try {
 					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model || "gpt-5.2-chat-latest",
+						model: config.model || "gpt-4o",
 						...promptData,
 						temperature: config.temperature,
 						max_completion_tokens: config.maxTokens || config.max_tokens,
@@ -82,7 +82,7 @@ class OpenAIProvider extends BaseProvider {
 
 	async analyze(prompt: string, options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
-			model: options.model || "gpt-5.2-chat-latest",
+			model: options.model || "gpt-4o",
 			temperature: options.temperature || 0.2,
 			maxTokens: options.maxTokens || 1000,
 		});
@@ -117,7 +117,7 @@ class OpenAIProvider extends BaseProvider {
 
 	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
-			model: options.model || "gpt-5.2-chat-latest",
+			model: options.model || "gpt-4o",
 			temperature: options.temperature || 0.3,
 			maxTokens: options.maxTokens || 2000,
 		});

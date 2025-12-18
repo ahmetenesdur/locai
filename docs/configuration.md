@@ -48,7 +48,7 @@ Below is the full list of available options, including advanced performance, qua
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.2.0",
+	version: "2.3.0",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es"], // Target language codes
@@ -61,7 +61,7 @@ export default defineConfig({
 	// Provider-specific configs (overrides defaults)
 	apiConfig: {
 		openai: {
-			model: "gpt-5.2-chat-latest",
+			model: "gpt-4o",
 			temperature: 0.3,
 			maxTokens: 2000,
 		},
@@ -100,7 +100,7 @@ export default defineConfig({
 		useAI: true, // Use AI to analyze context (Technical, Marketing, etc.)
 		minTextLength: 200, // Only analyze longer texts to save tokens
 		analysisOptions: {
-			model: "gpt-5.2-chat-latest", // Use a smart model for analysis
+			model: "gpt-4o", // Use a smart model for analysis
 		},
 		categories: {
 			// Custom categories

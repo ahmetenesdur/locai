@@ -49,7 +49,7 @@ describe("OpenAIProvider", () => {
 		expect(mockClient.post).toHaveBeenCalledWith(
 			"/chat/completions",
 			expect.objectContaining({
-				model: "gpt-5.2-chat-latest",
+				model: "gpt-4o",
 				messages: expect.arrayContaining([
 					expect.objectContaining({
 						role: "user",

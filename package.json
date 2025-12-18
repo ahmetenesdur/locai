@@ -1,6 +1,6 @@
 {
 	"name": "locai",
-	"version": "2.1.3",
+	"version": "2.2.0",
 	"type": "module",
 	"main": "dist/core/orchestrator.js",
 	"types": "dist/core/orchestrator.d.ts",

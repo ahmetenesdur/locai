@@ -48,7 +48,7 @@ Below is the full list of available options, including advanced performance, qua
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.1.3",
+	version: "2.2.0",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es"], // Target language codes

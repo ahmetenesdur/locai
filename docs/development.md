@@ -21,14 +21,15 @@ Want to contribute to Locai? Here is everything you need to know to set up your 
 
 ## Development Commands
 
-| Command       | Description                                          |
-| ------------- | ---------------------------------------------------- |
-| `pnpm dev`    | Run the CLI locally using `ts-node` (Fast iteration) |
-| `pnpm build`  | Compile TypeScript to JavaScript in `dist/`          |
-| `pnpm start`  | Run the compiled version from `dist/`                |
-| `pnpm test`   | Run unit tests with Vitest                           |
-| `pnpm format` | Format code with Prettier                            |
-| `pnpm lint`   | Lint code with ESLint                                |
+| Command            | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| `pnpm dev`         | Run the CLI locally using `ts-node` (Fast iteration) |
+| `pnpm build`       | Compile TypeScript to JavaScript in `dist/`          |
+| `pnpm start`       | Run the compiled library (orchestrator)              |
+| `node dist/cli.js` | Run the compiled CLI manually                        |
+| `pnpm test`        | Run unit tests with Vitest                           |
+| `pnpm format`      | Format code with Prettier                            |
+| `pnpm lint`        | Lint code with ESLint                                |
 
 ## Project Structure
 

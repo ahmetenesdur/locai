@@ -1,5 +1,5 @@
 import translationService from "../services/translation-service.js";
-import { TranslationOptions, GlobalStats } from "../services/translation-service.js";
+import { GlobalStats, TranslationOptions } from "../types/index.js";
 
 /**
  * Main translator function to process source file and create translations.

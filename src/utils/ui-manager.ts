@@ -101,11 +101,9 @@ export class UIManager {
 				if (details && details.samples > 0) {
 					const avgConfidence = details.totalConfidence / details.samples;
 					const confidenceStr = `${(avgConfidence * 100).toFixed(1)}%`;
-					await this.log(
-						`  ${category}: ${count} items (${confidenceStr} avg confidence)`
-					);
+					await this.log(`${category}: ${count} items (${confidenceStr} avg confidence)`);
 				} else {
-					await this.log(`  ${category}: ${count} items`);
+					await this.log(`${category}: ${count} items`);
 				}
 			}
 		}

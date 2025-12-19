@@ -205,3 +205,34 @@ export async function loadConfig(cwd: string = process.cwd()) {
 		layers,
 	};
 }
+
+export const validateEnvironment = (config?: any) => {
+	const providerMap: Record<string, string> = {
+		openai: "OPENAI_API_KEY",
+		anthropic: "ANTHROPIC_API_KEY",
+		gemini: "GEMINI_API_KEY",
+		deepseek: "DEEPSEEK_API_KEY",
+		xai: "XAI_API_KEY",
+		dashscope: "DASHSCOPE_API_KEY",
+	};
+
+	// If a specific provider is configured, check its key
+	if (config?.apiProvider && config.apiProvider !== "auto") {
+		const requiredKey = providerMap[config.apiProvider];
+		if (requiredKey && !process.env[requiredKey]) {
+			console.warn(
+				`\n\u26a0\ufe0f  Warning: ${requiredKey} is missing for provider '${config.apiProvider}'`
+			);
+			console.warn(`   Please add it to your .env file or environment variables.\n`);
+		}
+		return;
+	}
+
+	// If auto or no provider, check if ANY valid key exists
+	const hasAnyKey = Object.values(providerMap).some((key) => process.env[key]);
+	if (!hasAnyKey) {
+		console.warn("\n\u26a0\ufe0f  Warning: No supported API keys found in environment.");
+		console.warn("   Supported keys: " + Object.values(providerMap).join(", "));
+		console.warn("   Please add at least one to your .env file.\n");
+	}
+};

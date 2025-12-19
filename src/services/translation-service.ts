@@ -615,6 +615,7 @@ class TranslationService {
 	) {
 		globalStats.endTime = new Date().toISOString();
 		globalStats.totalDuration = (Date.now() - startTime) / 1000;
+		globalStats.totalTime = globalStats.totalDuration;
 
 		await uiManager.displayGlobalSummary(globalStats, (options.targets || []).length);
 

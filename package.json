@@ -27,18 +27,26 @@
 		"prepublishOnly": "pnpm build"
 	},
 	"keywords": [
-		"translation",
-		"localization",
 		"i18n",
-		"nextjs",
-		"ai-translation",
-		"cli",
+		"localization",
+		"translation",
+		"l10n",
+		"internationalization",
 		"automation",
+		"cli",
 		"llm",
+		"ai",
+		"artificial-intelligence",
 		"openai",
+		"anthropic",
+		"claude",
 		"gemini",
 		"deepseek",
-		"developer-tools"
+		"xai",
+		"vector-database",
+		"semantic-search",
+		"developer-tools",
+		"typescript"
 	],
 	"author": {
 		"name": "Ahmet Enes Dur",

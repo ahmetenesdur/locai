@@ -7,7 +7,7 @@
 Before you begin, ensure you have:
 
 - **Node.js**: v14.13.0 or higher (v18+ recommended for ESM support).
-- **API Key**: At least one AI provider key (OpenAI, Gemini, DeepSeek, XAI, or Dashscope).
+- **API Key**: At least one AI provider key (OpenAI, Gemini, DeepSeek, Anthropic, XAI, or Dashscope).
 
 ## Installation
 
@@ -49,6 +49,7 @@ Creates a `.env` file in your project root. Locai will automatically load it.
 ```env
 # Required: At least one of these
 OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=AIza...
 DEEPSEEK_API_KEY=sk-...
 DASHSCOPE_API_KEY=sk-...

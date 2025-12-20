@@ -72,8 +72,8 @@
 		"./translator": "./dist/commands/translator.js"
 	},
 	"dependencies": {
-		"axios": "1.13.1",
-		"c12": "^3.3.2",
+		"axios": "1.13.2",
+		"c12": "^3.3.3",
 		"commander": "^14.0.2",
 		"dot-properties": "^1.1.0",
 		"dotenv": "^17.2.3",
@@ -81,25 +81,25 @@
 		"gettext-parser": "^8.0.0",
 		"jiti": "^2.6.1",
 		"js-yaml": "^4.1.1",
-		"lru-cache": "^11.2.2",
+		"lru-cache": "^11.2.4",
 		"p-limit": "^7.2.0",
 		"prompts": "^2.4.2",
 		"vectra": "^0.11.1"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.39.1",
+		"@eslint/js": "^9.39.2",
 		"@types/js-yaml": "^4.0.9",
-		"@types/node": "^25.0.1",
+		"@types/node": "^25.0.3",
 		"@types/prompts": "^2.4.9",
-		"@vitest/coverage-v8": "^4.0.15",
-		"eslint": "^9.39.1",
+		"@vitest/coverage-v8": "^4.0.16",
+		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^16.5.0",
-		"prettier": "^3.6.2",
+		"prettier": "^3.7.4",
 		"std-mocks": "^2.0.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.15"
+		"vitest": "^4.0.16"
 	},
 	"files": [
 		"dist/"

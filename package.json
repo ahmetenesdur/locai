@@ -16,7 +16,7 @@
 		"start": "node dist/core/orchestrator.js",
 		"dev": "tsx src/core/orchestrator.js",
 		"build": "tsc",
-		"type-check": "tsc --noEmit",
+		"typecheck": "tsc --noEmit",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write \"**/*.{js,json,md,jsx,ts,tsx,css}\"",

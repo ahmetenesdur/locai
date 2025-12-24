@@ -21,6 +21,8 @@ Run it directly in your project root. It will detect your framework and settings
 npx locai translate --source en --targets tr,es,de
 ```
 
+> For complex projects, we recommend creating a configuration file. See the [Configuration Guide](./configuration.md) for details.
+
 ### 2. Global Installation
 
 For frequent use across your system.

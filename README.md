@@ -13,6 +13,8 @@ Translate your project in seconds without installing anything:
 npx locai translate --source en --targets tr,es,de
 ```
 
+> **Need a permanent setup?** Check out our [Configuration Guide](./docs/configuration.md) to create a `localize.config.js` file.
+
 ## 📖 Documentation
 
 Everything you need to know to master Locai.

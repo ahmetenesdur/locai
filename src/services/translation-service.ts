@@ -11,6 +11,7 @@ import uiManager from "../utils/ui-manager.js";
 import statisticsManager from "../utils/statistics-manager.js";
 import { TranslationResult } from "../core/pipeline/context.js";
 import { LanguageProcessor } from "./language-processor.js";
+import { SourceCodeAnalyzer } from "./source-analyzer.js";
 import {
 	TranslationOptions,
 	GlobalStats,
@@ -226,6 +227,11 @@ class TranslationService {
 			`Processing ${targetLanguages.length} languages with concurrency of ${languageConcurrency}`
 		);
 
+		// Initialize shared SourceCodeAnalyzer
+		console.log("Initializing Locai Engine...");
+		const sharedAnalyzer = new SourceCodeAnalyzer();
+		sharedAnalyzer.initialize();
+
 		// Create shared orchestrators array to collect review queues
 		const orchestrators: Orchestrator[] = [];
 
@@ -245,6 +251,7 @@ class TranslationService {
 						...options,
 						concurrencyLimit: 1,
 						progressOptions,
+						sourceCodeAnalyzer: sharedAnalyzer,
 					} as OrchestratorOptions);
 					orchestrators.push(orchestrator);
 					return this.processLanguage(

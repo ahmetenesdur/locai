@@ -38,6 +38,7 @@ const main = async () => {
 			defaultConfig.targets
 		)
 		.option("--localesDir <dir>", "Localization files directory", defaultConfig.localesDir)
+		.option("--no-deep-context", "Disable deep context analysis (source code scanning)")
 		.option("--debug", "Enable debug mode with verbose logging", false)
 		.option("--verbose", "Enable detailed diagnostic output", false);
 

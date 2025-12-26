@@ -21,10 +21,19 @@ graph TD
 
 ## 1. Infinite Memory (Vector Cache)
 
-Locai uses a local vector database to "remember" every translation it has ever generated.
+LocAI uses vector embeddings to store every translation it generates. When translating a new key, it checks if similar content has been translated before to maintain consistency across your application.
 
-- **Exact Matches**: Reused instantly (Zero cost).
-- **Semantic Matches**: Used as context for similar phrases.
+## Deep Context (Source Code Analysis)
+
+Unlike traditional tools that only see the key and value, LocAI scans your source code (TypeScript/TSX) to understand **where** and **how** a string is used.
+
+It extracts:
+
+- **Component Name**: Knowing it's in a `DeleteModal` vs `SuccessToast` changes the tone.
+- **Comments**: Reads comments like `// context: shown to admin users`.
+- **Props**: Analyzes JSX props (e.g., `variant="danger"`) to infer urgency or style.
+
+This rich context is sent to the AI, resulting in significantly more accurate translations.
 
 ## 2. Smart Synchronization
 

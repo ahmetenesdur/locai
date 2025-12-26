@@ -27,15 +27,16 @@ locai
 ```
 
 **Options:**
-| Option | Description |
-|--------|-------------|
-| `--provider <name>` | Override API provider (e.g., `gemini`, `anthropic`) |
-| `--concurrency <num>` | Number of parallel requests (Max 20) |
-| `--force` | Re-translate all keys, ignoring cache |
-| `--no-cache` | Disable read/write to cache |
-| `--min-confidence <0-1>` | Set threshold for "Low Confidence" flagging |
-| `--save-review-queue` | Save flagged translations for later review |
-| `--stats` | Show detailed statistics after run |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--provider <name>` | Translation provider (openai, anthropic, etc.) | Configured provider |
+| `--concurrency <num>` | Number of concurrent requests | 5 |
+| `--no-cache` | Disable caching | `false` |
+| `--no-deep-context` | Disable source code context analysis | `false` |
+| `--force` | Force re-translation of existing keys | `false` |
+| `--min-confidence <0-1>` | Set threshold for "Low Confidence" flagging | |
+| `--save-review-queue` | Save flagged translations for later review | |
+| `--stats` | Show detailed statistics after run | |
 
 ### `fix`
 

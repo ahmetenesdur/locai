@@ -18,7 +18,12 @@ Suitable for simple projects or `npx` usage.
 // localize.config.js
 export default {
 	source: "en",
-	targets: ["tr", "es", "de", "fr"],
+	targets: ["tr", "es", "de"], // Changed from ["tr", "es", "de", "fr"]
+
+	// Scans source code for rich context (enabled by default)
+	deepContext: true,
+
+	// API Provider
 	apiProvider: "openai",
 	localesDir: "./locales", // Tool auto-detects this usually
 };
@@ -48,10 +53,13 @@ Below is the full list of available options, including advanced performance, qua
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.4.0",
+	version: "2.5.0",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es"], // Target language codes
+
+	// Deep Context (Source Code Analysis)
+	deepContext: true, // Scans source code for better context (component names, props)
 
 	// ===== API PROVIDERS =====
 	apiProvider: "openai", // 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'xai' | 'dashscope'

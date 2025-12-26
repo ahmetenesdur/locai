@@ -28,9 +28,12 @@ import QualityCheckStep from "./pipeline/steps/QualityCheckStep.js";
 import ToneCheckStep from "./pipeline/steps/ToneCheckStep.js";
 import ConfidenceCheckStep from "./pipeline/steps/ConfidenceCheckStep.js";
 import CacheWriteStep from "./pipeline/steps/CacheWriteStep.js";
+import ContextEnrichmentStep from "./pipeline/steps/ContextEnrichmentStep.js";
+import { SourceCodeAnalyzer } from "../services/source-analyzer.js";
 
 export interface OrchestratorOptions {
 	context: ContextConfig;
+	deepContext?: boolean;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	progressOptions?: any;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,6 +122,9 @@ class Orchestrator {
 	public vectorStore: VectorStore;
 	public embeddingProvider: EmbeddingProvider;
 	public vectorStats: VectorMemoryStats;
+
+	// Source Code Analysis
+	public sourceAnalyzer: SourceCodeAnalyzer;
 
 	public confidenceSettings: ConfidenceSettings;
 	private concurrencyLimit: number;
@@ -249,6 +255,26 @@ class Orchestrator {
 			});
 		}
 
+		// Initialize Source Analyzer
+		if (options.sourceCodeAnalyzer) {
+			this.sourceAnalyzer = options.sourceCodeAnalyzer;
+			// Assumed initialized or self-initializing
+		} else {
+			this.sourceAnalyzer = new SourceCodeAnalyzer();
+			// Fire and forget initialization (or await if strict)
+			// We'll trust it catches up or is fast enough for the first few items,
+			// or we can await it if we want to block startup.
+			// For CLI responsiveness, we might want to await it only if deep context is enabled.
+			const deepContextEnabled = options.deepContext !== false; // Enabled by default
+			if (deepContextEnabled) {
+				this.sourceAnalyzer.initialize().catch((err) => {
+					if (this.advanced.debug) {
+						console.warn("Source analyzer init failed:", err.message);
+					}
+				});
+			}
+		}
+
 		// Initialize Pipeline
 		this.pipeline = new Pipeline();
 		this._buildPipeline();
@@ -297,6 +323,10 @@ class Orchestrator {
 		this.pipeline.use(new GlossaryPreStep(this.glossaryManager));
 
 		// 4. Translation
+		// 3.5 Context Enrichment (Deep Context)
+		const deepContextEnabled = this.options.deepContext !== false;
+		this.pipeline.use(new ContextEnrichmentStep(this.sourceAnalyzer, deepContextEnabled));
+
 		this.pipeline.use(new TranslationStep(this.options, this.confidenceSettings));
 
 		// 4.5 Vector Cache Write (save new translations)

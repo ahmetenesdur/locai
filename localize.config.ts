@@ -1,16 +1,20 @@
 /**
  * Localization Tool Configuration
- * Version: 2.4.0 - ES Module format
+ * Version: 2.5.0 - ES Module format
  * Controls API providers, performance settings, and quality controls
  */
 
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.4.0",
+	version: "2.5.0",
 	localesDir: "./locales",
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
+
+	// Deep Context (Source Code Analysis)
+	// Scans source code for context (component name, comments, props)
+	deepContext: true,
 
 	// Optional: Filter by specific file extensions
 	// fileExtensions: [".json", ".arb"],

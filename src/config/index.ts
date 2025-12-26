@@ -13,6 +13,13 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	targets?: string[];
 
 	/**
+	 * Deep Context (Source Code Analysis)
+	 * Scans source code for context (component name, comments, props)
+	 * @default true
+	 */
+	deepContext?: boolean;
+
+	/**
 	 * Filter by file extensions (e.g. ['.json', '.arb'])
 	 */
 	fileExtensions?: string[];

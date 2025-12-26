@@ -39,9 +39,9 @@ Choose the right brain for your localization. Compare OpenAI, Gemini, DeepSeek, 
 
 Deep dive into Locai's intelligent features. We didn't just wrap an API; we built a localization engine.
 
-- **🧠 Smart Context Awareness**: Uses AI to understand the context of your strings for better translations.
-- **🔬 Deep Context Analysis**: Scans your source code (AST) to extract component names, comments, and props for context-aware translations.
-- **📚 Infinite Memory**: Uses vector embeddings to remember previous translations and maintain consistency. If you translate the same (or similar) sentence again, we fetch it from local cache instantly. Zero cost, 100% consistency.
+- **Smart Context Awareness**: Uses AI to understand the context of your strings for better translations.
+- **Deep Context Analysis**: Scans your source code (AST) to extract component names, comments, and props for context-aware translations.
+- **Infinite Memory**: Uses vector embeddings to remember previous translations and maintain consistency. If you translate the same (or similar) sentence again, we fetch it from local cache instantly. Zero cost, 100% consistency.
 - **Smart Sync**: We hash every key. Locai only translates **new** or **modified** keys. If you have 1000 keys and change 5, we only send 5 to the AI.
 - **Context Awareness**: Locai analyzes your content. It knows if a string is for a **Button** (keep it short), **Marketing** (make it punchy), or **Legal** (be precise).
 - **Glossary & Brand Safety**: Define immutable terms (like "Locai", "API", "SaaS"). We guarantee they are never translated or corrupted.

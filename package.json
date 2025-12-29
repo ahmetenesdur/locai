@@ -75,7 +75,7 @@
 		"axios": "1.13.2",
 		"c12": "^3.3.3",
 		"commander": "^14.0.2",
-		"dot-properties": "^1.1.0",
+		"dot-properties": "^1.1.1",
 		"dotenv": "^17.2.3",
 		"fast-xml-parser": "^5.3.3",
 		"gettext-parser": "^8.0.0",

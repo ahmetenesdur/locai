@@ -7,7 +7,7 @@
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.5.0",
+	version: "2.5.2",
 	localesDir: "./locales",
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],

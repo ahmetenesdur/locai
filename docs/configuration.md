@@ -53,41 +53,72 @@ Below is the full list of available options, including advanced performance, qua
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.5.0",
+	version: "2.5.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language code (ISO 639-1)
 	targets: ["tr", "de", "es"], // Target language codes
 
 	// Deep Context (Source Code Analysis)
-	deepContext: true, // Scans source code for better context (component names, props)
+	deepContext: true, // Scans source code for context (component name, comments, props)
 
-	// ===== API PROVIDERS =====
-	apiProvider: "openai", // 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'xai' | 'dashscope'
-	useFallback: true, // Automatically switch providers if one fails
-	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"], // Priority order
-
-	// Provider-specific configs (overrides defaults)
+	// API Provider Configuration
+	apiProvider: "openai",
+	useFallback: true,
+	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"],
 	apiConfig: {
+		dashscope: {
+			model: "qwen-plus",
+			temperature: 0.3,
+			maxTokens: 2000,
+		},
+		xai: {
+			model: "grok-4",
+			temperature: 0.3,
+			maxTokens: 2000,
+		},
 		openai: {
 			model: "gpt-4o",
 			temperature: 0.3,
 			maxTokens: 2000,
 		},
+		deepseek: {
+			model: "deepseek-chat",
+			temperature: 0.1,
+			maxTokens: 2000,
+		},
 		gemini: {
 			model: "gemini-3-flash",
+			temperature: 0.3,
+			maxTokens: 2000,
 		},
 		anthropic: {
 			model: "claude-haiku-4-5-20251001",
+			temperature: 0.3,
+			maxTokens: 4096,
 		},
-		// ... (see docs/providers.md for full list)
 	},
 
-	// ===== PERFORMANCE & CACHING =====
-	concurrencyLimit: 5, // Max parallel requests. Lower if hitting rate limits.
-	cacheEnabled: true, // Enable caching to save costs
-	cacheTTL: 24 * 60 * 60 * 1000, // Cache validity (24 hours)
+	// Performance Optimization
+	concurrencyLimit: 1,
+	cacheEnabled: true,
+	cacheTTL: 24 * 60 * 60 * 1000,
+	cacheSize: 2000,
+	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
+	allowStaleCache: true, // Allow returning stale cache while refreshing
+	staleWhileRevalidate: true, // Serve stale content while revalidating in background
 
-	// Rate Limiter (Speed vs Stability)
+	// Vector Memory (Infinite Memory)
+	// Semantic caching using embeddings to find similar translations
+	vectorMemory: {
+		enabled: true,
+		similarityThreshold: 0.85, // Minimum similarity to use as context
+		exactMatchThreshold: 0.98, // Minimum similarity to use directly as translation
+		vectorDbPath: "./.localize-cache/vector-memory",
+		embeddingProvider: "openai", // Provider for generating embeddings
+		embeddingModel: "text-embedding-3-small",
+	},
+
+	// Rate Limiter Configuration
 	rateLimiter: {
 		enabled: true,
 		providerLimits: {
@@ -98,88 +129,176 @@ export default defineConfig({
 			gemini: { rpm: 500, concurrency: 12 },
 			anthropic: { rpm: 50, concurrency: 5 },
 		},
+		queueStrategy: "fifo",
+		adaptiveThrottling: false,
+		queueTimeout: 10000,
 	},
 
-	// ===== QUALITY & CONTEXT =====
+	// Error Handling
+	retryOptions: {
+		maxRetries: 2,
+		initialDelay: 1000,
+		maxDelay: 10000,
+		retryableErrors: ["rate_limit", "timeout", "network", "server", "unknown"],
+		perProviderRetry: {
+			dashscope: { maxRetries: 3 },
+			openai: { maxRetries: 2 },
+			anthropic: { maxRetries: 2 },
+		},
+	},
 
-	// Context Awareness (Smart Translation)
+	// Translation Quality and Context
 	context: {
 		enabled: true,
-		useAI: true, // Use AI to analyze context (Technical, Marketing, etc.)
-		minTextLength: 200, // Only analyze longer texts to save tokens
+		useAI: true,
+		aiProvider: "openai",
+		minTextLength: 200,
+		allowNewCategories: true,
+		debug: false,
 		analysisOptions: {
-			model: "gpt-4o", // Use a smart model for analysis
+			model: "gpt-4o",
+			temperature: 0.2,
+			maxTokens: 1000,
+		},
+		detection: {
+			threshold: 2,
+			minConfidence: 0.6,
 		},
 		categories: {
-			// Custom categories
+			technical: {
+				keywords: ["API", "backend", "database", "server", "endpoint"],
+				prompt: "Preserve technical terms and variable names",
+				weight: 1.3,
+			},
 			marketing: {
-				keywords: ["brand", "buy", "sale"],
-				prompt: "Use persuasive, engaging language.",
+				keywords: ["brand", "campaign", "customer", "audience"],
+				prompt: "Use persuasive and engaging language appropriate for marketing content",
+				weight: 1.1,
 			},
 		},
 	},
 
-	// Quality Assurance Checks
+	// Quality Checks
 	qualityChecks: {
-		enabled: true,
-		autoFix: true, // Automatically fix simple issues
+		enabled: true, // Enable quality checks
 		rules: {
-			placeholderConsistency: true, // Ensure {{name}} is preserved
-			htmlTagsConsistency: true, // Ensure <b>tags</b> are preserved
+			placeholderConsistency: true, // Check placeholders
+			htmlTagsConsistency: true, // Check HTML tags
 			punctuationCheck: true, // Check punctuation
-			quoteBalanceCheck: true, // Fix invalid JSON quotes
-			lengthValidation: true, // Warn if translation is too long/short
+			quoteBalanceCheck: true, // Check quote balance
+			lengthValidation: true, // Check text length
 			sanitizeOutput: true, // Clean output text
 			markdownPreservation: true, // Preserve markdown
 			specialCharacters: true, // Maintain special characters
 			codeBlockPreservation: true, // Preserve code blocks
 		},
+		autoFix: true, // Auto-fix common issues
 	},
 
-	// Style Guide & Tone
+	// Style Guide
 	styleGuide: {
-		formality: "neutral", // 'formal' | 'informal' | 'neutral'
-		toneOfVoice: "friendly", // 'professional' | 'friendly' | 'tech'
-		enforceTone: true, // Use AI to audit tone
+		formality: "neutral", // formal, neutral, informal
+		toneOfVoice: "professional", // professional, friendly, casual, technical
+		toneProvider: "openai", // Provider for tone verification
+		enforceTone: true, // Validate tone with AI (Smart Stylist)
+		analysisOptions: {
+			model: "gpt-4o",
+			temperature: 0.1,
+		},
 		conventions: {
-			useOxfordComma: true,
-			useSentenceCase: true,
+			useOxfordComma: true, // Use Oxford comma in lists
+			useSentenceCase: true, // Use sentence case for headings
 		},
 	},
 
-	// ===== ADVANCED FEATURES =====
-
-	// Infinite Memory (Vector Cache)
-	vectorMemory: {
-		enabled: true,
-		similarityThreshold: 0.85, // 85% match triggers context reuse
-		exactMatchThreshold: 0.98, // 98% match triggers direct reuse
-	},
-
-	// Glossary (Brand Protection)
-	glossary: {
-		enabled: true,
-		glossary: {
-			Locai: "Locai",
-			API: "API",
-			Cloud: {
-				tr: "Bulut",
-				es: "Nube",
+	// Length Control
+	lengthControl: {
+		mode: "smart", // strict, flexible, exact, relaxed, smart
+		rules: {
+			strict: 0.1, // 10% deviation
+			flexible: 0.3, // 30% deviation
+			exact: 0.05, // 5% deviation
+			relaxed: 0.5, // 50% deviation
+			smart: {
+				default: 0.15, // Default tolerance
+				byLanguage: {
+					ja: { max: 0.35, min: -0.2 },
+					zh: { max: 0.35, min: -0.2 },
+					// ... other languages
+				},
+				byContext: {
+					technical: { max: 0.2, min: -0.1 },
+					marketing: { max: 0.3, min: -0.15 },
+					// ... other contexts
+				},
 			},
 		},
 	},
 
-	// Synchronization Options
-	syncOptions: {
-		enabled: true,
-		removeDeletedKeys: true, // Delete keys from targets if removed from source
-		retranslateModified: true, // Detect content changes
+	// Loggging & Progress
+	progressOptions: {
+		logToConsole: true,
+		logFrequency: 1,
+	},
+	logging: {
+		verbose: false,
+		saveErrorLogs: true,
+		logDirectory: "./logs",
+		logRotation: { enabled: true },
 	},
 
-	// Manual Review
-	saveReviewQueue: false, // Save low-confidence items for `locai review`
+	// File Operations
+	fileOperations: {
+		backupFiles: false,
+		backupDir: "./.backups",
+		atomic: true,
+		createMissingDirs: true,
+	},
+
+	// Synchronization
+	syncOptions: {
+		enabled: true,
+		removeDeletedKeys: true,
+		retranslateModified: true,
+		stateTracking: {
+			enabled: true,
+			stateFileName: "localization.state.json",
+			stateDir: ".localize-cache",
+		},
+	},
+
+	// Advanced Settings
+	advanced: {
+		timeoutMs: 15000,
+		maxKeyLength: 10000,
+		maxBatchSize: 30,
+		autoOptimize: true,
+		debug: false,
+	},
+
+	// Confidence Scoring
 	confidenceScoring: {
-		minConfidence: 0.7, // Flag translations below this score
+		enabled: false,
+		minConfidence: 0.7,
+		saveReviewQueue: false,
+		autoApproveThreshold: 0.9,
+		reviewThreshold: 0.7,
+		rejectThreshold: 0.5,
+	},
+
+	// Glossary
+	glossary: {
+		enabled: true,
+		caseSensitive: false,
+		preserveFormatting: true,
+		glossary: {
+			API: "API",
+			SDK: "SDK",
+			Dashboard: {
+				en: "Dashboard",
+				tr: "Kontrol Paneli",
+			},
+		},
 	},
 });
 ```

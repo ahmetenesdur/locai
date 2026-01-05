@@ -38,6 +38,7 @@ Thumbs.db
 # Project Specific
 .localize-cache/
 localization.state.json
+backups
 
 # Temporary
 tmp/

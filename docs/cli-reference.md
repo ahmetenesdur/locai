@@ -75,6 +75,23 @@ Validates your configuration file and environment without running any translatio
 locai validate-config --show-warnings
 ```
 
+### `advanced`
+
+Access advanced configuration and debugging options directly from the CLI.
+
+```bash
+locai advanced [options]
+```
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--context-confidence <0-1>` | Minimum confidence threshold for context detection |
+| `--context-debug` | Show detailed AI context analysis logs |
+| `--min-text-length <num>` | Minimum text length to trigger AI analysis |
+| `--allow-new-categories` | Allow AI to suggest new context categories |
+| `--max-retries <num>` | Maximum number of API retries |
+
 ## Examples
 
 **Production Build Run:**

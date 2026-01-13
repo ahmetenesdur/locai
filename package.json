@@ -85,22 +85,22 @@
 		"p-limit": "^7.2.0",
 		"prompts": "^2.4.2",
 		"ts-morph": "^27.0.2",
-		"vectra": "^0.11.1"
+		"vectra": "^0.12.3"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
 		"@types/js-yaml": "^4.0.9",
-		"@types/node": "^25.0.3",
+		"@types/node": "^25.0.7",
 		"@types/prompts": "^2.4.9",
-		"@vitest/coverage-v8": "^4.0.16",
+		"@vitest/coverage-v8": "^4.0.17",
 		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
-		"globals": "^16.5.0",
+		"globals": "^17.0.0",
 		"prettier": "^3.7.4",
 		"std-mocks": "^2.0.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.16"
+		"vitest": "^4.0.17"
 	},
 	"files": [
 		"dist/"

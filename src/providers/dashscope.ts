@@ -23,7 +23,7 @@ class DashScopeProvider extends BaseProvider {
 				...this.commonHeaders,
 				Authorization: `Bearer ${this.getApiKey()}`,
 			},
-			timeout: 30000,
+			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
 			validateStatus: (status) => status < 500,
 		});
@@ -35,7 +35,7 @@ class DashScopeProvider extends BaseProvider {
 				...this.commonHeaders,
 				Authorization: `Bearer ${this.getApiKey()}`,
 			},
-			timeout: 30000,
+			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
 			validateStatus: (status) => status < 500,
 		});

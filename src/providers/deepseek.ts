@@ -22,7 +22,7 @@ class DeepSeekProvider extends BaseProvider {
 				...this.commonHeaders,
 				Authorization: `Bearer ${this.getApiKey()}`,
 			},
-			timeout: 45000,
+			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
 			validateStatus: (status) => status < 500,
 		});

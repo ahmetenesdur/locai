@@ -89,14 +89,14 @@ export default defineConfig({
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
-		queueTimeout: 10000,
+		queueTimeout: 300000,
 	},
 
 	// Error Handling
 	retryOptions: {
 		maxRetries: 2,
 		initialDelay: 1000,
-		maxDelay: 10000,
+		maxDelay: 60000,
 		retryableErrors: ["rate_limit", "timeout", "network", "server", "unknown"],
 		perProviderRetry: {
 			dashscope: { maxRetries: 3 },
@@ -322,7 +322,7 @@ export default defineConfig({
 
 	// Advanced Settings
 	advanced: {
-		timeoutMs: 15000,
+		timeoutMs: 60000,
 		maxKeyLength: 10000,
 		maxBatchSize: 30,
 		autoOptimize: true,

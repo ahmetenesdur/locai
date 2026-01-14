@@ -23,7 +23,7 @@ class AnthropicProvider extends BaseProvider {
 				"x-api-key": this.getApiKey(),
 				"anthropic-version": "2023-06-01",
 			},
-			timeout: 30000,
+			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
 			validateStatus: (status) => status < 500,
 		});

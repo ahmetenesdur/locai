@@ -517,7 +517,7 @@ class RateLimiter {
 
 const config: RateLimiterConfig = {
 	queueStrategy: (process.env.QUEUE_STRATEGY as "fifo" | "priority") || "priority",
-	queueTimeout: parseInt(process.env.QUEUE_TIMEOUT || "30000"),
+	queueTimeout: parseInt(process.env.QUEUE_TIMEOUT || "60000"),
 	adaptiveThrottling: process.env.ADAPTIVE_THROTTLING !== "false",
 };
 

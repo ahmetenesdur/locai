@@ -59,6 +59,7 @@ Contributing to Locai? Learn how to build, test, and run the project locally.
 - **Framework Agnostic**: Works with Next.js, Flutter, Django, and more.
 - **Context Aware**: Knows the difference between "Home" (House) and "Home" (Page).
 - **Cost Efficient**: Smart caching and incremental updates save ~90% of AI costs.
+- **Flexible Structure**: Supports both flat (`en.json`) and nested (`en/translation.json`) directory structures automatically.
 - **Developer Friendly**: TypeScript config, type safety, and great error messages.
 
 ## 🤝 Community & Contributing

@@ -71,7 +71,7 @@ npx locai
 
 Locai will:
 
-1.  Detect your locale directory.
+1.  Detect your locale directory (supports flat `en.json` or nested `en/translation.json`).
 2.  Identify your source language files (e.g., `en.json`).
 3.  Look for missing keys in target languages.
 4.  Translate them using the configured AI.

@@ -373,18 +373,31 @@ class TranslationService {
 		options: TranslationOptions
 	) {
 		const sourceDir = path.dirname(sourceFile);
+		// Detect structure based on source file name
+		const isNestedStructure = path.basename(sourceFile) === "translation.json";
+
 		let totalRemoved = 0;
 		let filesProcessed = 0;
 
 		for (const targetLang of options.targets || []) {
 			try {
-				const safeTargetFilename = `${targetLang}.json`;
-				const targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
+				let targetPath: string;
+
+				if (isNestedStructure) {
+					// Nested: locales/tr/translation.json
+					const localesRoot = path.dirname(sourceDir);
+					const targetDir = path.join(localesRoot, targetLang);
+					targetPath = path.join(targetDir, "translation.json");
+				} else {
+					// Flat: locales/tr.json
+					const safeTargetFilename = `${targetLang}.json`;
+					targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
+				}
 
 				// Check if target file exists
 				const fileExists = await FileManager.exists(targetPath);
 				if (!fileExists) {
-					await uiManager.log(`   Skipping ${targetLang}.json (file doesn't exist)`);
+					await uiManager.log(`   Skipping ${targetLang} (file doesn't exist)`);
 					continue;
 				}
 
@@ -410,14 +423,12 @@ class TranslationService {
 						`   ${targetLang}.json: Removed ${removedFromThisFile} keys`
 					);
 				} else {
-					await uiManager.log(`   No keys to remove from ${targetLang}.json`);
+					await uiManager.log(`   No keys to remove from ${targetLang}`);
 				}
 
 				filesProcessed++;
 			} catch (error: any) {
-				await uiManager.log(
-					`   \u274c Error processing ${targetLang}.json: ${error.message}`
-				);
+				await uiManager.log(`   \u274c Error processing ${targetLang}: ${error.message}`);
 			}
 		}
 
@@ -439,14 +450,24 @@ class TranslationService {
 		const flattenedSource = ObjectTransformer.flatten(sourceContent);
 		const orchestrator = new Orchestrator(options as OrchestratorOptions);
 
+		const sourceDir = path.dirname(file);
+		const isNestedStructure = path.basename(file) === "translation.json";
+
 		const languageResults = await Promise.all(
 			(options.targets || []).map(async (targetLang) => {
 				try {
-					const targetPath = path.join(path.dirname(file), `${targetLang}.json`);
+					let targetPath: string;
+					if (isNestedStructure) {
+						const localesRoot = path.dirname(sourceDir);
+						targetPath = path.join(localesRoot, targetLang, "translation.json");
+					} else {
+						targetPath = path.join(sourceDir, `${targetLang}.json`);
+					}
+
 					const targetContent = await FileManager.readJSON(targetPath);
 					return { targetLang, targetPath, content: targetContent, success: true };
 				} catch (err: any) {
-					await uiManager.log(`Could not read ${targetLang}.json: ${err.message}`);
+					await uiManager.log(`Could not read ${targetLang}: ${err.message}`);
 					return {
 						targetLang,
 						targetPath: "",

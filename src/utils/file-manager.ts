@@ -73,12 +73,32 @@ class FileManager {
 	 * @param sourceLang - Source language code
 	 * @returns Array of file paths
 	 */
+	/**
+	 * Find locale files in the specified directory
+	 * @param localesDir - Directory containing locale files
+	 * @param sourceLang - Source language code
+	 * @returns Array of file paths
+	 */
 	static async findLocaleFiles(localesDir: string, sourceLang: string): Promise<string[]> {
 		try {
-			// Find any file with the source language name (ignoring extension)
+			// Priority 1: Check for nested structure: localesDir/sourceLang/translation.json
+			// This is the standard i18next-fs-backend pattern
+			const nestedPath = path.join(localesDir, sourceLang, "translation.json");
+			if (await this.exists(nestedPath)) {
+				return [nestedPath];
+			}
+
+			// Priority 2: Check for flat structure: localesDir/sourceLang.json
+			const flatPath = path.join(localesDir, `${sourceLang}.json`);
+			if (await this.exists(flatPath)) {
+				return [flatPath];
+			}
+
+			// Priority 3: Scan directory for any file starting with sourceLang
+			// This matches "en-US.json" or "en_GB.json" if sourceLang is "en"
 			const files = await fs.readdir(localesDir);
 			const sourceFiles = files
-				.filter((file) => file.startsWith(`${sourceLang}.`))
+				.filter((file) => file.startsWith(`${sourceLang}.`) || file === sourceLang)
 				.map((file) => path.join(localesDir, file));
 
 			if (sourceFiles.length === 0) {
@@ -87,9 +107,26 @@ class FileManager {
 				);
 			}
 
-			// Return the first match, or maybe prioritize JSON?
-			// For now, return all matches, but usually there's only one.
-			return sourceFiles;
+			// Filter specifically for files or directories that look like the locale
+			const validFiles = [];
+			for (const file of sourceFiles) {
+				const stats = await fs.stat(file);
+				if (stats.isDirectory()) {
+					// If it's a directory, check for translation.json inside
+					const nestedTrial = path.join(file, "translation.json");
+					if (await this.exists(nestedTrial)) {
+						validFiles.push(nestedTrial);
+					}
+				} else {
+					validFiles.push(file);
+				}
+			}
+
+			if (validFiles.length > 0) {
+				return validFiles;
+			}
+
+			throw new Error(`Source language file not found for '${sourceLang}' in ${localesDir}`);
 		} catch (err: any) {
 			if (err.code === "ENOENT") {
 				throw new Error(`Locales directory not found: ${localesDir}`);

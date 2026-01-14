@@ -68,8 +68,27 @@ export class LanguageProcessor {
 			statisticsManager.initLanguageStats(safeTargetLang);
 
 			const sourceDir = path.dirname(sourceFile);
-			const safeTargetFilename = `${safeTargetLang}.json`;
-			const targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
+
+			// Detect structure based on source file name
+			const isNestedStructure = path.basename(sourceFile) === "translation.json";
+
+			let targetPath: string;
+			if (isNestedStructure) {
+				// Nested: locales/tr/translation.json
+				// We assume sourceDir ends with the language code (e.g. .../en)
+				// So we need to go up one level and then into target lang
+				const localesRoot = path.dirname(sourceDir);
+				const targetDir = path.join(localesRoot, safeTargetLang);
+
+				// Ensure target directory exists for nested structure
+				await FileManager.ensureDir(targetDir);
+
+				targetPath = path.join(targetDir, "translation.json");
+			} else {
+				// Flat: locales/tr.json
+				const safeTargetFilename = `${safeTargetLang}.json`;
+				targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
+			}
 
 			let targetContent: Record<string, any> = {};
 			try {

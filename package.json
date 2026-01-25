@@ -78,7 +78,7 @@
 		"dot-properties": "^1.1.1",
 		"dotenv": "^17.2.3",
 		"fast-xml-parser": "^5.3.3",
-		"gettext-parser": "^9.0.0",
+		"gettext-parser": "^9.0.1",
 		"jiti": "^2.6.1",
 		"js-yaml": "^4.1.1",
 		"lru-cache": "^11.2.4",
@@ -90,17 +90,17 @@
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
 		"@types/js-yaml": "^4.0.9",
-		"@types/node": "^25.0.7",
+		"@types/node": "^25.0.10",
 		"@types/prompts": "^2.4.9",
-		"@vitest/coverage-v8": "^4.0.17",
+		"@vitest/coverage-v8": "^4.0.18",
 		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
-		"globals": "^17.0.0",
-		"prettier": "^3.7.4",
+		"globals": "^17.1.0",
+		"prettier": "^3.8.1",
 		"std-mocks": "^2.0.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.17"
+		"vitest": "^4.0.18"
 	},
 	"files": [
 		"dist/"

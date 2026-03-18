@@ -7,7 +7,7 @@
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.6.1",
+	version: "2.6.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json) structures.
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],

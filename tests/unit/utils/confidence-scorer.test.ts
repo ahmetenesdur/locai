@@ -70,6 +70,21 @@ describe("ConfidenceScorer", () => {
 			);
 		});
 
+		it("should apply language pair rules to tags with script or region subtags", () => {
+			const plain = ConfidenceScorer.calculateConfidence({
+				...baseOptions,
+				sourceLang: "en",
+				targetLang: "zh",
+			});
+			const tagged = ConfidenceScorer.calculateConfidence({
+				...baseOptions,
+				sourceLang: "en-US",
+				targetLang: "zh-Hant-TW",
+			});
+
+			expect(tagged.details.languageFactor).toBe(plain.details.languageFactor);
+		});
+
 		it("should punish lengths deviation", () => {
 			const result = ConfidenceScorer.calculateConfidence({
 				...baseOptions,

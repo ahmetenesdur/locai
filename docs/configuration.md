@@ -84,8 +84,8 @@ export default defineConfig({
 	// ===== BASIC SETTINGS =====
 	version: "2.6.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored
-	source: "en", // Source language code (ISO 639-1)
-	targets: ["tr", "de", "es"], // Target language codes
+	source: "en", // Source language (BCP 47 tag, e.g. "en", "pt-BR", "zh-Hant")
+	targets: ["tr", "de", "es"], // Target language tags; also used as output file names (e.g. pt-BR.json)
 
 	// Deep Context (Source Code Analysis)
 	deepContext: true, // Scans source code for context (component name, comments, props)

@@ -79,7 +79,13 @@ export interface AppConfig {
 }
 
 class InputValidator {
-	static LANGUAGE_CODE_PATTERN: RegExp = /^[a-z]{2}(-[a-z]{2})?$/;
+	/**
+	 * Well-formed BCP 47 language tag, limited to the subtags locai supports:
+	 * a 2-3 letter language, an optional 4-letter script and an optional
+	 * 2-letter or 3-digit region (e.g. "en", "fil", "pt-BR", "zh-Hant-TW", "es-419").
+	 * Matching is case-insensitive; see validateLanguageCode for canonical casing.
+	 */
+	static LANGUAGE_CODE_PATTERN: RegExp = /^([a-z]{2,3})(?:-([a-z]{4}))?(?:-([a-z]{2}|\d{3}))?$/i;
 	static VALID_PROVIDERS: string[] = [
 		"dashscope",
 		"xai",
@@ -105,10 +111,12 @@ class InputValidator {
 	private static _requestCounts?: Map<string, number>;
 
 	/**
-	 * Validate and sanitize language code.
-	 * @param {string} langCode - Language code to validate.
+	 * Validate a BCP 47 language tag and return it in canonical casing:
+	 * lowercase language, title-case script, uppercase region
+	 * (e.g. "ZH-hant-tw" -> "zh-Hant-TW", "PT-br" -> "pt-BR").
+	 * @param {string} langCode - Language tag to validate.
 	 * @param {string} [paramName="language"] - Parameter name for error messages.
-	 * @returns {string} - Sanitized language code.
+	 * @returns {string} - Canonical language tag.
 	 * @throws {Error} If validation fails.
 	 */
 	static validateLanguageCode(langCode: string, paramName: string = "language"): string {
@@ -116,27 +124,33 @@ class InputValidator {
 			throw new Error(`${paramName} must be a non-empty string`);
 		}
 
-		const sanitized = langCode.trim().toLowerCase();
+		const trimmed = langCode.trim();
 
-		if (sanitized.length === 0) {
+		if (trimmed.length === 0) {
 			throw new Error(`${paramName} cannot be empty after trimming`);
 		}
 
-		if (sanitized.length > 10) {
-			throw new Error(`${paramName} code too long: '${langCode}' (max 10 characters)`);
-		}
-
-		if (sanitized.includes("..") || sanitized.includes("/") || sanitized.includes("\\")) {
+		if (trimmed.includes("..") || trimmed.includes("/") || trimmed.includes("\\")) {
 			throw new Error(`${paramName} code contains forbidden characters: '${langCode}'`);
 		}
 
-		if (!this.LANGUAGE_CODE_PATTERN.test(sanitized)) {
+		const match = this.LANGUAGE_CODE_PATTERN.exec(trimmed);
+		if (!match) {
 			throw new Error(
-				`Invalid ${paramName} code: '${langCode}'. Must match pattern: ${this.LANGUAGE_CODE_PATTERN}`
+				`Invalid ${paramName} code: '${langCode}'. Expected a BCP 47 language tag such as 'en', 'fil', 'pt-BR', 'zh-Hant' or 'es-419'`
 			);
 		}
 
-		return sanitized;
+		const [, language, script, region] = match;
+		let canonical = language.toLowerCase();
+		if (script) {
+			canonical += `-${script.charAt(0).toUpperCase()}${script.slice(1).toLowerCase()}`;
+		}
+		if (region) {
+			canonical += `-${region.toUpperCase()}`;
+		}
+
+		return canonical;
 	}
 
 	/**
@@ -314,6 +328,8 @@ class InputValidator {
 
 	/**
 	 * Validate configuration object.
+	 * Rewrites `source` and `targets` in place to canonical BCP 47 casing so that
+	 * file lookups and per-language settings all see the same tag.
 	 * @param {any} config - Configuration object to validate.
 	 * @returns {AppConfig} - Validated configuration.
 	 * @throws {Error} If configuration is invalid.
@@ -334,7 +350,7 @@ class InputValidator {
 			errors.push("Missing required field 'source' (source language)");
 		} else {
 			try {
-				this.validateLanguageCode(config.source, "source language");
+				config.source = this.validateLanguageCode(config.source, "source language");
 			} catch (error: any) {
 				errors.push(`Invalid source language: ${error.message}`);
 			}
@@ -344,7 +360,7 @@ class InputValidator {
 			errors.push("Missing or empty 'targets' array (target languages)");
 		} else {
 			try {
-				this.validateLanguageCodes(config.targets, "target languages");
+				config.targets = this.validateLanguageCodes(config.targets, "target languages");
 			} catch (error: any) {
 				errors.push(`Invalid target languages: ${error.message}`);
 			}

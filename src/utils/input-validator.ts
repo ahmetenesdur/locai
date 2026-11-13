@@ -79,7 +79,13 @@ export interface AppConfig {
 }
 
 class InputValidator {
-	static LANGUAGE_CODE_PATTERN: RegExp = /^[a-z]{2}(-[a-z]{2})?$/;
+	/**
+	 * Well-formed BCP 47 language tag, limited to the subtags locai supports:
+	 * a 2-3 letter language, an optional 4-letter script and an optional
+	 * 2-letter or 3-digit region (e.g. "en", "fil", "pt-BR", "zh-Hant-TW", "es-419").
+	 * Matching is case-insensitive; see validateLanguageCode for canonical casing.
+	 */
+	static LANGUAGE_CODE_PATTERN: RegExp = /^([a-z]{2,3})(?:-([a-z]{4}))?(?:-([a-z]{2}|\d{3}))?$/i;
 	static VALID_PROVIDERS: string[] = [
 		"dashscope",
 		"xai",
@@ -93,22 +99,13 @@ class InputValidator {
 	static MAX_PATH_LENGTH: number = 1000;
 	static MAX_CONFIG_DEPTH: number = 10;
 
-	static DANGEROUS_PATTERNS: RegExp[] = [
-		/\.\.\//g,
-		/\0/g,
-		/[\x00-\x08\x0b\x0c\x0e-\x1f\x7F]/g, // eslint-disable-line no-control-regex
-		/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-		/javascript:/gi,
-		/data:.*base64/gi,
-	];
-
-	private static _requestCounts?: Map<string, number>;
-
 	/**
-	 * Validate and sanitize language code.
-	 * @param {string} langCode - Language code to validate.
+	 * Validate a BCP 47 language tag and return it in canonical casing:
+	 * lowercase language, title-case script, uppercase region
+	 * (e.g. "ZH-hant-tw" -> "zh-Hant-TW", "PT-br" -> "pt-BR").
+	 * @param {string} langCode - Language tag to validate.
 	 * @param {string} [paramName="language"] - Parameter name for error messages.
-	 * @returns {string} - Sanitized language code.
+	 * @returns {string} - Canonical language tag.
 	 * @throws {Error} If validation fails.
 	 */
 	static validateLanguageCode(langCode: string, paramName: string = "language"): string {
@@ -116,27 +113,33 @@ class InputValidator {
 			throw new Error(`${paramName} must be a non-empty string`);
 		}
 
-		const sanitized = langCode.trim().toLowerCase();
+		const trimmed = langCode.trim();
 
-		if (sanitized.length === 0) {
+		if (trimmed.length === 0) {
 			throw new Error(`${paramName} cannot be empty after trimming`);
 		}
 
-		if (sanitized.length > 10) {
-			throw new Error(`${paramName} code too long: '${langCode}' (max 10 characters)`);
-		}
-
-		if (sanitized.includes("..") || sanitized.includes("/") || sanitized.includes("\\")) {
+		if (trimmed.includes("..") || trimmed.includes("/") || trimmed.includes("\\")) {
 			throw new Error(`${paramName} code contains forbidden characters: '${langCode}'`);
 		}
 
-		if (!this.LANGUAGE_CODE_PATTERN.test(sanitized)) {
+		const match = this.LANGUAGE_CODE_PATTERN.exec(trimmed);
+		if (!match) {
 			throw new Error(
-				`Invalid ${paramName} code: '${langCode}'. Must match pattern: ${this.LANGUAGE_CODE_PATTERN}`
+				`Invalid ${paramName} code: '${langCode}'. Expected a BCP 47 language tag such as 'en', 'fil', 'pt-BR', 'zh-Hant' or 'es-419'`
 			);
 		}
 
-		return sanitized;
+		const [, language, script, region] = match;
+		let canonical = language.toLowerCase();
+		if (script) {
+			canonical += `-${script.charAt(0).toUpperCase()}${script.slice(1).toLowerCase()}`;
+		}
+		if (region) {
+			canonical += `-${region.toUpperCase()}`;
+		}
+
+		return canonical;
 	}
 
 	/**
@@ -314,6 +317,8 @@ class InputValidator {
 
 	/**
 	 * Validate configuration object.
+	 * Rewrites `source` and `targets` in place to canonical BCP 47 casing so that
+	 * file lookups and per-language settings all see the same tag.
 	 * @param {any} config - Configuration object to validate.
 	 * @returns {AppConfig} - Validated configuration.
 	 * @throws {Error} If configuration is invalid.
@@ -334,7 +339,7 @@ class InputValidator {
 			errors.push("Missing required field 'source' (source language)");
 		} else {
 			try {
-				this.validateLanguageCode(config.source, "source language");
+				config.source = this.validateLanguageCode(config.source, "source language");
 			} catch (error: any) {
 				errors.push(`Invalid source language: ${error.message}`);
 			}
@@ -344,7 +349,7 @@ class InputValidator {
 			errors.push("Missing or empty 'targets' array (target languages)");
 		} else {
 			try {
-				this.validateLanguageCodes(config.targets, "target languages");
+				config.targets = this.validateLanguageCodes(config.targets, "target languages");
 			} catch (error: any) {
 				errors.push(`Invalid target languages: ${error.message}`);
 			}
@@ -758,63 +763,6 @@ class InputValidator {
 	}
 
 	/**
-	 * Sanitize translation text for security.
-	 * @param {string | null} text - Text to sanitize.
-	 * @returns {string | null} - Sanitized text.
-	 */
-	static sanitizeTranslationText(text: string | null): string | null {
-		if (!text || typeof text !== "string") {
-			return text;
-		}
-
-		let sanitized = text;
-
-		for (const pattern of this.DANGEROUS_PATTERNS) {
-			sanitized = sanitized.replace(pattern, "");
-		}
-
-		sanitized = sanitized
-			.replace(/\r\n/g, "\n")
-			.replace(/\r/g, "\n")
-			.replace(/\n{3,}/g, "\n\n")
-			.trim();
-
-		return sanitized;
-	}
-
-	/**
-	 * Validate API key format.
-	 * @param {string} apiKey - API key to validate.
-	 * @param {string} providerName - Provider name.
-	 * @returns {boolean} - True if valid.
-	 * @throws {Error} If key is invalid.
-	 */
-	static validateApiKeyFormat(apiKey: string, providerName: string): boolean {
-		if (!apiKey || typeof apiKey !== "string") {
-			throw new Error(`${providerName} API key must be a non-empty string`);
-		}
-
-		if (apiKey.length < 10) {
-			throw new Error(`${providerName} API key appears too short`);
-		}
-
-		if (apiKey.length > 200) {
-			throw new Error(`${providerName} API key appears too long`);
-		}
-
-		const lowercaseKey = apiKey.toLowerCase();
-		const invalidPatterns = ["test", "placeholder", "example", "your-api-key", "sk-test"];
-
-		for (const pattern of invalidPatterns) {
-			if (lowercaseKey.includes(pattern)) {
-				throw new Error(`${providerName} API key appears to be a placeholder`);
-			}
-		}
-
-		return true;
-	}
-
-	/**
 	 * Validate object depth to prevent circular references and deep nesting.
 	 * @param {any} obj - Object to validate.
 	 * @param {number} [maxDepth=10] - Maximum depth.
@@ -836,41 +784,6 @@ class InputValidator {
 				if (value && typeof value === "object") {
 					this.validateObjectDepth(value, maxDepth, currentDepth + 1);
 				}
-			}
-		}
-
-		return true;
-	}
-
-	/**
-	 * Validate request rate for an identifier.
-	 * @param {string} identifier - Identifier (e.g., user ID or IP).
-	 * @param {number} [maxRequestsPerMinute=60] - Max requests per minute.
-	 * @returns {boolean} - True if allowed.
-	 * @throws {Error} If rate limit exceeded.
-	 */
-	static validateRequestRate(identifier: string, maxRequestsPerMinute: number = 60): boolean {
-		const now = Date.now();
-		const minute = Math.floor(now / 60000);
-
-		if (!this._requestCounts) {
-			this._requestCounts = new Map();
-		}
-
-		const key = `${identifier}-${minute}`;
-		const currentCount = this._requestCounts.get(key) || 0;
-
-		if (currentCount >= maxRequestsPerMinute) {
-			throw new Error(`Too many requests from ${identifier}. Please try again later.`);
-		}
-
-		this._requestCounts.set(key, currentCount + 1);
-
-		// Cleanup old entries
-		for (const [k] of this._requestCounts) {
-			const [, keyMinute] = k.split("-");
-			if (parseInt(keyMinute) < minute - 5) {
-				this._requestCounts.delete(k);
 			}
 		}
 

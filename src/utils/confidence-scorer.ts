@@ -194,7 +194,11 @@ class ConfidenceScorer {
 	/**
 	 * Get language pair complexity factor
 	 */
-	private static _getLanguagePairFactor(sourceLang: string, targetLang: string): number {
+	private static _getLanguagePairFactor(sourceTag: string, targetTag: string): number {
+		// Compare on the primary language subtag so "zh-Hant" or "pt-BR" behave like "zh" / "pt"
+		const sourceLang = sourceTag.split("-")[0].toLowerCase();
+		const targetLang = targetTag.split("-")[0].toLowerCase();
+
 		// Similar language pairs get higher confidence
 		const similarPairs: Record<string, string[]> = {
 			en: ["es", "fr", "de", "pl"],

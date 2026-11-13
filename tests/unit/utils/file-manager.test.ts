@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { FileManager } from "../../../src/utils/file-manager";
 import { promises as fs } from "fs";
 import { JsonAdapter } from "../../../src/core/adapters/json-adapter";
@@ -59,15 +59,43 @@ describe("FileManager", () => {
 	});
 
 	describe("findLocaleFiles", () => {
-		it("should find valid locale files", async () => {
-			(fs.readdir as any).mockResolvedValue(["en.json", "tr.json", "rubbish.txt"]);
+		// FileManager.exists() is backed by fs.access, so the mocked filesystem must
+		// reject access for paths that are not present.
+		const mockExistingPaths = (paths: string[]) => {
+			vi.mocked(fs.access).mockImplementation(async (p) => {
+				if (!paths.includes(String(p))) {
+					throw Object.assign(new Error(`ENOENT: ${String(p)}`), { code: "ENOENT" });
+				}
+			});
+		};
+
+		it("should prefer the nested <lang>/translation.json structure", async () => {
+			mockExistingPaths(["/locales/en/translation.json", "/locales/en.json"]);
+
+			const result = await FileManager.findLocaleFiles("/locales", "en");
+			expect(result).toEqual(["/locales/en/translation.json"]);
+		});
+
+		it("should find the flat <lang>.json structure", async () => {
+			mockExistingPaths(["/locales/en.json", "/locales/tr.json"]);
 
 			const result = await FileManager.findLocaleFiles("/locales", "en");
 			expect(result).toEqual(["/locales/en.json"]);
+			expect(fs.readdir).not.toHaveBeenCalled();
+		});
+
+		it("should fall back to scanning the directory for other extensions", async () => {
+			mockExistingPaths([]);
+			(fs.readdir as unknown as Mock).mockResolvedValue(["en.yaml", "tr.yaml", "notes.txt"]);
+			(fs.stat as unknown as Mock).mockResolvedValue({ isDirectory: () => false });
+
+			const result = await FileManager.findLocaleFiles("/locales", "en");
+			expect(result).toEqual(["/locales/en.yaml"]);
 		});
 
 		it("should throw if source language not found", async () => {
-			(fs.readdir as any).mockResolvedValue(["tr.json"]);
+			mockExistingPaths([]);
+			(fs.readdir as unknown as Mock).mockResolvedValue(["tr.json"]);
 
 			await expect(FileManager.findLocaleFiles("/locales", "en")).rejects.toThrow(
 				"Source language file not found"

@@ -318,14 +318,15 @@ class ErrorHelper {
 				code: this.ErrorCodes.VALIDATION_LANGUAGE,
 				message: `Invalid language code: ${details.langCode || "unknown"}`,
 				context: [
-					"Language code must be ISO 639-1 format (e.g., 'en', 'tr', 'de')",
-					"Only lowercase 2-letter codes are supported",
-					"Regional codes like 'en-US' are not yet supported",
+					"Language codes must be BCP 47 language tags",
+					"Format: 2-3 letter language, optional 4-letter script, optional 2-letter or 3-digit region",
+					"Examples: 'en', 'fil', 'pt-BR', 'zh-Hant', 'zh-Hant-TW', 'es-419'",
 				],
 				solutions: [
-					"Use ISO 639-1 two-letter codes (e.g., 'en' instead of 'english')",
-					"Check supported languages: https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes",
-					`Update your config: ${details.field || "targets"} = ["en", "tr", "de"]`,
+					"Use a language tag instead of a language name (e.g., 'en' instead of 'english')",
+					"Separate subtags with '-' (e.g., 'pt-BR', not 'pt_BR')",
+					"Look up tags in the IANA Language Subtag Registry: https://www.iana.org/assignments/language-subtag-registry",
+					`Update your config: ${details.field || "targets"} = ["en", "pt-BR", "zh-Hant"]`,
 				],
 			},
 		};

@@ -64,7 +64,7 @@
 	},
 	"homepage": "https://github.com/ahmetenesdur/locai#readme",
 	"engines": {
-		"node": ">=14.13.0"
+		"node": "^20.19.0 || >=22.0.0"
 	},
 	"exports": {
 		".": "./dist/core/orchestrator.js",

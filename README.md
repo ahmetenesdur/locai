@@ -1,5 +1,7 @@
 # Locai
 
+[![CI](https://github.com/ahmetenesdur/locai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ahmetenesdur/locai/actions/workflows/ci.yml)
+
 **The Universal AI Localization Engine.**
 
 Locai brings human-quality AI localization to **any project** (Next.js, Flutter, Android, iOS, Python) and **any file format** with a single command. It fits right into your workflow, whether you're a solo dev or an enterprise team.
@@ -44,7 +46,7 @@ Deep dive into Locai's intelligent features. We didn't just wrap an API; we buil
 - **Infinite Memory**: Uses vector embeddings to remember previous translations and maintain consistency. If you translate the same (or similar) sentence again, we fetch it from local cache instantly. Zero cost, 100% consistency.
 - **Smart Sync**: We hash every key. Locai only translates **new** or **modified** keys. If you have 1000 keys and change 5, we only send 5 to the AI.
 - **Context Awareness**: Locai analyzes your content. It knows if a string is for a **Button** (keep it short), **Marketing** (make it punchy), or **Legal** (be precise).
-- **Glossary & Brand Safety**: Define immutable terms (like "Locai", "API", "SaaS"). We guarantee they are never translated or corrupted.
+- **Glossary & Brand Safety**: Define protected terms (like "Locai", "API", "SaaS"). Locai swaps them for placeholder tokens before the text reaches the AI, then restores your configured translation, so the model never sees the original term.
 - **Auto-Fix Engine**: Did the AI forget a closing quote? Or mess up a `{placeholder}`? Locai detects these syntax errors and fixes them automatically before saving.
 - **Multi-Provider Fallback**: OpenAI down? Rate limit hit? Locai automatically switches to Gemini, DeepSeek, or other configured providers without breaking the build.
 - **Confidence Scoring**: Every translation gets a score (0-1). Low confidence translations are flagged for your review.
@@ -58,7 +60,7 @@ Contributing to Locai? Learn how to build, test, and run the project locally.
 
 - **Framework Agnostic**: Works with Next.js, Flutter, Django, and more.
 - **Context Aware**: Knows the difference between "Home" (House) and "Home" (Page).
-- **Cost Efficient**: Smart caching and incremental updates save ~90% of AI costs.
+- **Cost Efficient**: Only new or changed keys are sent to the AI, and strings already translated in the current run or found in translation memory are reused instead of triggering another API call.
 - **Flexible Structure**: Supports both flat (`en.json`) and nested (`en/translation.json`) directory structures automatically.
 - **Developer Friendly**: TypeScript config, type safety, and great error messages.
 

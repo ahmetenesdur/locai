@@ -38,12 +38,10 @@ const main = async () => {
 	configureComponents(defaultConfig);
 	validateEnvironment(defaultConfig);
 
-	const toolVersion = defaultConfig.version || version;
-
 	program
 		.name("locai")
 		.description("AI-powered localization tool for Next.js projects")
-		.version(toolVersion);
+		.version(version);
 
 	program
 		.option("-s, --source <lang>", "Source language", defaultConfig.source)

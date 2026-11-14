@@ -20,6 +20,8 @@ class GracefulShutdown {
 	private isShuttingDown: boolean;
 	private shutdownCallbacks: ShutdownCallback[];
 	private logger: ShutdownLogger;
+	/** stdout or stderr failed (closed pipe, dead parent): nothing can be printed anymore. */
+	private outputClosed: boolean;
 
 	constructor(options: ShutdownOptions = {}) {
 		this.options = {
@@ -31,6 +33,7 @@ class GracefulShutdown {
 		this.isShuttingDown = false;
 		this.shutdownCallbacks = [];
 		this.logger = options.logger || console;
+		this.outputClosed = false;
 	}
 
 	registerCallback(callback: ShutdownCallback): void {
@@ -48,25 +51,49 @@ class GracefulShutdown {
 		}
 	}
 
+	/** Log through the configured logger, unless the output streams are gone. */
+	private log(level: keyof ShutdownLogger, ...args: unknown[]): void {
+		if (!this.outputClosed) {
+			this.logger[level](...args);
+		}
+	}
+
 	init(): void {
 		process.on("SIGTERM", () => this.handleSignal("SIGTERM"));
 		process.on("SIGINT", () => this.handleSignal("SIGINT"));
 
 		process.on("uncaughtException", (err: Error) => {
-			this.logger.error("Uncaught Exception:", err);
+			this.log("error", "Uncaught Exception:", err);
 			this.shutdown(1);
 		});
 
 		process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
-			this.logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+			this.log("error", "Unhandled Rejection at:", promise, "reason:", reason);
 			this.shutdown(1);
 		});
 
-		this.logger.info("Graceful shutdown handlers initialized");
+		// When the reader of stdout or stderr goes away (a closed pipe, a parent that died),
+		// every later write fails. Left unhandled, each failure is an uncaught exception, and
+		// logging that exception fails as well: the process then spins without ever exiting.
+		// Stop printing and shut down instead; the run was cut short, so the exit code is 1.
+		process.stdout.on("error", () => {
+			if (!this.outputClosed) {
+				this.log("error", "Output closed (nothing is reading stdout); stopping.");
+			}
+			this.handleClosedOutput();
+		});
+		process.stderr.on("error", () => this.handleClosedOutput());
+
+		this.log("info", "Graceful shutdown handlers initialized");
+	}
+
+	private handleClosedOutput(): void {
+		this.outputClosed = true;
+		this.shutdown(1);
 	}
 
 	async handleSignal(signal: string): Promise<void> {
-		this.logger.info(`Received ${signal}, initiating graceful shutdown...`);
+		this.log("info", `Received ${signal}, initiating graceful shutdown...`);
 		await this.shutdown(0);
 	}
 
@@ -76,11 +103,12 @@ class GracefulShutdown {
 		}
 
 		this.isShuttingDown = true;
-		this.logger.info("Starting graceful shutdown...");
+		this.log("info", "Starting graceful shutdown...");
 
 		const timeoutPromise = new Promise<void>((resolve) => {
 			setTimeout(() => {
-				this.logger.warn(
+				this.log(
+					"warn",
 					`Shutdown timeout (${this.options.shutdownTimeout}ms) exceeded, forcing exit`
 				);
 				resolve();
@@ -92,7 +120,7 @@ class GracefulShutdown {
 		try {
 			await Promise.race([shutdownProcess, timeoutPromise]);
 		} catch (error) {
-			this.logger.error("Error during shutdown:", error);
+			this.log("error", "Error during shutdown:", error);
 		} finally {
 			process.exit(exitCode);
 		}
@@ -102,24 +130,24 @@ class GracefulShutdown {
 		const startTime = Date.now();
 
 		try {
-			this.logger.info("Executing shutdown callbacks...");
+			this.log("info", "Executing shutdown callbacks...");
 			for (const callback of this.shutdownCallbacks) {
 				try {
 					await callback();
 				} catch (error) {
-					this.logger.warn("Error in shutdown callback:", error);
+					this.log("warn", "Error in shutdown callback:", error);
 				}
 			}
 
 			if (this.options.waitForPending) {
-				this.logger.info("Waiting for pending operations...");
+				this.log("info", "Waiting for pending operations...");
 				await this.waitForPendingOperations();
 			}
 
 			const duration = Date.now() - startTime;
-			this.logger.info(`Graceful shutdown completed in ${duration}ms`);
+			this.log("info", `Graceful shutdown completed in ${duration}ms`);
 		} catch (error) {
-			this.logger.error("Error during shutdown process:", error);
+			this.log("error", "Error during shutdown process:", error);
 		}
 	}
 
@@ -130,7 +158,8 @@ class GracefulShutdown {
 		for (const [provider, status] of Object.entries(providerStatus)) {
 			if (status.queueSize > 0 || status.processing > 0) {
 				hasPending = true;
-				this.logger.info(
+				this.log(
+					"info",
 					`Waiting for ${status.queueSize} queued and ${status.processing} processing operations for ${provider}`
 				);
 			}
@@ -140,9 +169,10 @@ class GracefulShutdown {
 			await new Promise((resolve) => setTimeout(resolve, 2000));
 			try {
 				rateLimiter.clearAllQueues();
-				this.logger.info("Forced queue cleanup completed");
+				this.log("info", "Forced queue cleanup completed");
 			} catch (error) {
-				this.logger.warn(
+				this.log(
+					"warn",
 					"Error during forced queue cleanup:",
 					error instanceof Error ? error.message : String(error)
 				);

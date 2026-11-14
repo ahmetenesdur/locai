@@ -41,4 +41,19 @@ describe("VectorStore", () => {
 		// In a real unit test with mocked vectra, we would verify calls.
 		// Ideally we should mock 'vectra' itself to avoid file I/O and dependency issues in unit tests.
 	});
+
+	it("returns at most `limit` matches, all in the target language, best first", async () => {
+		await vectorStore.initialize();
+
+		const vector = (x: number, y: number) => [x, y, ...new Array(1534).fill(0)];
+		await vectorStore.addItem("Hello", "Hola", "en", "es", vector(1, 0));
+		await vectorStore.addItem("Hi", "Buenas", "en", "es", vector(0.6, 0.8));
+		await vectorStore.addItem("Hello", "Bonjour", "en", "fr", vector(1, 0));
+
+		const results = await vectorStore.search(vector(1, 0), "es", 1);
+
+		expect(results).toHaveLength(1);
+		expect(results[0].item.translation).toBe("Hola");
+		expect(results[0].score).toBeCloseTo(1);
+	});
 });

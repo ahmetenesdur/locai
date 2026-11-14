@@ -105,22 +105,21 @@ export class VectorStore {
 		if (!this.initialized || !this.index) return [];
 
 		try {
-			// @ts-expect-error -- vectra 0.12 is queryItems(vector, query, topK); `limit` lands in `query`, so topK is undefined and every item is returned (known bug, kept for behavior parity)
-			const results = await this.index.queryItems(embedding, limit);
+			// Filter by target language before ranking so `limit` counts only matching items.
+			const results = await this.index.queryItems(embedding, "", limit, {
+				targetLang: { $eq: targetLang },
+			});
 
-			// Filter by target language and map to result format
-			return results
-				.filter((result) => result.item.metadata.targetLang === targetLang)
-				.map((result) => ({
-					item: {
-						text: result.item.metadata.text,
-						translation: result.item.metadata.translation,
-						sourceLang: result.item.metadata.sourceLang,
-						targetLang: result.item.metadata.targetLang,
-						metadata: result.item.metadata,
-					},
-					score: result.score,
-				}));
+			return results.map((result) => ({
+				item: {
+					text: result.item.metadata.text,
+					translation: result.item.metadata.translation,
+					sourceLang: result.item.metadata.sourceLang,
+					targetLang: result.item.metadata.targetLang,
+					metadata: result.item.metadata,
+				},
+				score: result.score,
+			}));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			console.warn(`Vector search failed: ${message}`);

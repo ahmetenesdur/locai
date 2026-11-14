@@ -1,13 +1,11 @@
 /**
- * Localization Tool Configuration
- * Version: 2.5.0 - ES Module format
- * Controls API providers, performance settings, and quality controls
+ * Localization Tool Configuration (the repository's own example).
+ * Controls API providers, performance settings, and quality controls.
  */
 
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.6.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json) structures.
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
@@ -87,7 +85,7 @@ export default defineConfig({
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
-		queueTimeout: 300000,
+		queueTimeout: 120000, // ms; config validation accepts 1000-120000
 	},
 
 	// Error Handling

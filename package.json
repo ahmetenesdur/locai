@@ -13,8 +13,8 @@
 		"localize": "./dist/cli.js"
 	},
 	"scripts": {
-		"start": "node dist/core/orchestrator.js",
-		"dev": "tsx src/core/orchestrator.js",
+		"start": "node dist/cli.js",
+		"dev": "tsx src/cli.ts",
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc",
 		"lint": "eslint .",

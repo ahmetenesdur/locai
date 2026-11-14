@@ -107,28 +107,24 @@ class GlossaryManager {
 			const escapedTerm = this.escapeRegex(term);
 			const regex = new RegExp(`\\b${escapedTerm}\\b`, flags);
 
-			// Find all matches
-			const matches = protectedText.match(regex);
-			if (matches) {
-				matches.forEach((match) => {
-					const token = `__GLOSSARY_TOKEN_${tokenIndex}__`;
-					tokenIndex++;
+			// Replace each whole-word match in place with its own token
+			protectedText = protectedText.replace(regex, (match) => {
+				const token = `__GLOSSARY_TOKEN_${tokenIndex}__`;
+				tokenIndex++;
 
-					// Preserve original formatting if needed
-					const preservedTranslation = this.preserveFormatting
-						? this.matchFormatting(match, translation)
-						: translation;
+				// Preserve original formatting if needed
+				const preservedTranslation = this.preserveFormatting
+					? this.matchFormatting(match, translation)
+					: translation;
 
-					termMap.set(token, {
-						original: match,
-						translation: preservedTranslation,
-						term: term,
-					});
-
-					// Replace with token
-					protectedText = protectedText.replace(match, token);
+				termMap.set(token, {
+					original: match,
+					translation: preservedTranslation,
+					term: term,
 				});
-			}
+
+				return token;
+			});
 		}
 
 		return { protectedText, termMap };

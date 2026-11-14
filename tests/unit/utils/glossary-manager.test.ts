@@ -133,3 +133,16 @@ describe("GlossaryManager null entries", () => {
 		expect(manager.validate()).toEqual({ valid: true, errors: [], warnings: [] });
 	});
 });
+
+describe("GlossaryManager term replacement", () => {
+	it("tokenizes only whole-word matches, not the term inside a longer word", async () => {
+		const manager = new GlossaryManager({
+			preserveFormatting: false,
+			glossary: { API: "Application Interface" },
+		});
+		const context = await translate(manager, "APIs use the API", "fr");
+
+		expect(context.protectedText).toBe("APIs use the __GLOSSARY_TOKEN_0__");
+		expect(context.translatedText).toBe("APIs use the Application Interface");
+	});
+});

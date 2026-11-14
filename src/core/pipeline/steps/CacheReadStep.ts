@@ -1,32 +1,37 @@
 import PipelineStep from "../PipelineStep.js";
 import crypto from "crypto";
-import { TranslationContext } from "../context.js";
+import { TranslationContext, TranslationResult } from "../context.js";
 
+/** Translation cache counters, shared by the orchestrator and the cache steps. */
 export interface CacheStats {
 	hits: number;
 	staleHits: number;
 	misses: number;
 	stored: number;
-	[key: string]: any;
+	/** Background refreshes of stale entries (counted by the orchestrator). */
+	refreshes: number;
 }
 
+/** The part of the translation cache (an LRUCache) the cache steps use. */
 export interface Cache {
 	has(key: string): boolean;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	get(key: string): any;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	set(key: string, value: any, options?: any): void;
+	get(key: string): TranslationResult | undefined;
+	set(key: string, value: TranslationResult): void;
 	delete(key: string): void;
 	getRemainingTTL?(key: string): number;
+}
+
+export interface CacheStepOptions {
+	/** Set to false to bypass the cache (default enabled). */
+	enabled?: boolean;
 }
 
 class CacheReadStep extends PipelineStep {
 	private cache: Cache;
 	private stats: CacheStats;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private options: any;
+	private options: CacheStepOptions;
 
-	constructor(cache: Cache, cacheStats: CacheStats, options: any = {}) {
+	constructor(cache: Cache, cacheStats: CacheStats, options: CacheStepOptions = {}) {
 		super();
 		this.cache = cache;
 		this.stats = cacheStats;

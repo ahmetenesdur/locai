@@ -1,11 +1,15 @@
 import path from "path";
 import { FileManager } from "../utils/file-manager.js";
-import ObjectTransformer from "../utils/object-transformer.js";
+import ObjectTransformer, {
+	FlatTranslations,
+	TranslationObject,
+} from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
 import InputValidator from "../utils/input-validator.js";
 import uiManager from "../utils/ui-manager.js";
 import statisticsManager from "../utils/statistics-manager.js";
 import { TranslationResult } from "../core/pipeline/context.js";
+import { StateComparison } from "../utils/state-manager.js";
 import {
 	TranslationOptions,
 	GlobalStats,
@@ -18,21 +22,21 @@ export class LanguageProcessor {
 	 * Process a single language translation.
 	 * @param {string} targetLang - Target language code.
 	 * @param {string} sourceFile - Path to source file.
-	 * @param {Record<string, any>} flattenedSource - Flattened source content.
+	 * @param {FlatTranslations} flattenedSource - Flattened source content.
 	 * @param {Orchestrator} orchestrator - Orchestrator instance.
 	 * @param {TranslationOptions} options - Translation options.
 	 * @param {GlobalStats} globalStats - Global statistics object.
-	 * @param {any} comparison - State comparison result.
+	 * @param {Pick<StateComparison, "newKeys" | "modifiedKeys">} comparison - State comparison result.
 	 * @returns {Promise<LanguageProcessResult>} - Status and messages for this language.
 	 */
 	static async processLanguage(
 		targetLang: string,
 		sourceFile: string,
-		flattenedSource: Record<string, any>,
+		flattenedSource: FlatTranslations,
 		orchestrator: Orchestrator,
 		options: TranslationOptions,
 		globalStats: GlobalStats,
-		comparison: any
+		comparison: Pick<StateComparison, "newKeys" | "modifiedKeys">
 	): Promise<LanguageProcessResult> {
 		if (!targetLang) {
 			throw new Error("Invalid target language provided");
@@ -62,7 +66,7 @@ export class LanguageProcessor {
 			);
 
 			await uiManager.log(`Starting translations for ${safeTargetLang}`);
-			let finalStatus = null;
+			let finalStatus: LanguageProcessResult["status"] = null;
 			let savedMessage = undefined;
 
 			statisticsManager.initLanguageStats(safeTargetLang);
@@ -90,7 +94,7 @@ export class LanguageProcessor {
 				targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
 			}
 
-			let targetContent: Record<string, any> = {};
+			let targetContent: TranslationObject = {};
 			try {
 				targetContent = await FileManager.readJSON(targetPath);
 
@@ -98,43 +102,43 @@ export class LanguageProcessor {
 					console.warn(`Invalid content in ${targetPath}, using empty object`);
 					targetContent = {};
 				}
-			} catch (err: any) {
-				if (err.code === "ENOENT") {
+			} catch (err) {
+				if (err instanceof Error && "code" in err && err.code === "ENOENT") {
 					await uiManager.log(
 						`\ud83c\udd95 Creating new translation file for ${safeTargetLang}`
 					);
 				} else {
 					if (options.debug) {
-						console.warn(
-							`Error reading ${targetPath}: ${err.message}, using empty object`
-						);
+						const message = err instanceof Error ? err.message : String(err);
+						console.warn(`Error reading ${targetPath}: ${message}, using empty object`);
 					}
 				}
 				targetContent = {};
 			}
 
-			let flattenedTarget: Record<string, any> = {};
+			let flattenedTarget: FlatTranslations = {};
 			try {
 				flattenedTarget = ObjectTransformer.flatten(targetContent);
 				if (!flattenedTarget || typeof flattenedTarget !== "object") {
 					flattenedTarget = {};
 				}
-			} catch (err: any) {
-				console.warn(`Error flattening target content: ${err.message}, using empty object`);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				console.warn(`Error flattening target content: ${message}, using empty object`);
 				flattenedTarget = {};
 			}
 
 			const missingKeys: MissingKey[] = [];
 			let hasPlaceholderOnlyChanges = false;
 
-			for (const [key, sourceText] of Object.entries(flattenedSource)) {
+			for (const [key, sourceValue] of Object.entries(flattenedSource)) {
+				let sourceText: string;
 				try {
 					InputValidator.validateKey(key, "translation key");
-					InputValidator.validateText(sourceText, "source text");
-				} catch (keyError: any) {
-					await uiManager.log(
-						`\u26a0\ufe0f Skipping invalid key/text: ${keyError.message}`
-					);
+					sourceText = InputValidator.validateText(sourceValue, "source text");
+				} catch (keyError) {
+					const message = keyError instanceof Error ? keyError.message : String(keyError);
+					await uiManager.log(`\u26a0\ufe0f Skipping invalid key/text: ${message}`);
 					globalStats.languages[safeTargetLang].failed++;
 					globalStats.failed++;
 					continue;
@@ -199,9 +203,10 @@ export class LanguageProcessor {
 						console.warn("Invalid results from orchestrator, using empty array");
 						results = [];
 					}
-				} catch (err: any) {
+				} catch (err) {
+					const message = err instanceof Error ? err.message : String(err);
 					console.error(
-						`Error processing translations for ${safeTargetLang}: ${err.message}`
+						`Error processing translations for ${safeTargetLang}: ${message}`
 					);
 					results = [];
 
@@ -223,24 +228,25 @@ export class LanguageProcessor {
 				) {
 					finalStatus = orchestrator.progress.getStatus();
 				}
-			} catch (err: any) {
-				console.warn(`Error getting orchestrator status: ${err.message}`);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				console.warn(`Error getting orchestrator status: ${message}`);
 			}
 
 			let validResults: TranslationResult[] = [];
 			try {
 				validResults = results.filter((result) => result && result.success === true);
 
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				validResults = validResults.filter(
-					(result: any) =>
+					(result) =>
 						result.key &&
 						typeof result.key === "string" &&
 						result.translated &&
 						typeof result.translated === "string"
 				);
-			} catch (err: any) {
-				console.warn(`Error filtering results: ${err.message}`);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				console.warn(`Error filtering results: ${message}`);
 				validResults = [];
 			}
 
@@ -289,10 +295,11 @@ export class LanguageProcessor {
 
 			globalStats.languages[safeTargetLang].timeMs = Date.now() - langStartTime;
 			return { status: finalStatus, savedMessage };
-		} catch (error: any) {
-			const safeError = error.message.includes("outside working directory")
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const safeError = message.includes("outside working directory")
 				? "Invalid file path detected"
-				: error.message;
+				: message;
 
 			await uiManager.log(`\n\u274c Error processing ${targetLang}: ${safeError}`);
 			if (globalStats.languages[targetLang]) {

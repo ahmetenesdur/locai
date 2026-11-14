@@ -14,15 +14,13 @@ class ConfidenceCheckStep extends PipelineStep {
 	}
 
 	async execute(context: TranslationContext, next: () => Promise<void>): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		if (!(context as any).confidence || !this.confidenceSettings.enabled) {
+		if (!context.confidence || !this.confidenceSettings.enabled) {
 			await next();
 			return;
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const confidence = (context as any).confidence;
-		const result: any = context.result;
+		const confidence = context.confidence;
+		const result = context.result;
 
 		result.confidence = confidence;
 

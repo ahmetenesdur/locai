@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { IosAdapter } from "../../../../src/core/adapters/ios-adapter";
+import { IosAdapter } from "../../../../src/core/adapters/ios-adapter.js";
 
 describe("IosAdapter", () => {
 	const adapter = new IosAdapter();

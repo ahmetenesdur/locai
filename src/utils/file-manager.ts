@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { FormatFactory } from "../core/adapters/factory.js";
+import type { TranslationObject } from "./object-transformer.js";
 
 export interface FileOptions {
 	atomic?: boolean;
@@ -23,9 +24,17 @@ export interface ValidationResult {
 		line: number | null;
 	} | null;
 	key?: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	value?: any;
+	value?: unknown;
 }
+
+/**
+ * Read `code` (e.g. "ENOENT") from a caught Node.js system error.
+ */
+const errorCode = (error: unknown): unknown =>
+	error instanceof Error && "code" in error ? error.code : undefined;
+
+const errorMessage = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
 
 /**
  * FileManager - Modern asynchronous file operations
@@ -127,11 +136,11 @@ class FileManager {
 			}
 
 			throw new Error(`Source language file not found for '${sourceLang}' in ${localesDir}`);
-		} catch (err: any) {
-			if (err.code === "ENOENT") {
+		} catch (err) {
+			if (errorCode(err) === "ENOENT") {
 				throw new Error(`Locales directory not found: ${localesDir}`);
 			}
-			throw new Error(`Source language file search error: ${err.message}`);
+			throw new Error(`Source language file search error: ${errorMessage(err)}`);
 		}
 	}
 
@@ -141,8 +150,7 @@ class FileManager {
 	 * @param options - Options for reading
 	 * @returns Parsed data
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static async readFile(filePath: string, options: FileOptions = {}): Promise<any> {
+	static async readFile(filePath: string, options: FileOptions = {}): Promise<TranslationObject> {
 		const config = { ...this.getConfig(), ...options };
 
 		try {
@@ -153,8 +161,8 @@ class FileManager {
 					: FormatFactory.getAdapter(filePath);
 
 			return await adapter.parse(content as string);
-		} catch (err: any) {
-			throw new Error(`File read error (${filePath}): ${err.message}`);
+		} catch (err) {
+			throw new Error(`File read error (${filePath}): ${errorMessage(err)}`);
 		}
 	}
 
@@ -165,10 +173,9 @@ class FileManager {
 	 * @param options - Options for writing
 	 * @returns Success status
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	static async writeFile(
 		filePath: string,
-		data: any,
+		data: TranslationObject,
 		options: FileOptions = {}
 	): Promise<boolean> {
 		const config = { ...this.getConfig(), ...options };
@@ -194,10 +201,10 @@ class FileManager {
 						`${path.basename(filePath)}.${Date.now()}.bak`
 					);
 					await fs.copyFile(filePath, backupPath);
-				} catch (err: any) {
+				} catch (err) {
 					// Ignore if file doesn't exist
-					if (err.code !== "ENOENT") {
-						console.error(`Backup failed (${filePath}): ${err.message}`);
+					if (errorCode(err) !== "ENOENT") {
+						console.error(`Backup failed (${filePath}): ${errorMessage(err)}`);
 					}
 				}
 			}
@@ -223,7 +230,7 @@ class FileManager {
 					tempFileCreated = true;
 					await fs.rename(tempFile, filePath);
 					tempFileCreated = false;
-				} catch (renameError: any) {
+				} catch (renameError) {
 					if (tempFileCreated) {
 						try {
 							await fs.unlink(tempFile);
@@ -231,28 +238,28 @@ class FileManager {
 							/* ignore cleanup error */
 						}
 					}
-					throw new Error(`Atomic write failed (${filePath}): ${renameError.message}`);
+					throw new Error(
+						`Atomic write failed (${filePath}): ${errorMessage(renameError)}`
+					);
 				}
 			} else {
 				await fs.writeFile(filePath, content, config.encoding);
 			}
 
 			return true;
-		} catch (err: any) {
-			throw new Error(`File write error (${filePath}): ${err.message}`);
+		} catch (err) {
+			throw new Error(`File write error (${filePath}): ${errorMessage(err)}`);
 		}
 	}
 
 	// Legacy method aliases for backward compatibility
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static async readJSON(filePath: string, options: FileOptions = {}): Promise<any> {
+	static async readJSON(filePath: string, options: FileOptions = {}): Promise<TranslationObject> {
 		return this.readFile(filePath, { ...options, format: "json" });
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	static async writeJSON(
 		filePath: string,
-		data: any,
+		data: TranslationObject,
 		options: FileOptions = {}
 	): Promise<boolean> {
 		return this.writeFile(filePath, data, { ...options, format: "json" });
@@ -273,8 +280,8 @@ class FileManager {
 	static async ensureDir(dir: string): Promise<void> {
 		try {
 			await fs.mkdir(dir, { recursive: true });
-		} catch (err: any) {
-			if (err.code !== "EEXIST") {
+		} catch (err) {
+			if (errorCode(err) !== "EEXIST") {
 				throw err;
 			}
 		}
@@ -289,8 +296,8 @@ class FileManager {
 			return files
 				.filter((file) => pattern.test(file))
 				.map((file) => path.join(localesDir, file));
-		} catch (err: any) {
-			throw new Error(`Error scanning locale directory: ${err.message}`);
+		} catch (err) {
+			throw new Error(`Error scanning locale directory: ${errorMessage(err)}`);
 		}
 	}
 
@@ -301,8 +308,8 @@ class FileManager {
 		try {
 			const stats = await fs.stat(filePath);
 			return stats.mtime;
-		} catch (err: any) {
-			throw new Error(`Error getting file stats: ${err.message}`);
+		} catch (err) {
+			throw new Error(`Error getting file stats: ${errorMessage(err)}`);
 		}
 	}
 
@@ -337,15 +344,15 @@ class FileManager {
 						`${path.basename(filePath)}.deleted.${Date.now()}.bak`
 					);
 					await fs.copyFile(filePath, backupPath);
-				} catch (err: any) {
-					console.error(`Backup failed (${filePath}): ${err.message}`);
+				} catch (err) {
+					console.error(`Backup failed (${filePath}): ${errorMessage(err)}`);
 				}
 			}
 
 			await fs.unlink(filePath);
 			return true;
-		} catch (err: any) {
-			throw new Error(`File deletion error (${filePath}): ${err.message}`);
+		} catch (err) {
+			throw new Error(`File deletion error (${filePath}): ${errorMessage(err)}`);
 		}
 	}
 
@@ -362,11 +369,11 @@ class FileManager {
 				valid: true,
 				filePath,
 			};
-		} catch (error: any) {
+		} catch (error) {
 			return {
 				valid: false,
 				filePath,
-				error: error.message,
+				error: errorMessage(error),
 				position: this._extractErrorPosition(error),
 			};
 		}
@@ -377,11 +384,10 @@ class FileManager {
 	 * @param error - JSON parse error
 	 * @returns Error position details
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	static _extractErrorPosition(
-		error: any
+		error: unknown
 	): { position: number | null; line: number | null } | null {
-		const message = error.message;
+		const message = errorMessage(error);
 		const positionMatch = message.match(/position (\d+)/);
 		const lineMatch = message.match(/line (\d+)/);
 
@@ -401,8 +407,7 @@ class FileManager {
 	 * @param value - Translation value
 	 * @returns Validation result
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static validateTranslationValue(key: string, value: any): ValidationResult {
+	static validateTranslationValue(key: string, value: unknown): ValidationResult {
 		try {
 			// Test if value can be part of valid JSON
 			const testObject = { [key]: value };
@@ -413,12 +418,12 @@ class FileManager {
 				key,
 				value,
 			};
-		} catch (error: any) {
+		} catch (error) {
 			return {
 				valid: false,
 				key,
 				value,
-				error: `JSON validation failed: ${error.message}`,
+				error: `JSON validation failed: ${errorMessage(error)}`,
 			};
 		}
 	}
@@ -437,8 +442,8 @@ class FileManager {
 				.map((entry) => path.join(dirPath, entry.name));
 
 			return files;
-		} catch (err: any) {
-			throw new Error(`Directory read error (${dirPath}): ${err.message}`);
+		} catch (err) {
+			throw new Error(`Directory read error (${dirPath}): ${errorMessage(err)}`);
 		}
 	}
 
@@ -451,8 +456,8 @@ class FileManager {
 		try {
 			await fs.mkdir(dirPath, { recursive: true });
 			return true;
-		} catch (err: any) {
-			throw new Error(`Failed to create directory (${dirPath}): ${err.message}`);
+		} catch (err) {
+			throw new Error(`Failed to create directory (${dirPath}): ${errorMessage(err)}`);
 		}
 	}
 }

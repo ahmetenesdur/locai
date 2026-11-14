@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { promises as fs } from "fs";
 import path from "path";
+import type { LocalizeConfig } from "./index.js";
 import { FileManager } from "../utils/file-manager.js";
 import { getLogger } from "../utils/logger.js";
 import rateLimiter from "../utils/rate-limiter.js";
@@ -32,10 +33,13 @@ export const loadEnvironmentVariables = async () => {
 					console.log(`Loaded environment variables from ${envFile}`);
 				}
 			}
-		} catch (error: any) {
+		} catch (error) {
 			// ENOENT is expected when files don't exist - silently skip
-			if (error.code !== "ENOENT") {
-				console.warn(`Warning: Could not load ${envFile}: ${error.message}`);
+			const isMissingFile =
+				error instanceof Error && "code" in error && error.code === "ENOENT";
+			if (!isMissingFile) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.warn(`Warning: Could not load ${envFile}: ${message}`);
 			}
 		}
 	}
@@ -48,9 +52,9 @@ export const loadEnvironmentVariables = async () => {
 
 /**
  * Configure global components (logger, rate limiter, etc.).
- * @param {any} config - Configuration object.
+ * @param config - Configuration object.
  */
-export const configureComponents = (config: any) => {
+export const configureComponents = (config: LocalizeConfig) => {
 	// Configure FileManager with config settings
 	if (config.fileOperations) {
 		FileManager.configure(config.fileOperations);

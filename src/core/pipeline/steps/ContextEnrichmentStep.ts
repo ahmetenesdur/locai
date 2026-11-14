@@ -40,7 +40,7 @@ export default class ContextEnrichmentStep extends PipelineStep {
 						},
 					};
 				}
-			} catch (error) {
+			} catch {
 				// Non-blocking error
 				// console.warn(`Context enrichment failed for ${context.key}`, error);
 			}

@@ -1,7 +1,17 @@
 import axios, { AxiosInstance } from "axios";
-import BaseProvider, { ProviderConfig, TranslateOptions } from "./base-provider.js";
+import BaseProvider, { ChatMessage, ProviderConfig, TranslateOptions } from "./base-provider.js";
+import type { AnthropicMessagesResponse, ProviderResponseBody } from "./api-types.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
+
+/** Body of Anthropic `/v1/messages`; the system prompt is top-level, not a message. */
+interface AnthropicMessagesRequest {
+	model: string | undefined;
+	messages: ChatMessage[];
+	max_tokens: number;
+	temperature: number;
+	system?: string;
+}
 
 /**
  * Provider implementation for Anthropic (Claude) models.
@@ -25,7 +35,6 @@ class AnthropicProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 	}
 
@@ -58,17 +67,20 @@ class AnthropicProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: model,
-						...promptData, // Contains { system: "...", messages: [...] }
-						max_tokens: config.maxTokens || 4096,
-						temperature: config.temperature,
-					});
+					const response = await this.client.post<AnthropicMessagesResponse>(
+						this.getEndpoint(),
+						{
+							model: model,
+							...promptData, // Contains { system: "...", messages: [...] }
+							max_tokens: config.maxTokens || 4096,
+							temperature: config.temperature,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const translation = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(translation);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -97,17 +109,20 @@ class AnthropicProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model,
-						...promptData,
-						max_tokens: config.maxTokens,
-						temperature: config.temperature,
-					});
+					const response = await this.client.post<AnthropicMessagesResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model,
+							...promptData,
+							max_tokens: config.maxTokens,
+							temperature: config.temperature,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -120,7 +135,7 @@ class AnthropicProvider extends BaseProvider {
 		);
 	}
 
-	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+	async chat(messages: ChatMessage[], options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
 			model: options.model || "claude-3-5-sonnet-latest",
 			temperature: options.temperature || 0.3,
@@ -143,7 +158,7 @@ class AnthropicProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const payload: any = {
+					const payload: AnthropicMessagesRequest = {
 						model: config.model,
 						messages: cleanMessages,
 						max_tokens: config.maxTokens,
@@ -154,12 +169,15 @@ class AnthropicProvider extends BaseProvider {
 						payload.system = systemPrompt;
 					}
 
-					const response = await this.client.post(this.getEndpoint(), payload);
+					const response = await this.client.post<AnthropicMessagesResponse>(
+						this.getEndpoint(),
+						payload
+					);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -173,7 +191,10 @@ class AnthropicProvider extends BaseProvider {
 	}
 
 	// Override extractTranslation to handle Anthropic's specific response structure
-	extractTranslation(response: any, providerName: string): string {
+	extractTranslation(
+		response: AnthropicMessagesResponse | ProviderResponseBody,
+		providerName: string
+	): string {
 		// Check for error response first
 		if (response.error) {
 			const errorMsg =
@@ -183,14 +204,15 @@ class AnthropicProvider extends BaseProvider {
 
 		// Anthropic format: { content: [{ type: 'text', text: '...' }] }
 		if (response.content && Array.isArray(response.content) && response.content.length > 0) {
-			const textBlock = response.content.find((block: any) => block.type === "text");
+			const textBlock = response.content.find((block) => block.type === "text");
 			if (textBlock && textBlock.text) {
 				return textBlock.text.trim();
 			}
 		}
 
-		// Fallback to base implementation for other structures (though unlikely for Anthropic)
-		return super.extractTranslation(response, providerName);
+		// Fallback to base implementation for other structures (though unlikely for Anthropic).
+		// An Anthropic body without a text block still carries its `content` array here.
+		return super.extractTranslation(response as ProviderResponseBody, providerName);
 	}
 }
 
@@ -218,7 +240,7 @@ async function analyze(prompt: string, options: ProviderConfig = {}): Promise<st
 	return getProvider().analyze(prompt, options);
 }
 
-async function chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+async function chat(messages: ChatMessage[], options: ProviderConfig = {}): Promise<string> {
 	return getProvider().chat(messages, options);
 }
 

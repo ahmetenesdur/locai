@@ -34,6 +34,20 @@ export interface ConfidenceResult {
 	autoApprove: boolean;
 }
 
+/**
+ * Optional fields of raw provider responses that carry confidence signals:
+ * OpenAI-style `choices` (logprobs, finish_reason), Gemini `candidates`, or a
+ * top-level `finishReason`.
+ */
+interface ProviderConfidenceFields {
+	choices?: {
+		logprobs?: { token_logprobs?: (number | null)[] } | null;
+		finish_reason?: string;
+	}[];
+	candidates?: { finishReason?: string }[];
+	finishReason?: string;
+}
+
 class ConfidenceScorer {
 	/**
 	 * Calculate final confidence score
@@ -101,7 +115,6 @@ class ConfidenceScorer {
 	 */
 	private static _calculateQualityScore(sourceText: string, translation: string): number {
 		let score = 1.0;
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const issues: string[] = [];
 
 		// Check 1: Placeholder preservation
@@ -328,22 +341,24 @@ class ConfidenceScorer {
 	/**
 	 * Extract AI confidence from provider response
 	 */
-	static extractAIConfidence(response: any, provider: string): number {
+	static extractAIConfidence(response: unknown, provider: string): number {
+		// Raw provider payloads are not validated; only the optional fields above are read.
+		const res = response as ProviderConfidenceFields;
+
 		// OpenAI logprobs-based confidence
-		if (provider === "openai" && response.choices?.[0]?.logprobs) {
-			const logprobs = response.choices[0].logprobs.token_logprobs || [];
+		if (provider === "openai" && res.choices?.[0]?.logprobs) {
+			const logprobs = res.choices[0].logprobs.token_logprobs || [];
 			if (logprobs.length > 0) {
 				// Convert log probabilities to confidence
 				const avgLogProb =
-					logprobs.reduce((sum: number, lp: number) => sum + (lp || -1), 0) /
-					logprobs.length;
+					logprobs.reduce((sum: number, lp) => sum + (lp || -1), 0) / logprobs.length;
 				return Math.exp(avgLogProb); // Convert back to probability
 			}
 		}
 
 		// Gemini confidence scores
-		if (provider === "gemini" && response.candidates?.[0]) {
-			const finishReason = response.candidates[0].finishReason;
+		if (provider === "gemini" && res.candidates?.[0]) {
+			const finishReason = res.candidates[0].finishReason;
 
 			if (finishReason === "STOP") return 0.9; // Normal completion
 			if (finishReason === "MAX_TOKENS") return 0.75; // Incomplete
@@ -351,7 +366,7 @@ class ConfidenceScorer {
 		}
 
 		// Default confidence based on finish reason
-		const finishReason = response.choices?.[0]?.finish_reason || response.finishReason;
+		const finishReason = res.choices?.[0]?.finish_reason || res.finishReason;
 		if (finishReason === "stop" || finishReason === "STOP") return 0.85;
 		if (finishReason === "length") return 0.7;
 

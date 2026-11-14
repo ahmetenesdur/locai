@@ -3,49 +3,91 @@
  * Common infrastructure for all quality checkers.
  */
 
-export interface CheckerOptions {
+import type { ContextConfig } from "../../core/context-processor.js";
+import type { CodeBlockFixResult, CodeBlockIssue } from "./code-block-checker.js";
+import type { HtmlTagFixResult, HtmlTagIssue } from "./html-tag-checker.js";
+import type { LengthCheckOptions, LengthControlOptions, LengthIssue } from "./length-checker.js";
+import type { MarkdownFixResult, MarkdownIssue } from "./markdown-checker.js";
+import type { PlaceholderFixResult, PlaceholderIssue } from "./placeholder-checker.js";
+import type { PunctuationFixResult, PunctuationIssue } from "./punctuation-checker.js";
+import type { QuoteFixResult, QuoteIssue } from "./quote-balance-checker.js";
+import type { SpecialCharFixResult, SpecialCharIssue } from "./special-characters-checker.js";
+import type { StyleFixResult, StyleGuideConfig, StyleIssue } from "./style-guide-checker.js";
+
+/** Toggles for the individual quality checks (the `qualityChecks.rules` config section) */
+export interface QualityRules {
 	placeholderConsistency?: boolean;
 	htmlTagsConsistency?: boolean;
 	punctuationCheck?: boolean;
+	quoteBalanceCheck?: boolean;
 	lengthValidation?: boolean;
 	sanitizeOutput?: boolean;
-	rules?: Record<string, any>;
-	styleGuide?: {
-		formality?: string;
-		toneOfVoice?: string;
-	};
-	context?: Record<string, any>;
-	[key: string]: any;
+	markdownPreservation?: boolean;
+	codeBlockPreservation?: boolean;
+	specialCharacters?: boolean;
 }
 
+export interface CheckerOptions extends QualityRules {
+	/** Master switch for quality checks (the `qualityChecks.enabled` config value) */
+	enabled?: boolean;
+	styleGuide?: StyleGuideConfig;
+	context?: Partial<ContextConfig>;
+	lengthControl?: LengthControlOptions;
+}
+
+/** Generic issue record built by {@link BaseChecker.createIssue} */
 export interface Issue {
 	type: string;
 	message: string;
 	timestamp: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
+/** Generic fix record built by {@link BaseChecker.createFix} */
 export interface Fix {
 	type: string;
 	message: string;
 	timestamp: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
+
+/** Any issue reported by one of the quality checkers */
+export type QualityIssue =
+	| PlaceholderIssue
+	| HtmlTagIssue
+	| PunctuationIssue
+	| QuoteIssue
+	| LengthIssue
+	| StyleIssue
+	| MarkdownIssue
+	| CodeBlockIssue
+	| SpecialCharIssue;
+
+/** Any fix applied by one of the quality checkers */
+export type QualityFix =
+	| PlaceholderFixResult["appliedFixes"][number]
+	| HtmlTagFixResult["appliedFixes"][number]
+	| PunctuationFixResult["appliedFixes"][number]
+	| QuoteFixResult["appliedFixes"][number]
+	| StyleFixResult["appliedFixes"][number]
+	| MarkdownFixResult["appliedFixes"][number]
+	| CodeBlockFixResult["appliedFixes"][number]
+	| SpecialCharFixResult["appliedFixes"][number];
 
 export interface ValidationResult {
 	isValid: boolean;
-	issues: Issue[];
+	issues: QualityIssue[];
 	source?: string;
 	translated?: string;
-	context?: Record<string, any>;
+	context?: Partial<ContextConfig>;
 }
 
 export interface FixResult {
 	originalText: string;
 	fixedText: string;
 	isModified: boolean;
-	issues: Issue[];
-	fixes: Fix[];
+	issues: QualityIssue[];
+	fixes: QualityFix[];
 	metadata?: {
 		sourceLength: number;
 		originalLength: number;
@@ -55,7 +97,8 @@ export interface FixResult {
 }
 
 class BaseChecker {
-	protected rules: Record<string, boolean | any>;
+	/** Effective options: rule defaults overridden by the constructor options */
+	readonly rules: CheckerOptions;
 	protected styleGuide: { formality: string; toneOfVoice: string };
 
 	/**
@@ -81,7 +124,7 @@ class BaseChecker {
 	/**
 	 * Create an issue object.
 	 */
-	createIssue(type: string, message: string, details: Record<string, any> = {}): Issue {
+	createIssue(type: string, message: string, details: Record<string, unknown> = {}): Issue {
 		return {
 			type,
 			message,
@@ -93,7 +136,7 @@ class BaseChecker {
 	/**
 	 * Create a fix object.
 	 */
-	createFix(type: string, message: string, details: Record<string, any> = {}): Fix {
+	createFix(type: string, message: string, details: Record<string, unknown> = {}): Fix {
 		return {
 			type,
 			message,
@@ -105,9 +148,12 @@ class BaseChecker {
 	/**
 	 * Validate translation.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	validate(_sourceText: string, _translatedText: string, _options?: any): ValidationResult {
-		const issues: Issue[] = [];
+	validate(
+		_sourceText: string,
+		_translatedText: string,
+		_options?: LengthCheckOptions
+	): ValidationResult {
+		const issues: QualityIssue[] = [];
 		return {
 			isValid: issues.length === 0,
 			issues,
@@ -117,7 +163,6 @@ class BaseChecker {
 	/**
 	 * Validate and fix translation.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	validateAndFix(sourceText: string, translatedText: string): FixResult {
 		return {
 			originalText: translatedText,

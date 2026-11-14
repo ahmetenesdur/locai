@@ -16,15 +16,42 @@ export interface ProtectedTerm {
 	term: string;
 }
 
+/** Advanced format: `{ "API": { translation: "API", caseSensitive: true } }` */
+export type GlossaryEntryConfig = Partial<Omit<GlossaryEntry, "term">>;
+
+/** Language-specific format: `{ "API": { tr: "API", de: "API" } }` */
+export type LanguageTranslations = Record<string, string>;
+
+/** Simple format (`{ "API": "API" }`), advanced entry, or per-language translations. */
+export type GlossaryTermConfig = string | GlossaryEntryConfig | LanguageTranslations;
+
 export interface GlossaryConfig {
-	glossary?: Record<string, string | Partial<GlossaryEntry> | Record<string, string>>;
+	glossary?: Record<string, GlossaryTermConfig>;
 	enabled?: boolean;
 	caseSensitive?: boolean;
 	preserveFormatting?: boolean;
 }
 
+export interface GlossaryStats {
+	totalTerms: number;
+	enabled: boolean;
+	caseSensitive: boolean;
+	preserveFormatting: boolean;
+	terms: string[];
+}
+
+/** An object entry with a truthy `translation` is an advanced entry ... */
+const isEntryConfig = (
+	config: GlossaryEntryConfig | LanguageTranslations
+): config is GlossaryEntryConfig & { translation: string } => Boolean(config.translation);
+
+/** ... any other object entry is a per-language map. */
+const isLanguageMap = (
+	config: GlossaryEntryConfig | LanguageTranslations
+): config is LanguageTranslations => !isEntryConfig(config);
+
 class GlossaryManager {
-	private glossary: Record<string, any>;
+	private glossary: Record<string, GlossaryTermConfig>;
 	public enabled: boolean;
 	private caseSensitive: boolean;
 	private preserveFormatting: boolean;
@@ -117,7 +144,6 @@ class GlossaryManager {
 	 * Get applicable glossary entries for language pair
 	 */
 	getApplicableEntries(sourceLang: string, targetLang: string): GlossaryEntry[] {
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const entries: GlossaryEntry[] = [];
 
 		for (const [term, config] of Object.entries(this.glossary)) {
@@ -130,7 +156,7 @@ class GlossaryManager {
 				});
 			}
 			// Advanced format: { "API": { translation: "API", caseSensitive: true } }
-			else if (typeof config === "object" && config.translation) {
+			else if (typeof config === "object" && isEntryConfig(config)) {
 				entries.push({
 					term,
 					translation: config.translation,
@@ -139,7 +165,7 @@ class GlossaryManager {
 				});
 			}
 			// Language-specific format
-			else if (typeof config === "object" && config[targetLang]) {
+			else if (typeof config === "object" && isLanguageMap(config) && config[targetLang]) {
 				entries.push({
 					term,
 					translation: config[targetLang],
@@ -224,7 +250,7 @@ class GlossaryManager {
 	/**
 	 * Get statistics about glossary
 	 */
-	getStats(): any {
+	getStats(): GlossaryStats {
 		const terms = Object.keys(this.glossary);
 		return {
 			totalTerms: terms.length,
@@ -242,10 +268,11 @@ class GlossaryManager {
 		try {
 			const { readFile } = await import("fs/promises");
 			const content = await readFile(filePath, "utf8");
-			const glossary = JSON.parse(content);
+			const glossary: GlossaryConfig["glossary"] = JSON.parse(content);
 			return new GlossaryManager({ glossary, enabled: true });
-		} catch (error: any) {
-			throw new Error(`Failed to load glossary from ${filePath}: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Failed to load glossary from ${filePath}: ${message}`);
 		}
 	}
 }

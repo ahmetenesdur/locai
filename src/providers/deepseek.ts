@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import BaseProvider, { ProviderConfig, TranslateOptions } from "./base-provider.js";
+import type { ChatCompletionResponse } from "./api-types.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
@@ -24,7 +25,6 @@ class DeepSeekProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 	}
 
@@ -53,17 +53,20 @@ class DeepSeekProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model || "deepseek-chat",
-						...promptData,
-						temperature: config.temperature || 0.3,
-						max_tokens: config.maxTokens || 2000,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model || "deepseek-chat",
+							...promptData,
+							temperature: config.temperature || 0.3,
+							max_tokens: config.maxTokens || 2000,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const translation = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(translation);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -92,17 +95,20 @@ class DeepSeekProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model,
-						...promptData,
-						temperature: config.temperature,
-						max_tokens: config.maxTokens,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model,
+							...promptData,
+							temperature: config.temperature,
+							max_tokens: config.maxTokens,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}

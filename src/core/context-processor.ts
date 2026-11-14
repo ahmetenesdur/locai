@@ -9,20 +9,35 @@ interface KeywordConfig {
 	prompt?: string;
 }
 
-interface CategoryConfig {
+/** A content category and the keywords that identify it. */
+export interface CategoryConfig {
 	keywords: string[];
+	/** Multiplier applied to this category's keyword matches (default 1.0). */
 	weight?: number;
+	/** Instruction added to the translation prompt for texts in this category. */
 	prompt?: string;
 }
 
+/** Settings of the AI-based analysis; the whole object is also read by AIContextAnalyzer. */
+export interface ContextAnalysisOptions {
+	model?: string;
+	temperature?: number;
+	maxTokens?: number;
+	timeout?: number;
+	retries?: number;
+	/** Cache analysis results (default true). */
+	cacheAnalysis?: boolean;
+}
+
+/** The `context` configuration section: category detection for translation texts. */
 export interface ContextConfig {
 	enabled?: boolean;
 	useAI?: boolean;
 	aiProvider?: string;
 	minTextLength?: number;
-	analysisOptions?: {
-		cacheAnalysis?: boolean;
-	};
+	allowNewCategories?: boolean;
+	debug?: boolean;
+	analysisOptions?: ContextAnalysisOptions;
 	categories: Record<string, CategoryConfig>;
 	detection: {
 		threshold: number;
@@ -34,13 +49,21 @@ export interface ContextConfig {
 	};
 }
 
-interface AnalysisResult {
+/** Detected category of a text. */
+export interface AnalysisResult {
 	category: string;
 	confidence: number;
 	prompt?: string;
 	matches: number;
 	aiAnalyzed?: boolean;
 	keywords?: string[];
+}
+
+/** Keyword score of one category, as accumulated by keyword analysis. */
+interface CategoryScore {
+	score: number;
+	matches: number;
+	prompt?: string;
 }
 
 /**
@@ -51,16 +74,14 @@ class ContextProcessor {
 	private config: ContextConfig;
 	private keywordCache: Map<string, KeywordConfig>;
 	private aiAnalyzer: AIContextAnalyzer;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private resultCache: LRUCache<string, any> | null;
+	private resultCache: LRUCache<string, AnalysisResult> | null;
 
 	/**
 	 * Create a new ContextProcessor instance.
 	 * @param config - Configuration object.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	constructor(config: any) {
-		this.config = config as ContextConfig;
+	constructor(config: ContextConfig) {
+		this.config = config;
 		this.keywordCache = new Map();
 		this.aiAnalyzer = new AIContextAnalyzer(config);
 
@@ -68,7 +89,7 @@ class ContextProcessor {
 		const enableCache = config.analysisOptions?.cacheAnalysis !== false;
 
 		this.resultCache = enableCache
-			? new LRUCache({
+			? new LRUCache<string, AnalysisResult>({
 					max: 1000,
 					ttl: 1000 * 60 * 60 * 24,
 				})
@@ -105,8 +126,7 @@ class ContextProcessor {
 			return texts.map(() => this.getFallback());
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const results: any[] = [];
+		const results: AnalysisResult[] = [];
 		const aiTexts: string[] = [];
 		const aiIndices: number[] = [];
 
@@ -121,7 +141,7 @@ class ContextProcessor {
 
 			const cacheKey = this.getCacheKey(text, {});
 			if (this.resultCache?.has(cacheKey)) {
-				results[i] = this.resultCache.get(cacheKey);
+				results[i] = this.resultCache.get(cacheKey)!;
 				continue;
 			}
 
@@ -159,7 +179,7 @@ class ContextProcessor {
 					const aiResult = aiResults[i];
 
 					if (aiResult) {
-						const processedResult = {
+						const processedResult: AnalysisResult = {
 							category: aiResult.category,
 							confidence: aiResult.confidence,
 							prompt: aiResult.prompt,
@@ -184,8 +204,9 @@ class ContextProcessor {
 						true
 					);
 				}
-			} catch (error: any) {
-				console.error("Batch AI context analysis failed:", error.message);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.error("Batch AI context analysis failed:", message);
 			}
 		}
 
@@ -209,8 +230,7 @@ class ContextProcessor {
 	 */
 	private _performKeywordAnalysis(text: string): AnalysisResult {
 		const lowerText = text.toLowerCase();
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const results = new Map<string, any>();
+		const results = new Map<string, CategoryScore>();
 		let totalScore = 0;
 
 		const isShortText = text.length < 500;
@@ -258,8 +278,7 @@ class ContextProcessor {
 	/**
 	 * Determine the best category match from analysis results.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private getBestMatch(results: Map<string, any>, totalScore: number): AnalysisResult {
+	private getBestMatch(results: Map<string, CategoryScore>, totalScore: number): AnalysisResult {
 		if (totalScore === 0) return this.getFallback();
 
 		const bestMatches = Array.from(results.entries())
@@ -290,8 +309,7 @@ class ContextProcessor {
 	/**
 	 * Generate a collision-resistant cache key for text and context.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private getCacheKey(text: string, context: any): string {
+	private getCacheKey(text: string, context: Record<string, unknown>): string {
 		let keyContent;
 
 		if (text.length <= 200) {

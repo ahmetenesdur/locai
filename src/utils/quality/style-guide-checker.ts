@@ -9,7 +9,7 @@ export interface StyleGuideConfig {
 	conventions?: {
 		useOxfordComma?: boolean;
 		useSentenceCase?: boolean;
-		[key: string]: any;
+		[convention: string]: boolean | undefined;
 	};
 }
 
@@ -53,7 +53,6 @@ class StyleGuideChecker {
 	/**
 	 * Check if text follows style guide conventions.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	checkStyleGuide(_sourceText: string, translatedText: string): StyleIssue[] {
 		const issues: StyleIssue[] = [];
 
@@ -131,7 +130,6 @@ class StyleGuideChecker {
 	/**
 	 * Fix style guide issues.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	fixStyleGuide(sourceText: string, translatedText: string): StyleFixResult {
 		let fixedText = translatedText;
 		const foundIssues: StyleIssue[] = [];

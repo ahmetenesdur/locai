@@ -1,13 +1,19 @@
-import rateLimiter from "../utils/rate-limiter.js";
+import rateLimiter, { ProviderStatus, RateLimiterConfig } from "../utils/rate-limiter.js";
 import pLimit from "p-limit";
-import ProgressTracker from "../utils/progress-tracker.js";
+import ProgressTracker, { ProgressOptions } from "../utils/progress-tracker.js";
 import QualityChecker from "../utils/quality/index.js";
-import ContextProcessor, { ContextConfig } from "./context-processor.js";
+import type { QualityRules } from "../utils/quality/base-checker.js";
+import type { LengthControlOptions } from "../utils/quality/length-checker.js";
+import type { StyleGuideConfig } from "../utils/quality/style-guide-checker.js";
+import ContextProcessor, { AnalysisResult, ContextConfig } from "./context-processor.js";
 import { LRUCache } from "lru-cache";
 import os from "os";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 
-import GlossaryManager from "../utils/glossary-manager.js";
+import GlossaryManager, { GlossaryConfig } from "../utils/glossary-manager.js";
+import type { FlatTranslationValue } from "../utils/object-transformer.js";
+import type { RetryConfig } from "../utils/retry-helper.js";
+import type { ProviderConfig } from "../providers/base-provider.js";
 import fs from "fs";
 import path from "path";
 import { log } from "../utils/logger.js";
@@ -16,13 +22,16 @@ import { log } from "../utils/logger.js";
 import Pipeline from "./pipeline/Pipeline.js";
 import {
 	createTranslationContext,
-	TranslationContext,
+	TranslationMeta,
 	TranslationResult,
 } from "./pipeline/context.js";
 import InputValidationStep from "./pipeline/steps/InputValidationStep.js";
 import CacheReadStep, { CacheStats } from "./pipeline/steps/CacheReadStep.js";
 import GlossaryPreStep from "./pipeline/steps/GlossaryPreStep.js";
-import TranslationStep, { ConfidenceSettings } from "./pipeline/steps/TranslationStep.js";
+import TranslationStep, {
+	ConfidenceSettings,
+	ReviewQueueItem,
+} from "./pipeline/steps/TranslationStep.js";
 import GlossaryPostStep from "./pipeline/steps/GlossaryPostStep.js";
 import QualityCheckStep from "./pipeline/steps/QualityCheckStep.js";
 import ToneCheckStep from "./pipeline/steps/ToneCheckStep.js";
@@ -31,19 +40,42 @@ import CacheWriteStep from "./pipeline/steps/CacheWriteStep.js";
 import ContextEnrichmentStep from "./pipeline/steps/ContextEnrichmentStep.js";
 import { SourceCodeAnalyzer } from "../services/source-analyzer.js";
 
+/** The `rateLimiter` configuration section. */
+export interface RateLimiterOptions extends RateLimiterConfig {
+	enabled?: boolean;
+}
+
+/** The `retryOptions` configuration section; providers read `maxRetries` and `initialDelay`. */
+export interface ProviderRetryOptions {
+	maxRetries?: number;
+	initialDelay?: number;
+	maxDelay?: number;
+	jitter?: boolean;
+	retryableErrors?: string[];
+	perProviderRetry?: Record<string, Partial<RetryConfig>>;
+}
+
+/** The `vectorMemory` configuration section. */
+export interface VectorMemoryOptions extends VectorStoreConfig {
+	embeddingProvider?: string;
+	embeddingModel?: string;
+}
+
+/**
+ * Settings read by the orchestrator and its pipeline steps. The whole object is also
+ * forwarded to the provider's `translate()` (see TranslationStep).
+ */
 export interface OrchestratorOptions {
 	context: ContextConfig;
+	/** Scan the project's source code for where each key is used (default true). */
 	deepContext?: boolean;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	progressOptions?: any;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	styleGuide?: any;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	lengthControl?: any;
+	progressOptions?: ProgressOptions;
+	styleGuide?: StyleGuideConfig;
+	lengthControl?: LengthControlOptions;
 	qualityChecks?: {
 		enabled?: boolean;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		rules?: any;
+		rules?: QualityRules;
+		autoFix?: boolean;
 	};
 	advanced?: {
 		timeoutMs?: number;
@@ -52,15 +84,8 @@ export interface OrchestratorOptions {
 		autoOptimize?: boolean;
 		debug?: boolean;
 	};
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	glossary?: any;
-	rateLimiter?: {
-		queueStrategy?: string;
-		queueTimeout?: number;
-		adaptiveThrottling?: boolean;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		providerLimits?: any;
-	};
+	glossary?: GlossaryConfig;
+	rateLimiter?: RateLimiterOptions;
 	cacheSize?: number;
 	cacheTTL?: number;
 	updateAgeOnGet?: boolean;
@@ -78,13 +103,24 @@ export interface OrchestratorOptions {
 	};
 	concurrencyLimit?: number;
 	cacheEnabled?: boolean;
+	/** Language of the source texts. */
 	source: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[key: string]: any;
+	vectorMemory?: VectorMemoryOptions;
+	/** Analyzer shared between orchestrators; a new one is created when omitted. */
+	sourceCodeAnalyzer?: SourceCodeAnalyzer;
+
+	// Provider selection (TranslationStep) and settings read by the providers
+	/** Translation provider; the available providers are tried in order when unset. */
+	apiProvider?: string;
+	useFallback?: boolean;
+	fallbackOrder?: string[];
+	/** Model settings per provider, keyed by provider name. */
+	apiConfig?: Record<string, ProviderConfig>;
+	retryOptions?: ProviderRetryOptions;
 }
 
 // Vector Memory Imports
-import { VectorStore } from "../services/vector-store.js";
+import { VectorStore, VectorStoreConfig } from "../services/vector-store.js";
 import { EmbeddingProvider } from "../services/embedding-provider.js";
 import { VectorCacheReadStep, VectorMemoryStats } from "./pipeline/steps/VectorCacheReadStep.js";
 import { VectorCacheWriteStep } from "./pipeline/steps/VectorCacheWriteStep.js";
@@ -97,13 +133,44 @@ interface AdvancedSettings {
 	debug: boolean;
 }
 
+/** One key to translate, as passed to {@link Orchestrator.processTranslations}. */
 interface TranslationItem {
 	key: string;
 	text: string;
 	targetLang: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	existingTranslation?: any;
-	[key: string]: any;
+	existingTranslation?: FlatTranslationValue;
+}
+
+/** What a background refresh needs to re-translate a cached entry (the cache's fetch context). */
+interface CacheRefreshContext {
+	text: string;
+	targetLang: string;
+	contextData?: TranslationMeta;
+}
+
+/** Cache counters plus the cache's current size, capacity and hit rate. */
+export interface CacheStatus extends CacheStats {
+	size: number;
+	capacity: number;
+	hitRate: number;
+}
+
+/** Snapshot returned by {@link Orchestrator.getStatus}. */
+export interface OrchestratorStatus {
+	/** Empty when the cache is disabled. */
+	cache: CacheStatus | Record<string, never>;
+	rateLimiter: Record<string, ProviderStatus>;
+	concurrency: number;
+	advanced: AdvancedSettings;
+	confidence: {
+		minThreshold?: number;
+		autoApproveThreshold: number;
+		reviewThreshold: number;
+		rejectThreshold: number;
+		reviewQueueSize: number;
+		autoApprovedCount: number;
+		rejectedCount: number;
+	} | null;
 }
 
 class Orchestrator {
@@ -111,11 +178,10 @@ class Orchestrator {
 	private contextProcessor: ContextProcessor;
 
 	public progress: ProgressTracker;
-	public qualityChecker: QualityChecker | any;
+	public qualityChecker: QualityChecker | null;
 	public advanced: AdvancedSettings;
 	public glossaryManager: GlossaryManager;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	public translationCache: LRUCache<string, any> | null;
+	public translationCache: LRUCache<string, TranslationResult, CacheRefreshContext> | null;
 	public cacheStats: CacheStats;
 
 	// Vector Memory
@@ -163,7 +229,7 @@ class Orchestrator {
 
 		if (options.rateLimiter) {
 			rateLimiter.updateConfig({
-				queueStrategy: options.rateLimiter.queueStrategy as "fifo" | "priority" | undefined,
+				queueStrategy: options.rateLimiter.queueStrategy,
 				queueTimeout: options.rateLimiter.queueTimeout,
 				adaptiveThrottling: options.rateLimiter.adaptiveThrottling,
 				providerLimits: options.rateLimiter.providerLimits,
@@ -171,14 +237,13 @@ class Orchestrator {
 		}
 
 		// Cache Initialization
-		this.translationCache = new LRUCache({
+		this.translationCache = new LRUCache<string, TranslationResult, CacheRefreshContext>({
 			max: options.cacheSize || 1000,
 			ttl: options.cacheTTL || 1000 * 60 * 60 * 24,
 			updateAgeOnGet: options.updateAgeOnGet !== false,
 			allowStale: options.allowStaleCache !== false,
 			// Simplified fetchMethod for stale-while-revalidate pattern
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			fetchMethod: async (key: string, staleValue: any, { context }: any) => {
+			fetchMethod: async (key, staleValue, { context }) => {
 				if (staleValue && options.staleWhileRevalidate !== false) {
 					// Background refresh using a mini-pipeline or direct logic
 					this._refreshCacheEntry(key, context).catch((err) => {
@@ -186,7 +251,7 @@ class Orchestrator {
 					});
 					return staleValue;
 				}
-				return null;
+				return undefined;
 			},
 		});
 
@@ -371,10 +436,8 @@ class Orchestrator {
 		key: string,
 		text: string,
 		targetLang: string,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		contextData: any,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		existingTranslation: any
+		contextData: TranslationMeta,
+		existingTranslation?: FlatTranslationValue
 	): Promise<TranslationResult> {
 		const context = createTranslationContext(
 			key,
@@ -405,18 +468,17 @@ class Orchestrator {
 			);
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const allPromises: Promise<any>[] = [];
+		const allPromises: Promise<TranslationResult>[] = [];
 
 		for (const chunk of chunks) {
 			const texts = chunk.map((item) => item.text);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			let contextResults: any[] = [];
+			let contextResults: AnalysisResult[] = [];
 
 			try {
 				contextResults = await this.contextProcessor.analyzeBatch(texts);
-			} catch (error: any) {
-				console.warn(`Context analysis failed for batch: ${error.message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.warn(`Context analysis failed for batch: ${message}`);
 			}
 
 			for (let i = 0; i < chunk.length; i++) {
@@ -424,7 +486,7 @@ class Orchestrator {
 				const contextData =
 					contextResults[i] || (await this.contextProcessor.analyze(item.text));
 
-				const promise = limit(async () => {
+				const promise = limit(async (): Promise<TranslationResult> => {
 					try {
 						const result = await this.processTranslation(
 							item.key,
@@ -436,15 +498,15 @@ class Orchestrator {
 
 						this.progress.increment(result.success ? "success" : "failed");
 						return result;
-					} catch (error: any) {
+					} catch (error) {
 						this.progress.increment("failed");
 						return {
 							key: item.key,
 							translated: item.text,
-							error: error.message,
+							error: error instanceof Error ? error.message : String(error),
 							success: false,
 							context: {},
-						} as TranslationResult;
+						};
 					}
 				});
 
@@ -457,10 +519,8 @@ class Orchestrator {
 	}
 
 	// Helper methods
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private _chunkArray(array: any[], chunkSize: number): any[][] {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const chunks: any[][] = [];
+	private _chunkArray<T>(array: T[], chunkSize: number): T[][] {
+		const chunks: T[][] = [];
 		for (let i = 0; i < array.length; i += chunkSize) {
 			chunks.push(array.slice(i, i + chunkSize));
 		}
@@ -487,8 +547,9 @@ class Orchestrator {
 					true
 				);
 			}
-		} catch (error: any) {
-			console.warn("Failed to auto-optimize settings:", error.message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn("Failed to auto-optimize settings:", message);
 		}
 	}
 
@@ -509,8 +570,7 @@ class Orchestrator {
 		};
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	getCacheStats(): any {
+	getCacheStats(): CacheStatus | Record<string, never> {
 		if (!this.translationCache) return {};
 		return {
 			...this.cacheStats,
@@ -521,8 +581,7 @@ class Orchestrator {
 	}
 
 	// Used by background revalidation.
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async _refreshCacheEntry(key: string, context: any): Promise<void> {
+	async _refreshCacheEntry(key: string, context: CacheRefreshContext): Promise<void> {
 		if (!context || !context.text || !context.targetLang) {
 			return;
 		}
@@ -549,13 +608,13 @@ class Orchestrator {
 
 			// Stats are handled within steps (TranslationStep adds confidence, CacheWriteStep updates cache & stats)
 			this.cacheStats.refreshes++;
-		} catch (error: any) {
-			console.warn(`Failed to refresh cache entry: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Failed to refresh cache entry: ${message}`);
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	getStatus(): any {
+	getStatus(): OrchestratorStatus {
 		return {
 			cache: this.getCacheStats(),
 			rateLimiter: rateLimiter.getStatus(),
@@ -592,8 +651,7 @@ class Orchestrator {
 			const reviewFile = path.join(cacheDir, "review-queue.json");
 			const data = {
 				timestamp: new Date().toISOString(),
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				minConfidence: (this.options as any).minConfidence,
+				minConfidence: this.options.minConfidence,
 				items: this.confidenceSettings.reviewQueue,
 				stats: {
 					total: this.confidenceSettings.reviewQueue.length,
@@ -610,13 +668,13 @@ class Orchestrator {
 			);
 			console.log(`   File: ${reviewFile}`);
 			console.log(`   Run 'localize review' to start interactive review\n`);
-		} catch (error: any) {
-			console.warn(`Warning: Failed to save review queue: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Warning: Failed to save review queue: ${message}`);
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private _groupByLanguage(items: any[]): Record<string, number> {
+	private _groupByLanguage(items: ReviewQueueItem[]): Record<string, number> {
 		const grouped: Record<string, number> = {};
 		items.forEach((item) => {
 			if (!grouped[item.language]) {
@@ -627,8 +685,7 @@ class Orchestrator {
 		return grouped;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private _groupByConfidenceLevel(items: any[]): Record<string, number> {
+	private _groupByConfidenceLevel(items: ReviewQueueItem[]): Record<string, number> {
 		const grouped: Record<string, number> = { high: 0, medium: 0, low: 0, very_low: 0 };
 		items.forEach((item) => {
 			if (grouped[item.confidence.level] !== undefined) {

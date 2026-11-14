@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { autoDetectConfig, runCommand } from "../../../src/cli/helpers.js";
+import { autoDetectConfig } from "../../../src/cli/helpers.js";
 import { FrameworkDetector } from "../../../src/core/detection/framework-detector.js";
-import InputValidator from "../../../src/utils/input-validator.js";
+import { LocalizeConfig } from "../../../src/config/index.js";
 
 vi.mock("../../../src/core/detection/framework-detector.js");
 vi.mock("../../../src/utils/input-validator.js");
@@ -21,7 +21,8 @@ describe("autoDetectConfig", () => {
 			framework: "next",
 		});
 
-		const config = await autoDetectConfig({ source: "en" });
+		const input: LocalizeConfig = { source: "en" };
+		const config = await autoDetectConfig(input);
 		expect(config.localesDir).toBe("./detected/locales");
 	});
 

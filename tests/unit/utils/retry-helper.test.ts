@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import RetryHelper, { RetryOptions } from "../../../src/utils/retry-helper.js";
+import RetryHelper from "../../../src/utils/retry-helper.js";
 
 describe("RetryHelper", () => {
 	// Mock RetryHelper.delay to speed up tests (so we don't actually wait seconds)
@@ -50,6 +50,16 @@ describe("RetryHelper", () => {
 			).rejects.toThrow("fail");
 
 			expect(operation).toHaveBeenCalledTimes(1); // Only initial attempt
+		});
+
+		it("should keep the message when the operation rejects with a non-Error value", async () => {
+			const operation = vi.fn().mockRejectedValue("quota exhausted");
+
+			await expect(
+				RetryHelper.withRetry(operation, { maxRetries: 1, initialDelay: 1 })
+			).rejects.toThrow("quota exhausted (after 2 attempts");
+
+			expect(operation).toHaveBeenCalledTimes(2);
 		});
 	});
 

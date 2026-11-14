@@ -2,15 +2,19 @@
  * Prompt template utilities for translation and analysis
  */
 
+import type { FlatTranslationValue } from "./object-transformer.js";
+import type { LengthControlOptions } from "./quality/length-checker.js";
+
 export interface PromptOptions {
 	mode?: "smart" | "strict" | "flexible" | "exact" | "relaxed";
-	lengthControl?: any;
+	lengthControl?: LengthControlOptions;
 	targetLang?: string;
 	detectedContext?: {
 		category?: string;
 		confidence?: number;
 		prompt?: string;
-		existingTranslation?: string;
+		/** Current value in the target file; only a string triggers a revision request */
+		existingTranslation?: FlatTranslationValue;
 		similarTranslation?: {
 			source: string;
 			target: string;
@@ -21,12 +25,52 @@ export interface PromptOptions {
 		formality?: string;
 		toneOfVoice?: string;
 	};
-	categories?: Record<string, any>;
+	categories?: Record<string, unknown>;
 	allowNewCategories?: boolean;
 	model?: string;
 	temperature?: number;
 	maxTokens?: number;
 }
+
+export interface ChatMessage {
+	role: "system" | "user";
+	content: string;
+}
+
+/** OpenAI-compatible chat payload (OpenAI, DeepSeek, xAI, DashScope translation) */
+export interface ChatPrompt {
+	messages: ChatMessage[];
+}
+
+/** Anthropic Messages API payload: system prompt is a top-level field */
+export interface AnthropicPrompt {
+	system: string;
+	messages: ChatMessage[];
+}
+
+/** Gemini generateContent payload */
+export interface GeminiPrompt {
+	contents: { parts: { text: string }[] }[];
+}
+
+/** DashScope native analysis payload */
+export interface DashScopeAnalysisPrompt {
+	model: string;
+	input: { messages: ChatMessage[] };
+	parameters: { temperature: number; max_tokens: number };
+}
+
+export type TranslationPromptPayload = ChatPrompt | AnthropicPrompt | GeminiPrompt;
+export type AnalysisPromptPayload = TranslationPromptPayload | DashScopeAnalysisPrompt;
+
+type TranslationPromptBuilder = (
+	sourceLang: string,
+	targetLang: string,
+	text: string,
+	options: PromptOptions
+) => TranslationPromptPayload;
+
+type AnalysisPromptBuilder = (text: string, options: PromptOptions) => AnalysisPromptPayload;
 
 const getLengthInstructions = (options: PromptOptions): string => {
 	// ... existing getLengthInstructions ...
@@ -85,8 +129,9 @@ const getLengthInstructions = (options: PromptOptions): string => {
 	if (typeof templateFn === "function") {
 		try {
 			return templateFn();
-		} catch (error: any) {
-			console.warn(`Error generating length template for mode ${mode}:`, error.message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Error generating length template for mode ${mode}:`, message);
 		}
 	}
 
@@ -216,8 +261,9 @@ const baseAnalysisPromptTemplate = (text: string, options: PromptOptions = {}): 
 			if (Array.isArray(categoryKeys) && categoryKeys.length > 0) {
 				categories = categoryKeys.join(", ");
 			}
-		} catch (error: any) {
-			console.warn("Error processing categories:", error.message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn("Error processing categories:", message);
 		}
 	}
 
@@ -257,7 +303,7 @@ FORMAT YOUR RESPONSE AS JSON:
 };
 
 // Provider-specific templates for translation
-const translationPrompts: Record<string, any> = {
+const translationPrompts: Record<string, TranslationPromptBuilder> = {
 	gemini: (sourceLang: string, targetLang: string, text: string, options: PromptOptions) => ({
 		contents: [
 			{
@@ -353,7 +399,7 @@ Original Text: "${text}"`,
 };
 
 // Provider-specific templates for analysis
-const analysisPrompts: Record<string, any> = {
+const analysisPrompts: Record<string, AnalysisPromptBuilder> = {
 	gemini: (text: string, options: PromptOptions) => ({
 		contents: [
 			{
@@ -463,7 +509,7 @@ const getPrompt = (
 	targetLang: string,
 	text: string,
 	options: PromptOptions = {}
-): any => {
+): TranslationPromptPayload => {
 	if (!provider || typeof provider !== "string") {
 		console.warn("Invalid provider provided to getPrompt, using default");
 		provider = "default";
@@ -493,8 +539,9 @@ const getPrompt = (
 
 	try {
 		return promptGenerator(sourceLang, targetLang, text, options);
-	} catch (error: any) {
-		console.error(`Error generating prompt for provider ${provider}:`, error.message);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`Error generating prompt for provider ${provider}:`, message);
 		return translationPrompts.default(sourceLang, targetLang, text, options);
 	}
 };
@@ -502,7 +549,11 @@ const getPrompt = (
 /**
  * Get analysis prompt
  */
-const getAnalysisPrompt = (provider: string, text: string, options: PromptOptions = {}): any => {
+const getAnalysisPrompt = (
+	provider: string,
+	text: string,
+	options: PromptOptions = {}
+): AnalysisPromptPayload => {
 	if (!provider || typeof provider !== "string") {
 		console.warn("Invalid provider provided to getAnalysisPrompt, using default");
 		provider = "default";
@@ -522,8 +573,9 @@ const getAnalysisPrompt = (provider: string, text: string, options: PromptOption
 
 	try {
 		return promptGenerator(text, options);
-	} catch (error: any) {
-		console.error(`Error generating analysis prompt for provider ${provider}:`, error.message);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`Error generating analysis prompt for provider ${provider}:`, message);
 		return analysisPrompts.default(text, options);
 	}
 };

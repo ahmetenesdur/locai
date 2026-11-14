@@ -1,5 +1,40 @@
+export type LengthMode = "strict" | "flexible" | "exact" | "relaxed" | "smart";
+
+/** Modes whose tolerance is a single symmetric deviation */
+export type StandardLengthMode = Exclude<LengthMode, "smart">;
+
+/** Allowed deviation as a fraction of the source length (e.g. max 0.2 = up to 20% longer) */
+export interface LengthDeviationBounds {
+	min?: number;
+	max?: number;
+}
+
+export interface SmartLengthRules {
+	/** Symmetric tolerance used when no language/context bound applies */
+	default?: number;
+	byLanguage?: Record<string, LengthDeviationBounds>;
+	byContext?: Record<string, LengthDeviationBounds>;
+}
+
+export interface LengthControlRules extends Partial<Record<StandardLengthMode, number>> {
+	smart?: SmartLengthRules;
+}
+
+/** The `lengthControl` section of the configuration */
+export interface LengthControlOptions {
+	mode?: LengthMode;
+	rules?: LengthControlRules;
+}
+
+/** Options consulted by {@link LengthChecker.checkLength} */
+export interface LengthCheckOptions {
+	lengthControl?: LengthControlOptions;
+	targetLang?: string;
+	detectedContext?: { category?: string };
+}
+
 export interface LengthConfig {
-	mode: "strict" | "flexible" | "exact" | "relaxed" | "smart";
+	mode: LengthMode;
 	maxDeviation: number;
 	minDeviation: number;
 	targetLang?: string;
@@ -32,7 +67,7 @@ export interface LengthIssue {
  */
 class LengthChecker {
 	private defaultConfig: {
-		mode: string;
+		mode: StandardLengthMode;
 		maxDeviation: number;
 		minDeviation: number;
 	};
@@ -48,7 +83,11 @@ class LengthChecker {
 	/**
 	 * Check if translated text length is acceptable.
 	 */
-	checkLength(source: string, translated: string, options: any = {}): LengthIssue[] {
+	checkLength(
+		source: string,
+		translated: string,
+		options: LengthCheckOptions = {}
+	): LengthIssue[] {
 		try {
 			const sourceLength = this.calculateLength(source);
 			const translatedLength = this.calculateLength(translated);
@@ -81,14 +120,14 @@ class LengthChecker {
 			}
 
 			return [];
-		} catch (error: any) {
+		} catch (error) {
 			console.error("Length check failed:", error);
 			return [
 				{
 					type: "length",
 					severity: "error",
 					message: "Length validation failed due to technical error",
-					details: { error: error.message },
+					details: { error: error instanceof Error ? error.message : String(error) },
 				},
 			];
 		}
@@ -105,7 +144,7 @@ class LengthChecker {
 	/**
 	 * Get configuration for length check.
 	 */
-	getConfig(options: any): LengthConfig {
+	getConfig(options: LengthCheckOptions): LengthConfig {
 		const lengthControl = options.lengthControl || {};
 		const mode = lengthControl.mode || this.defaultConfig.mode;
 		const targetLang = options.targetLang || "en";
@@ -121,7 +160,11 @@ class LengthChecker {
 	/**
 	 * Get configuration for smart mode.
 	 */
-	getSmartModeConfig(lengthControl: any, targetLang: string, context: string): LengthConfig {
+	getSmartModeConfig(
+		lengthControl: LengthControlOptions,
+		targetLang: string,
+		context: string
+	): LengthConfig {
 		const smartRules = lengthControl.rules?.smart || {};
 		const langRules = smartRules.byLanguage?.[targetLang] || {};
 		const contextRules = smartRules.byContext?.[context] || {};
@@ -143,15 +186,14 @@ class LengthChecker {
 	 * Get configuration for standard mode.
 	 */
 	getStandardModeConfig(
-		lengthControl: any,
-		mode: any,
+		lengthControl: LengthControlOptions,
+		mode: StandardLengthMode,
 		targetLang: string,
 		context: string
 	): LengthConfig {
 		const deviation = lengthControl.rules?.[mode] || this.defaultConfig.maxDeviation;
 		return {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			mode: mode as any,
+			mode,
 			targetLang,
 			context,
 			maxDeviation: deviation,

@@ -1,22 +1,25 @@
 import rateLimiter from "./rate-limiter.js";
 
-// We'll define a simple interface for the rate limiter status if we can't import it yet.
-// Since rate-limiter.js is still JS, TS sees it as 'any' or based on inference if allowJs is on.
-// We will simply treat it as any for now until we migrate it, or assume inference works.
-
 export type ShutdownCallback = () => Promise<void> | void;
+
+/** Minimal logging surface used during shutdown; satisfied by `console` and our `Logger`. */
+export interface ShutdownLogger {
+	info(...args: unknown[]): void;
+	warn(...args: unknown[]): void;
+	error(...args: unknown[]): void;
+}
 
 export interface ShutdownOptions {
 	shutdownTimeout?: number;
 	waitForPending?: boolean;
-	logger?: Console | any; // 'any' for our custom Logger instance compatibility
+	logger?: ShutdownLogger;
 }
 
 class GracefulShutdown {
 	private options: Required<ShutdownOptions>;
 	private isShuttingDown: boolean;
 	private shutdownCallbacks: ShutdownCallback[];
-	private logger: Console | any;
+	private logger: ShutdownLogger;
 
 	constructor(options: ShutdownOptions = {}) {
 		this.options = {
@@ -121,8 +124,7 @@ class GracefulShutdown {
 	}
 
 	async waitForPendingOperations(): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const providerStatus: Record<string, any> = (rateLimiter as any).getStatus();
+		const providerStatus = rateLimiter.getStatus();
 		let hasPending = false;
 
 		for (const [provider, status] of Object.entries(providerStatus)) {
@@ -137,10 +139,13 @@ class GracefulShutdown {
 		if (hasPending) {
 			await new Promise((resolve) => setTimeout(resolve, 2000));
 			try {
-				(rateLimiter as any).clearAllQueues();
+				rateLimiter.clearAllQueues();
 				this.logger.info("Forced queue cleanup completed");
-			} catch (error: any) {
-				this.logger.warn("Error during forced queue cleanup:", error.message);
+			} catch (error) {
+				this.logger.warn(
+					"Error during forced queue cleanup:",
+					error instanceof Error ? error.message : String(error)
+				);
 			}
 		}
 	}

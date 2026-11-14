@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import QualityChecker from "../../../../src/utils/quality/index.js";
+import type { CheckerOptions } from "../../../../src/utils/quality/base-checker.js";
 
 describe("QualityChecker", () => {
 	let qualityChecker: QualityChecker;
-	const defaultOptions = {
-		rules: {
-			placeholderConsistency: true,
-			htmlTagsConsistency: true,
-			punctuationCheck: true,
-			lengthValidation: true,
-			quoteBalanceCheck: true,
-			sanitizeOutput: true,
-		},
+	// Rule toggles are top-level options (callers spread `qualityChecks.rules` into them)
+	const defaultOptions: CheckerOptions = {
+		placeholderConsistency: true,
+		htmlTagsConsistency: true,
+		punctuationCheck: true,
+		lengthValidation: true,
+		quoteBalanceCheck: true,
+		sanitizeOutput: true,
 	};
 
 	beforeEach(() => {
@@ -36,6 +36,19 @@ describe("QualityChecker", () => {
 			const result = qualityChecker.validate("Hello.", "Merhaba");
 			expect(result.isValid).toBe(false);
 			expect(result.issues.some((i) => i.type === "punctuation")).toBe(true);
+		});
+
+		it("should honour styleGuide.conventions from the config", () => {
+			const text = "Red, green and blue.";
+			const flagged = qualityChecker.validate(text, text);
+			expect(flagged.issues.some((i) => i.type === "oxford-comma")).toBe(true);
+
+			const withoutOxfordComma = new QualityChecker({
+				...defaultOptions,
+				styleGuide: { conventions: { useOxfordComma: false } },
+			});
+			const result = withoutOxfordComma.validate(text, text);
+			expect(result.issues.some((i) => i.type === "oxford-comma")).toBe(false);
 		});
 	});
 

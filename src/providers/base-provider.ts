@@ -2,44 +2,62 @@
  * Base class for translation providers
  */
 import ErrorHelper from "../utils/error-helper.js";
-import ConfidenceScorer from "../utils/confidence-scorer.js";
+import ConfidenceScorer, { ConfidenceResult } from "../utils/confidence-scorer.js";
+import type { PromptOptions } from "../utils/prompt-templates.js";
+import type { ProviderResponseBody } from "./api-types.js";
 
+/**
+ * Model settings for one provider: constructor config, `apiConfig.<provider>` entries,
+ * and per-call options of `analyze()` / `chat()` / `embed()`.
+ */
 export interface ProviderConfig {
 	model?: string;
 	temperature?: number;
 	maxTokens?: number;
-	[key: string]: any;
+	/** HTTP timeout, read once by the provider constructor. */
+	timeoutMs?: number;
+	/** Retry overrides for `analyze()` / `chat()` / `embed()`. */
+	maxRetries?: number;
+	initialDelay?: number;
+	/** OpenAI `chat()`: request a JSON object response. */
+	json?: boolean;
 }
 
-export interface TranslateOptions {
-	detectedContext?: {
-		category?: string;
-		[key: string]: any;
-	};
-	lengthControl?: {
-		mode?: string;
-		[key: string]: any;
-	};
-	apiConfig?: Record<string, any>;
+/** Options of `translate()`; forwarded to the prompt templates as well. */
+export interface TranslateOptions extends PromptOptions {
+	/** Per-provider overrides, keyed by provider name. */
+	apiConfig?: Record<string, ProviderConfig>;
 	retryOptions?: {
 		maxRetries?: number;
 		initialDelay?: number;
-		[key: string]: any;
 	};
-	[key: string]: any;
 }
 
-export interface ConfidenceResult {
-	score: number;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	metrics?: any;
-	[key: string]: any;
+export interface ChatMessage {
+	role: "system" | "user" | "assistant";
+	content: string;
 }
 
 export interface TranslationResult {
 	translation: string;
 	confidence: ConfidenceResult;
-	rawResponse: any;
+	rawResponse: ProviderResponseBody;
+}
+
+/** HTTP client error (AxiosError or compatible) as read by `handleApiError`. */
+interface ApiErrorLike {
+	message?: string;
+	code?: string;
+	config?: { timeout?: number };
+	response?: {
+		status: number;
+		data?: { error?: { message?: string }; message?: string };
+		headers?: Record<string, string | number | undefined>;
+	};
+}
+
+function isApiErrorLike(error: unknown): error is ApiErrorLike {
+	return typeof error === "object" && error !== null;
 }
 
 class BaseProvider {
@@ -72,11 +90,11 @@ class BaseProvider {
 		throw new Error(`translate method must be implemented by ${this.name} provider`);
 	}
 
-	async analyze(prompt: string, options: any = {}): Promise<string> {
+	async analyze(_prompt: string, _options: ProviderConfig = {}): Promise<string> {
 		throw new Error(`analyze method must be implemented by ${this.name} provider if supported`);
 	}
 
-	async chat(messages: any[], options: any = {}): Promise<string> {
+	async chat(_messages: ChatMessage[], _options: ProviderConfig = {}): Promise<string> {
 		throw new Error(`chat method must be implemented by ${this.name} provider if supported`);
 	}
 
@@ -102,7 +120,10 @@ class BaseProvider {
 		}
 	}
 
-	validateResponse(response: any, providerName: string): boolean {
+	validateResponse(
+		response: { data?: unknown } | null | undefined,
+		providerName: string
+	): boolean {
 		if (!response) {
 			throw new Error(`No response from ${providerName} API`);
 		}
@@ -114,22 +135,23 @@ class BaseProvider {
 		return true;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
-	handleApiError(error: any, providerName: string): never {
-		if (error.response) {
-			const status = error.response.status;
-			const apiMessage =
-				error.response.data?.error?.message || error.response.data?.message || null;
+	handleApiError(error: unknown, providerName: string): never {
+		const apiErrorLike: ApiErrorLike = isApiErrorLike(error) ? error : {};
+
+		if (apiErrorLike.response) {
+			const { response } = apiErrorLike;
+			const status = response.status;
+			const apiMessage = response.data?.error?.message || response.data?.message || null;
 
 			// Rate limit error
 			if (status === 429) {
-				const retryAfter = error.response.headers?.["retry-after"] || 60;
-				const limit = error.response.headers?.["x-ratelimit-limit"];
-				const remaining = error.response.headers?.["x-ratelimit-remaining"];
+				const retryAfter = response.headers?.["retry-after"] || 60;
+				const limit = response.headers?.["x-ratelimit-limit"];
+				const remaining = response.headers?.["x-ratelimit-remaining"];
 
 				throw ErrorHelper.rateLimitError(providerName, {
 					limit,
-					current: limit ? limit - remaining : null,
+					current: limit ? Number(limit) - Number(remaining) : null,
 					retryAfter,
 					statusCode: status,
 				});
@@ -156,21 +178,20 @@ class BaseProvider {
 		}
 
 		// Network errors
-		if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+		if (apiErrorLike.code === "ECONNREFUSED" || apiErrorLike.code === "ENOTFOUND") {
 			throw ErrorHelper.networkError(providerName);
 		}
 
 		// Timeout errors
-		if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-			throw ErrorHelper.timeoutError(providerName, error.config?.timeout);
+		if (apiErrorLike.code === "ECONNABORTED" || apiErrorLike.code === "ETIMEDOUT") {
+			throw ErrorHelper.timeoutError(providerName, apiErrorLike.config?.timeout);
 		}
 
 		// Unknown errors - preserve original for debugging
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const unknownError: any = new Error(`${providerName}: ${error.message}`);
-		unknownError.code = "ERR_UNKNOWN";
-		unknownError.originalError = error;
-		throw unknownError;
+		throw Object.assign(new Error(`${providerName}: ${apiErrorLike.message}`), {
+			code: "ERR_UNKNOWN",
+			originalError: error,
+		});
 	}
 
 	generatePrompt(
@@ -235,8 +256,7 @@ class BaseProvider {
 		};
 	}
 
-	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
-	extractTranslation(response: any, providerName: string): string {
+	extractTranslation(response: ProviderResponseBody, providerName: string): string {
 		// Check for error response first
 		if (response.error) {
 			const errorMsg =
@@ -244,7 +264,7 @@ class BaseProvider {
 			throw new Error(`api: ${providerName} - ${errorMsg}`);
 		}
 
-		let translation = null;
+		let translation: string | null = null;
 
 		if (response.choices && response.choices[0]?.message?.content) {
 			translation = response.choices[0].message.content.trim();
@@ -291,8 +311,7 @@ class BaseProvider {
 	 * Extract translation with confidence score
 	 */
 	extractTranslationWithConfidence(
-		// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
-		response: any,
+		response: ProviderResponseBody,
 		providerName: string,
 		sourceText: string,
 		sourceLang: string,
@@ -317,7 +336,7 @@ class BaseProvider {
 
 		return {
 			translation,
-			confidence: confidenceResult as ConfidenceResult,
+			confidence: confidenceResult,
 			rawResponse: response,
 		};
 	}

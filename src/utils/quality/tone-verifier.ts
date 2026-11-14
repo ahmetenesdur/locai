@@ -25,7 +25,7 @@ export class ToneVerifier {
 		try {
 			// Try to get a specific "judge" provider if configured, otherwise default
 			this.provider = ProviderFactory.getProvider(providerName, true);
-		} catch (error) {
+		} catch {
 			// If specific provider fails, might fall back to any available
 			const available = ProviderFactory.getAvailableProviders();
 			if (available.length > 0) {

@@ -14,14 +14,31 @@ interface ProviderConfig {
 	maxConcurrent: number;
 }
 
+/**
+ * A queued task. The queue mixes tasks of different result types, so the
+ * settle callbacks are typed on `unknown`; `enqueue<T>` pairs each task with
+ * its own promise's callbacks.
+ */
 interface QueueItem {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	task: () => Promise<any>;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	resolve: (value: any) => void;
-	reject: (reason?: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+	task: () => Promise<unknown>;
+	resolve: (value: unknown) => void;
+	reject: (reason?: unknown) => void;
 	timestamp: number;
 	priority: number;
+}
+
+export interface ProviderStatus {
+	queueSize: number;
+	processing: number;
+	requestsUsed: number;
+	requestsLimit: number;
+	resetIn: number;
+	errorRate: number;
+	adjustments: { rpm: number; concurrency: number };
+	config: {
+		maxConcurrent: number;
+		rpm: number;
+	};
 }
 
 interface Metrics {
@@ -171,7 +188,6 @@ class RateLimiter {
 	 * @param priority - Task priority (higher is better).
 	 * @returns Task result.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	async enqueue<T>(provider: string, task: () => Promise<T>, priority = 0): Promise<T> {
 		provider = provider.toLowerCase();
 
@@ -179,10 +195,11 @@ class RateLimiter {
 			throw new Error(`Unknown provider: ${provider}`);
 		}
 
-		return new Promise((resolve, reject) => {
+		return new Promise<T>((resolve, reject) => {
 			const queueItem: QueueItem = {
 				task,
-				resolve,
+				// Only ever called with this item's own task result, which is a T.
+				resolve: resolve as (value: unknown) => void,
 				reject,
 				timestamp: Date.now(),
 				priority,
@@ -260,8 +277,10 @@ class RateLimiter {
 									`Request timed out in queue after ${this.config.queueTimeout}ms`
 								)
 							);
-						} catch (error: any) {
-							console.error(`Failed to reject timed out request: ${error.message}`);
+						} catch (error) {
+							console.error(
+								`Failed to reject timed out request: ${error instanceof Error ? error.message : String(error)}`
+							);
 						}
 					});
 				});
@@ -302,11 +321,11 @@ class RateLimiter {
 				this._trackErrorRate(provider, false);
 
 				resolve(result);
-			} catch (error: any) {
+			} catch (error) {
 				this._trackErrorRate(provider, true);
 
 				console.error(`Provider ${provider} task failed:`, {
-					error: error.message,
+					error: error instanceof Error ? error.message : String(error),
 					queueTime: queueTime,
 					processingTime: performance.now() - startTime,
 					queueSize: queue.length,
@@ -445,10 +464,8 @@ class RateLimiter {
 	 * Get complete rate limiter status.
 	 * @returns Status object including active metrics.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	getStatus(): Record<string, any> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const status: Record<string, any> = {};
+	getStatus(): Record<string, ProviderStatus> {
+		const status: Record<string, ProviderStatus> = {};
 
 		Object.entries(this.providers).forEach(([name, config]) => {
 			const errorRates = this.metrics.errorRates[name];

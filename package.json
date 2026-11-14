@@ -15,8 +15,8 @@
 	"scripts": {
 		"start": "node dist/core/orchestrator.js",
 		"dev": "tsx src/core/orchestrator.js",
-		"build": "tsc",
-		"typecheck": "tsc --noEmit",
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write \"**/*.{js,json,md,jsx,ts,tsx,css}\"",
@@ -100,6 +100,7 @@
 		"std-mocks": "^2.0.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.72.2",
 		"vitest": "^4.1.0"
 	},
 	"files": [

@@ -1,8 +1,21 @@
+/** Details for a code block count mismatch */
+export interface CodeBlockCountDetails {
+	sourceCount: number;
+	translatedCount: number;
+}
+
+/** Details for a code block whose content changed */
+export interface CodeBlockModifiedDetails {
+	index: number;
+	sourceCode: string;
+	translatedCode: string;
+}
+
 export interface CodeBlockIssue {
 	type: "code-block-count" | "code-block-modified" | "code-block-restore";
 	severity: "error" | "critical";
 	message: string;
-	details?: any;
+	details?: CodeBlockCountDetails | CodeBlockModifiedDetails;
 }
 
 export interface CodeBlockFixResult {
@@ -204,8 +217,8 @@ class CodeBlockChecker {
 		sourceText: string,
 		translatedText: string,
 		sourceCodeBlocks: CodeBlock[]
-	): { text: string; appliedFixes: any[] } {
-		const appliedFixes: any[] = [];
+	): Pick<CodeBlockFixResult, "text" | "appliedFixes"> {
+		const appliedFixes: CodeBlockFixResult["appliedFixes"] = [];
 		const fixedText = translatedText;
 
 		// This is a simplified restoration - in reality, we'd need more context

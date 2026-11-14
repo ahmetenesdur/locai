@@ -1,3 +1,23 @@
+/** Details for a per-category character count mismatch */
+export interface SpecialCharCountDetails {
+	sourceChars: string[];
+	translatedChars: string[];
+	missing: string[];
+	extra: string[];
+}
+
+/** Details for a special character that disappeared from the translation */
+export interface SpecialCharSubstitutionDetails {
+	originalChar: string;
+	charCode: number;
+}
+
+/** Details for an emoji count mismatch */
+export interface EmojiDetails {
+	sourceEmojis: string[];
+	translatedEmojis: string[];
+}
+
 export interface SpecialCharIssue {
 	type:
 		| "special-characters"
@@ -8,7 +28,7 @@ export interface SpecialCharIssue {
 	category?: string;
 	severity: "error" | "warning";
 	message: string;
-	details?: any;
+	details?: SpecialCharCountDetails | SpecialCharSubstitutionDetails | EmojiDetails;
 }
 
 export interface SpecialCharFixResult {
@@ -287,7 +307,6 @@ class SpecialCharactersChecker {
 				const count = (fixedText.match(new RegExp(wrong, "g")) || []).length;
 
 				foundIssues.push({
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					type: "character-substitution",
 					severity: "warning", // Added severity
 					message: `Found ${count} instances of "${wrong}" that should be "${correct}"`,

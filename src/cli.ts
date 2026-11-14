@@ -1,11 +1,27 @@
 #!/usr/bin/env node
 import { createRequire } from "module";
 import { program } from "commander";
-import ErrorHelper from "./utils/error-helper.js";
+import ErrorHelper, { HelperError } from "./utils/error-helper.js";
 import { loadConfig, validateEnvironment } from "./config/index.js";
 import { loadEnvironmentVariables, configureComponents } from "./config/setup.js";
-import { autoDetectConfig, runCommand } from "./cli/helpers.js";
+import { autoDetectConfig, runCommand, CommandOptions } from "./cli/helpers.js";
 import InputValidator from "./utils/input-validator.js";
+import type { ReviewCommandConfig } from "./commands/review.js";
+
+interface ValidateConfigOptions {
+	showWarnings: boolean;
+}
+
+interface ReviewOptions {
+	export?: string;
+}
+
+/** Errors built by ErrorHelper carry an `ERR_*` code and get its formatted output. */
+const isHelperError = (error: unknown): error is HelperError =>
+	error instanceof Error &&
+	"code" in error &&
+	typeof error.code === "string" &&
+	error.code.startsWith("ERR_");
 
 // Use createRequire to load package.json in ESM context
 const require = createRequire(import.meta.url);
@@ -16,7 +32,7 @@ const main = async () => {
 
 	// Load configuration
 	const loaded = await loadConfig();
-	let defaultConfig = loaded.config || {};
+	let defaultConfig = loaded.config;
 
 	defaultConfig = await autoDetectConfig(defaultConfig);
 	configureComponents(defaultConfig);
@@ -73,11 +89,11 @@ const main = async () => {
 		.option("--stats", "Show detailed stats after completion", false)
 		.option("--min-confidence <score>", "Minimum confidence threshold (0-1)", parseFloat)
 		.option("--save-review-queue", "Save low-confidence items for manual review", false)
-		.action(async (options) => {
+		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "translate");
-			} catch (error: any) {
-				if (error.code && error.code.startsWith("ERR_")) {
+			} catch (error) {
+				if (isHelperError(error)) {
 					console.error(
 						ErrorHelper.formatError(error, {
 							showDebug: process.env.DEBUG === "true",
@@ -86,8 +102,9 @@ const main = async () => {
 						})
 					);
 				} else {
-					console.error(`\nError: ${error.message}`);
-					if (error.stack && process.env.DEBUG) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(`\nError: ${message}`);
+					if (error instanceof Error && error.stack && process.env.DEBUG) {
 						console.error(error.stack);
 					}
 				}
@@ -99,17 +116,18 @@ const main = async () => {
 		.command("fix")
 		.description("Fix issues in existing translations")
 		.option("--length", "Fix length issues in existing translations", true)
-		.action(async (options) => {
+		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "fix");
-			} catch (error: any) {
-				if (error.code && error.code.startsWith("ERR_")) {
+			} catch (error) {
+				if (isHelperError(error)) {
 					console.error(
 						ErrorHelper.formatError(error, { showDebug: process.env.DEBUG === "true" })
 					);
 				} else {
-					console.error(`\nError: ${error.message}`);
-					if (error.stack && process.env.DEBUG) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(`\nError: ${message}`);
+					if (error instanceof Error && error.stack && process.env.DEBUG) {
 						console.error(error.stack);
 					}
 				}
@@ -132,17 +150,18 @@ const main = async () => {
 			Number,
 			defaultConfig.context?.detection?.threshold
 		)
-		.action(async (options) => {
+		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "analyze");
-			} catch (error: any) {
-				if (error.code && error.code.startsWith("ERR_")) {
+			} catch (error) {
+				if (isHelperError(error)) {
 					console.error(
 						ErrorHelper.formatError(error, { showDebug: process.env.DEBUG === "true" })
 					);
 				} else {
-					console.error(`\nError: ${error.message}`);
-					if (error.stack && process.env.DEBUG) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(`\nError: ${message}`);
+					if (error instanceof Error && error.stack && process.env.DEBUG) {
 						console.error(error.stack);
 					}
 				}
@@ -177,17 +196,18 @@ const main = async () => {
 			Number,
 			defaultConfig.retryOptions?.maxRetries || 2
 		)
-		.action(async (options) => {
+		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "advanced");
-			} catch (error: any) {
-				if (error.code && error.code.startsWith("ERR_")) {
+			} catch (error) {
+				if (isHelperError(error)) {
 					console.error(
 						ErrorHelper.formatError(error, { showDebug: process.env.DEBUG === "true" })
 					);
 				} else {
-					console.error(`\nError: ${error.message}`);
-					if (error.stack && process.env.DEBUG) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(`\nError: ${message}`);
+					if (error instanceof Error && error.stack && process.env.DEBUG) {
 						console.error(error.stack);
 					}
 				}
@@ -199,7 +219,7 @@ const main = async () => {
 		.command("validate-config")
 		.description("Validate configuration file without running translations")
 		.option("--show-warnings", "Show configuration warnings", false)
-		.action(async (options) => {
+		.action(async (options: ValidateConfigOptions) => {
 			try {
 				console.log("Validating configuration...\n");
 
@@ -252,9 +272,9 @@ const main = async () => {
 					defaultConfig.verbose = originalVerbose;
 				}
 				process.exit(0);
-			} catch (error: any) {
+			} catch (error) {
 				console.error("\nConfiguration Validation Failed:\n");
-				console.error(error.message);
+				console.error(error instanceof Error ? error.message : String(error));
 				console.error("\nFix the errors above and try again\n");
 				process.exit(1);
 			}
@@ -264,17 +284,15 @@ const main = async () => {
 		.command("review")
 		.description("Interactively review low-confidence translations")
 		.option("--export <format>", "Export review queue (json|csv)")
-		.action(async (options) => {
+		.action(async (options: ReviewOptions) => {
 			try {
 				const ReviewCommand = (await import("./commands/review.js")).default;
-				// Ensure config matches expectations of ReviewCommand
-				// ReviewCommand expects ConfigLayer/LocalizeConfig, need to ensure mandatory fields or cast
 				// ReviewCommandConfig requires localesDir and source to be strings (not undefined)
-				const reviewConfig = {
+				const reviewConfig: ReviewCommandConfig = {
 					...defaultConfig,
 					localesDir: defaultConfig.localesDir || "./locales",
 					source: defaultConfig.source || "en",
-				} as any;
+				};
 
 				const review = new ReviewCommand(reviewConfig);
 
@@ -283,9 +301,10 @@ const main = async () => {
 				} else {
 					await review.startReview();
 				}
-			} catch (error: any) {
-				console.error(`\nError: ${error.message}`);
-				if (error.stack && process.env.DEBUG) {
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.error(`\nError: ${message}`);
+				if (error instanceof Error && error.stack && process.env.DEBUG) {
 					console.error(error.stack);
 				}
 				process.exit(1);
@@ -295,8 +314,8 @@ const main = async () => {
 	program.action(async () => {
 		try {
 			await runCommand(defaultConfig, {}, "translate");
-		} catch (error: any) {
-			console.error(`\nError: ${error.message}`);
+		} catch (error) {
+			console.error(`\nError: ${error instanceof Error ? error.message : String(error)}`);
 			process.exit(1);
 		}
 	});

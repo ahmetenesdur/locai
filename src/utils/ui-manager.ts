@@ -1,3 +1,4 @@
+import type { LanguageProcessResult } from "../types/index.js";
 import { GlobalStats } from "./statistics-manager.js";
 
 interface ConsoleLock {
@@ -115,7 +116,7 @@ export class UIManager {
 		await this.log("=".repeat(60) + "\n");
 	}
 
-	async logBatchResults(batchResults: any[]): Promise<void> {
+	async logBatchResults(batchResults: LanguageProcessResult[]): Promise<void> {
 		for (const result of batchResults) {
 			if (result && result.savedMessage) {
 				await this.log(result.savedMessage);

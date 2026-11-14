@@ -3,7 +3,7 @@ import path from "path";
 import prompts from "prompts";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
 
-interface ReviewItem {
+export interface ReviewItem {
 	key: string;
 	language: string;
 	source: string;
@@ -19,17 +19,26 @@ interface ReviewItem {
 	editedAt?: string;
 }
 
-interface ReviewDecisions {
+export interface ReviewDecisions {
 	accepted: ReviewItem[];
 	edited: ReviewItem[];
 	rejected: ReviewItem[];
 	skipped: ReviewItem[];
 }
 
-interface ReviewCommandConfig {
+export interface ReviewCommandConfig {
 	localesDir: string;
 	source: string;
-	[key: string]: any;
+}
+
+/** Shape of `.localize-cache/review-queue.json` written by Orchestrator.saveReviewQueue. */
+interface ReviewQueueFile {
+	items?: ReviewItem[];
+}
+
+/** Nested locale file content: leaves are translations, branches are key segments. */
+export interface LocaleTree {
+	[key: string]: string | LocaleTree;
 }
 
 class ReviewCommand {
@@ -68,11 +77,12 @@ class ReviewCommand {
 		}
 
 		try {
-			const data = JSON.parse(fs.readFileSync(reviewFile, "utf8"));
+			const data = JSON.parse(fs.readFileSync(reviewFile, "utf8")) as ReviewQueueFile;
 			this.reviewQueue = data.items || [];
 			return true;
-		} catch (error: any) {
-			console.error(`Error loading review queue: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`Error loading review queue: ${message}`);
 			return false;
 		}
 	}
@@ -206,10 +216,9 @@ class ReviewCommand {
 		Object.entries(byLanguage).forEach(([lang, items]) => {
 			const localeFile = path.join(this.config.localesDir, `${lang}.json`);
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			let localeData: any = {};
+			let localeData: LocaleTree = {};
 			if (fs.existsSync(localeFile)) {
-				localeData = JSON.parse(fs.readFileSync(localeFile, "utf8"));
+				localeData = JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree;
 			}
 
 			items.forEach((item) => {
@@ -225,12 +234,11 @@ class ReviewCommand {
 
 	/**
 	 * Set nested value in object using dot notation.
-	 * @param {any} obj - Object to modify.
+	 * @param {LocaleTree} obj - Object to modify.
 	 * @param {string} path - Dot notation path.
-	 * @param {any} value - Value to set.
+	 * @param {string} value - Value to set.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	setNestedValue(obj: any, path: string, value: any): void {
+	setNestedValue(obj: LocaleTree, path: string, value: string): void {
 		const keys = path.split(".");
 		let current = obj;
 
@@ -238,7 +246,7 @@ class ReviewCommand {
 			if (!current[keys[i]]) {
 				current[keys[i]] = {};
 			}
-			current = current[keys[i]];
+			current = current[keys[i]] as LocaleTree;
 		}
 
 		current[keys[keys.length - 1]] = value;

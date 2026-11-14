@@ -1,7 +1,6 @@
-import { LocalIndex } from "vectra";
+import { LocalIndex, MetadataTypes } from "vectra";
 import path from "path";
 import fs from "fs";
-import { log } from "../utils/logger.js";
 
 export interface VectorStoreConfig {
 	enabled: boolean;
@@ -10,19 +9,31 @@ export interface VectorStoreConfig {
 	exactMatchThreshold?: number;
 }
 
+/** Extra metadata callers attach to a stored translation (e.g. key, category). */
+export type VectorItemMetadata = Record<string, MetadataTypes>;
+
+/** Metadata persisted with every vector: the translation pair plus caller metadata. */
+export type TranslationMemoryMetadata = VectorItemMetadata & {
+	text: string;
+	translation: string;
+	sourceLang: string;
+	targetLang: string;
+	timestamp: number;
+};
+
 export interface SearchResult {
 	item: {
 		text: string;
 		translation: string;
 		sourceLang: string;
 		targetLang: string;
-		metadata?: any;
+		metadata?: TranslationMemoryMetadata;
 	};
 	score: number;
 }
 
 export class VectorStore {
-	private index: LocalIndex | null = null;
+	private index: LocalIndex<TranslationMemoryMetadata> | null = null;
 	private config: VectorStoreConfig;
 	private initialized: boolean = false;
 	private readonly DIMENSION = 1536; // OpenAI text-embedding-3-small dimension
@@ -42,7 +53,7 @@ export class VectorStore {
 				fs.mkdirSync(dbPath, { recursive: true });
 			}
 
-			this.index = new LocalIndex(dbPath);
+			this.index = new LocalIndex<TranslationMemoryMetadata>(dbPath);
 
 			if (!(await this.index.isIndexCreated())) {
 				await this.index.createIndex();
@@ -50,8 +61,9 @@ export class VectorStore {
 
 			this.initialized = true;
 			// log(`Vector store initialized at ${dbPath}`, true);
-		} catch (error: any) {
-			console.error(`Failed to initialize vector store: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`Failed to initialize vector store: ${message}`);
 			this.config.enabled = false; // Disable if init fails
 		}
 	}
@@ -62,7 +74,8 @@ export class VectorStore {
 		sourceLang: string,
 		targetLang: string,
 		embedding: number[],
-		metadata: any = {}
+		/** Undefined values are dropped when vectra serializes the index. */
+		metadata: Partial<VectorItemMetadata> = {}
 	): Promise<void> {
 		if (!this.initialized || !this.index) return;
 
@@ -78,8 +91,9 @@ export class VectorStore {
 					timestamp: Date.now(),
 				},
 			});
-		} catch (error: any) {
-			console.warn(`Failed to add item to vector store: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Failed to add item to vector store: ${message}`);
 		}
 	}
 
@@ -91,24 +105,24 @@ export class VectorStore {
 		if (!this.initialized || !this.index) return [];
 
 		try {
-			// @ts-ignore - Vectra types might be mismatched in this version
-			const results = await this.index.queryItems(embedding, limit);
+			// Filter by target language before ranking so `limit` counts only matching items.
+			const results = await this.index.queryItems(embedding, "", limit, {
+				targetLang: { $eq: targetLang },
+			});
 
-			// Filter by target language and map to result format
-			return results
-				.filter((result) => result.item.metadata.targetLang === targetLang)
-				.map((result) => ({
-					item: {
-						text: result.item.metadata.text as string,
-						translation: result.item.metadata.translation as string,
-						sourceLang: result.item.metadata.sourceLang as string,
-						targetLang: result.item.metadata.targetLang as string,
-						metadata: result.item.metadata,
-					},
-					score: result.score,
-				}));
-		} catch (error: any) {
-			console.warn(`Vector search failed: ${error.message}`);
+			return results.map((result) => ({
+				item: {
+					text: result.item.metadata.text,
+					translation: result.item.metadata.translation,
+					sourceLang: result.item.metadata.sourceLang,
+					targetLang: result.item.metadata.targetLang,
+					metadata: result.item.metadata,
+				},
+				score: result.score,
+			}));
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Vector search failed: ${message}`);
 			return [];
 		}
 	}

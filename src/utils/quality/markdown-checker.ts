@@ -3,8 +3,21 @@ export interface MarkdownIssue {
 	severity: "error" | "warning" | "critical";
 	message: string;
 	pattern?: string;
-	details?: any;
+	details?: {
+		sourceCount: number;
+		translatedCount: number;
+	};
 }
+
+/** A markdown link captured from source text */
+export interface MarkdownLink {
+	full: string;
+	text: string;
+	url: string;
+}
+
+/** A captured markdown element: the matched text, or the parts of a link */
+export type MarkdownElement = string | MarkdownLink;
 
 export interface MarkdownFixResult {
 	text: string;
@@ -149,8 +162,8 @@ class MarkdownChecker {
 	/**
 	 * Extract markdown elements from text.
 	 */
-	extractMarkdownElements(text: string): Record<string, any[]> {
-		const elements: Record<string, any[]> = {
+	extractMarkdownElements(text: string): Record<string, MarkdownElement[]> {
+		const elements: Record<string, MarkdownElement[]> = {
 			headers: [],
 			bold: [],
 			italic: [],
@@ -196,11 +209,11 @@ class MarkdownChecker {
 	 */
 	restoreMarkdownElements(
 		text: string,
-		elements: any[],
+		elements: MarkdownElement[],
 		type: string
-	): { text: string; foundIssues: MarkdownIssue[]; appliedFixes: any[] } {
+	): MarkdownFixResult {
 		const foundIssues: MarkdownIssue[] = [];
-		const appliedFixes: any[] = [];
+		const appliedFixes: MarkdownFixResult["appliedFixes"] = [];
 		const fixedText = text;
 
 		// For now, we'll just report issues

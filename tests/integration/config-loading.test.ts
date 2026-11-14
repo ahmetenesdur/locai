@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest";
 import { exec } from "child_process";
 import fs from "fs/promises";
-import path from "path";
 import util from "util";
 
 const execAsync = util.promisify(exec);

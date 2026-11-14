@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Orchestrator from "../../../src/core/orchestrator.js";
+import Orchestrator, { OrchestratorOptions } from "../../../src/core/orchestrator.js";
 import ProviderFactory from "../../../src/core/provider-factory.js";
-import ContextProcessor from "../../../src/core/context-processor.js";
 
 // Mock ProviderFactory
 vi.mock("../../../src/core/provider-factory.js", () => ({
@@ -32,14 +31,13 @@ vi.mock("../../../src/core/context-processor.js", () => ({
 
 describe("Orchestrator", () => {
 	let orchestrator: Orchestrator;
-	const mockOptions: any = {
-		advanced: {
-			rateLimiting: { enabled: false },
-			caching: { enabled: false },
-		},
+	const mockOptions: OrchestratorOptions = {
 		apiProvider: "mock",
-		targets: ["es"],
-		context: {},
+		context: {
+			categories: {},
+			detection: { threshold: 2, minConfidence: 0.6 },
+			fallback: { category: "general", prompt: "Provide a natural translation" },
+		},
 		source: "en",
 		qualityChecks: {
 			enabled: false,
@@ -52,7 +50,7 @@ describe("Orchestrator", () => {
 		vi.spyOn(console, "warn").mockImplementation(() => {});
 		vi.spyOn(console, "log").mockImplementation(() => {});
 		// Setup mock provider
-		(ProviderFactory.getProvider as any).mockReturnValue({
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue({
 			translate: vi.fn().mockResolvedValue("Translated Text"),
 		});
 
@@ -73,7 +71,7 @@ describe("Orchestrator", () => {
 
 	it("should handle translation errors", async () => {
 		// Force provider error
-		(ProviderFactory.getProvider as any).mockReturnValue({
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue({
 			translate: vi.fn().mockRejectedValue(new Error("Provider Error")),
 		});
 

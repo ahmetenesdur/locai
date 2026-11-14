@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import BaseProvider, { ProviderConfig, TranslateOptions } from "./base-provider.js";
+import type { GeminiGenerateContentResponse } from "./api-types.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
@@ -23,7 +24,6 @@ class GeminiProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 	}
 
@@ -59,7 +59,7 @@ class GeminiProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(
+					const response = await this.client.post<GeminiGenerateContentResponse>(
 						this.getEndpoint(model),
 						{
 							...promptData,
@@ -83,7 +83,7 @@ class GeminiProvider extends BaseProvider {
 
 					const translation = response.data.candidates[0].content.parts[0].text.trim();
 					return this.sanitizeTranslation(translation);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -117,7 +117,7 @@ class GeminiProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(
+					const response = await this.client.post<GeminiGenerateContentResponse>(
 						this.getEndpoint(config.model),
 						{
 							...promptData,
@@ -141,7 +141,7 @@ class GeminiProvider extends BaseProvider {
 
 					const result = response.data.candidates[0].content.parts[0].text.trim();
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}

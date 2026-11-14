@@ -31,7 +31,6 @@ export interface ProgressStatus {
 
 class ProgressTracker {
 	private logToConsole: boolean;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private logFrequency: number;
 
 	private _isUpdating: boolean;
@@ -45,7 +44,6 @@ class ProgressTracker {
 	private success: number;
 	private failed: number;
 	private startTime: number | null;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private endTime: number | null;
 	private lastUpdateTime: number | null;
 	private recentOperationTimes: number[];

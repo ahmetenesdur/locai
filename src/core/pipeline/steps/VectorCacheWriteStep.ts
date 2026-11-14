@@ -2,14 +2,18 @@ import PipelineStep from "../PipelineStep.js";
 import { TranslationContext } from "../context.js";
 import { VectorStore } from "../../../services/vector-store.js";
 import { EmbeddingProvider } from "../../../services/embedding-provider.js";
-import { VectorMemoryStats } from "./VectorCacheReadStep.js";
+import { VectorCacheOptions } from "./VectorCacheReadStep.js";
 
 export class VectorCacheWriteStep extends PipelineStep {
 	private vectorStore: VectorStore;
 	private embeddingProvider: EmbeddingProvider;
-	private options: any;
+	private options: VectorCacheOptions;
 
-	constructor(vectorStore: VectorStore, embeddingProvider: EmbeddingProvider, options: any = {}) {
+	constructor(
+		vectorStore: VectorStore,
+		embeddingProvider: EmbeddingProvider,
+		options: VectorCacheOptions = {}
+	) {
 		super();
 		this.vectorStore = vectorStore;
 		this.embeddingProvider = embeddingProvider;
@@ -54,8 +58,9 @@ export class VectorCacheWriteStep extends PipelineStep {
 					}
 				);
 			}
-		} catch (error: any) {
-			console.warn(`Vector cache write failed: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Vector cache write failed: ${message}`);
 		}
 	}
 }

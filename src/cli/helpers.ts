@@ -8,19 +8,58 @@ import {
 } from "../commands/translator.js";
 import InputValidator from "../utils/input-validator.js";
 import ErrorHelper from "../utils/error-helper.js";
-import translationService from "../services/translation-service.js";
-import { TranslationOptions } from "../types/index.js";
 import { FrameworkDetector } from "../core/detection/framework-detector.js";
 import { StructureDetector, LocaleStructure } from "../core/detection/structure-detector.js";
 import { configureComponents } from "../config/setup.js";
-import { loadConfig } from "../config/index.js";
+import { LocalizeConfig, ResolvedLocalizeConfig } from "../config/index.js";
+import type { LengthMode } from "../utils/quality/length-checker.js";
 
-interface CliConfigOptions {
-	defaultConfig: any;
-	version: string;
+/** Global options declared on the root program in src/cli.ts. */
+interface GlobalOptions {
+	source?: string;
+	targets?: string[];
+	localesDir?: string;
+	deepContext: boolean;
+	debug: boolean;
+	verbose: boolean;
 }
 
-export const autoDetectConfig = async (defaultConfig: any) => {
+/**
+ * Options commander parses for the commands handled by runCommand.
+ * Each command sets only its own subset (see the option definitions in src/cli.ts).
+ */
+export interface CommandOptions {
+	// translate
+	provider?: string;
+	concurrency?: number;
+	/** `--no-cache` sets `cache: false`. */
+	cache?: boolean;
+	force?: boolean;
+	/** `fix --length` is a boolean flag ("fix length issues"); a string is a length mode. */
+	length?: string | boolean;
+	autoOptimize?: boolean;
+	stats?: boolean;
+	minConfidence?: number;
+	saveReviewQueue?: boolean;
+	// analyze
+	useAi?: boolean;
+	contextProvider?: string;
+	contextThreshold?: number;
+	// advanced
+	contextConfidence?: number;
+	contextDebug?: boolean;
+	minTextLength?: number;
+	allowNewCategories?: boolean;
+	maxRetries?: number;
+	// Read by runCommand, but no command declares them (`--debug`/`--verbose` are global options).
+	debug?: boolean;
+	verbose?: boolean;
+	timeout?: number;
+	initialDelay?: number;
+	maxDelay?: number;
+}
+
+export const autoDetectConfig = async <T extends LocalizeConfig>(defaultConfig: T): Promise<T> => {
 	// Auto-detect framework and configuration if not explicitly set
 	const detected = await FrameworkDetector.detect(process.cwd());
 
@@ -69,21 +108,25 @@ export const autoDetectConfig = async (defaultConfig: any) => {
 	return defaultConfig;
 };
 
-export const runCommand = async (defaultConfig: any, commandOptions: any, commandName: string) => {
+export const runCommand = async (
+	defaultConfig: ResolvedLocalizeConfig,
+	commandOptions: CommandOptions,
+	commandName: string
+) => {
 	try {
 		const validCommands = ["translate", "fix", "analyze", "advanced"];
 		if (!validCommands.includes(commandName)) {
 			throw new Error(`Invalid command: ${commandName}`);
 		}
 
-		const globalOpts = program.opts();
+		const globalOpts = program.opts<GlobalOptions>();
 
 		if (globalOpts.debug) {
-			const safeGlobalOpts: any = { ...globalOpts };
-			const safeCommandOptions: any = { ...commandOptions };
+			const safeGlobalOpts: Record<string, unknown> = { ...globalOpts };
+			const safeCommandOptions: Record<string, unknown> = { ...commandOptions };
 
-			if (safeGlobalOpts.targets) {
-				safeGlobalOpts.targets = `[${safeGlobalOpts.targets.length} languages]`;
+			if (globalOpts.targets) {
+				safeGlobalOpts.targets = `[${globalOpts.targets.length} languages]`;
 			}
 			if (safeGlobalOpts.localesDir) {
 				safeGlobalOpts.localesDir = "[directory_path]";
@@ -129,7 +172,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 		}
 
 		if (sanitizedCommandOptions.concurrency !== undefined) {
-			const concurrency = parseInt(sanitizedCommandOptions.concurrency);
+			const concurrency = parseInt(String(sanitizedCommandOptions.concurrency));
 			if (isNaN(concurrency) || concurrency < 1 || concurrency > 20) {
 				throw new Error("Concurrency must be a number between 1 and 20");
 			}
@@ -137,7 +180,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 		}
 
 		if (sanitizedCommandOptions.contextThreshold !== undefined) {
-			const threshold = parseInt(sanitizedCommandOptions.contextThreshold);
+			const threshold = parseInt(String(sanitizedCommandOptions.contextThreshold));
 			if (isNaN(threshold) || threshold < 1 || threshold > 10) {
 				throw new Error("Context threshold must be a number between 1 and 10");
 			}
@@ -145,18 +188,27 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 		}
 
 		if (sanitizedCommandOptions.contextConfidence !== undefined) {
-			const confidence = parseFloat(sanitizedCommandOptions.contextConfidence);
+			const confidence = parseFloat(String(sanitizedCommandOptions.contextConfidence));
 			if (isNaN(confidence) || confidence < 0 || confidence > 1) {
 				throw new Error("Context confidence must be a number between 0 and 1");
 			}
 			sanitizedCommandOptions.contextConfidence = confidence;
 		}
 
-		if (sanitizedCommandOptions.length) {
-			const validLengthModes = ["strict", "flexible", "exact", "relaxed", "smart"];
-			if (!validLengthModes.includes(sanitizedCommandOptions.length)) {
+		let lengthMode: LengthMode | undefined;
+		if (typeof sanitizedCommandOptions.length === "string") {
+			const validLengthModes: LengthMode[] = [
+				"strict",
+				"flexible",
+				"exact",
+				"relaxed",
+				"smart",
+			];
+			const requested = sanitizedCommandOptions.length;
+			lengthMode = validLengthModes.find((mode) => mode === requested);
+			if (!lengthMode) {
 				throw new Error(
-					`Invalid length mode: ${sanitizedCommandOptions.length}. Valid modes: ${validLengthModes.join(", ")}`
+					`Invalid length mode: ${requested}. Valid modes: ${validLengthModes.join(", ")}`
 				);
 			}
 		}
@@ -175,7 +227,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 		};
 
 		let concurrencyLimit =
-			parseInt(mergedOpts.concurrency) || defaultConfig.concurrencyLimit || 5;
+			parseInt(String(mergedOpts.concurrency)) || defaultConfig.concurrencyLimit || 5;
 
 		if (mergedOpts.autoOptimize) {
 			const cpuCount = os.cpus().length;
@@ -199,7 +251,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 			throw new Error("Invalid concurrency limit after optimization");
 		}
 
-		const finalConfig: any = {
+		const finalConfig = {
 			...defaultConfig,
 			command: commandName,
 			source: mergedOpts.source,
@@ -207,8 +259,8 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 			localesDir: mergedOpts.localesDir,
 			apiProvider: mergedOpts.provider || defaultConfig.apiProvider,
 			concurrencyLimit: concurrencyLimit,
-			cacheEnabled:
-				mergedOpts.noCache === undefined ? defaultConfig.cacheEnabled : !mergedOpts.noCache,
+			// commander turns `--no-cache` into `cache: false`
+			cacheEnabled: mergedOpts.cache === false ? false : defaultConfig.cacheEnabled,
 			debug: mergedOpts.debug,
 			verbose: mergedOpts.verbose || defaultConfig.logging?.verbose || false,
 			forceUpdate: mergedOpts.force || false,
@@ -220,7 +272,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 			qualityChecks: defaultConfig.qualityChecks,
 			lengthControl: {
 				...defaultConfig.lengthControl,
-				mode: mergedOpts.length || defaultConfig.lengthControl?.mode || "smart",
+				mode: lengthMode || defaultConfig.lengthControl?.mode || "smart",
 			},
 			retryOptions: {
 				...defaultConfig.retryOptions,
@@ -278,18 +330,18 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 				...defaultConfig.logging,
 				verbose: mergedOpts.verbose || defaultConfig.logging?.verbose || false,
 			},
-		};
+		} satisfies LocalizeConfig;
 
 		try {
 			InputValidator.validateConfig(finalConfig);
 			if (finalConfig.debug || finalConfig.verbose) {
 				console.log("Configuration validated successfully");
 			}
-		} catch (configError: any) {
+		} catch (configError) {
+			const message =
+				configError instanceof Error ? configError.message : String(configError);
 			const error = ErrorHelper.configValidationError(
-				configError.message.includes("validation failed")
-					? configError.message.split("\n").slice(1)
-					: [configError.message]
+				message.includes("validation failed") ? message.split("\n").slice(1) : [message]
 			);
 			console.error(ErrorHelper.formatError(error, { showDebug: globalOpts.debug }));
 			process.exit(1);
@@ -311,9 +363,11 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 		if (finalConfig.debug) {
 			console.log("\nConfiguration details:");
 
-			const safeConfig = {
+			const safeConfig: LocalizeConfig = {
 				...finalConfig,
-				apiConfig: Object.keys(finalConfig.apiConfig || {}).reduce((acc: any, provider) => {
+				apiConfig: Object.keys(finalConfig.apiConfig || {}).reduce<
+					Record<string, { model: string; temperature?: number; maxTokens?: number }>
+				>((acc, provider) => {
 					acc[provider] = {
 						model: finalConfig.apiConfig[provider]?.model || "configured",
 						temperature: finalConfig.apiConfig[provider]?.temperature,
@@ -362,9 +416,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 			case "fix":
 				console.log("\nRunning in FIX mode");
 				await Promise.all(
-					files.map((file) =>
-						validateAndFixExistingTranslations(file, finalConfig as TranslationOptions)
-					)
+					files.map((file) => validateAndFixExistingTranslations(file, finalConfig))
 				);
 				break;
 
@@ -378,7 +430,7 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 			// Fall through to translate
 
 			case "translate":
-			default:
+			default: {
 				console.log("\nRunning in TRANSLATION mode");
 
 				const providerMap: Record<string, string> = {
@@ -425,23 +477,26 @@ export const runCommand = async (defaultConfig: any, commandOptions: any, comman
 				}
 
 				for (const file of files) {
-					await translateFile(file, finalConfig as TranslationOptions);
+					await translateFile(file, finalConfig);
 				}
 
 				// Exit after successful translation in CLI mode
 				// This allows translateFile to be used as library without forcing exit
 				process.exit(0);
 				break;
+			}
 		}
 
 		// Other commands (fix, analyze) handle their own completion
-	} catch (validationError: any) {
-		if (validationError.message.includes("Configuration validation")) {
+	} catch (validationError) {
+		const message =
+			validationError instanceof Error ? validationError.message : String(validationError);
+		if (message.includes("Configuration validation")) {
 			// Already handled above with better formatting
 			return;
 		}
-		console.error(`\nInput validation error: ${validationError.message}`);
-		if (validationError.stack && process.env.DEBUG) {
+		console.error(`\nInput validation error: ${message}`);
+		if (validationError instanceof Error && validationError.stack && process.env.DEBUG) {
 			console.error("\nStack trace:");
 			console.error(validationError.stack);
 		}

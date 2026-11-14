@@ -1,8 +1,15 @@
-import BaseChecker, { CheckerOptions, Issue, FixResult, ValidationResult } from "./base-checker.js";
+import type { ContextConfig } from "../../core/context-processor.js";
+import BaseChecker, {
+	CheckerOptions,
+	FixResult,
+	QualityFix,
+	QualityIssue,
+	ValidationResult,
+} from "./base-checker.js";
 import PlaceholderChecker from "./placeholder-checker.js";
 import HtmlTagChecker from "./html-tag-checker.js";
 import PunctuationChecker from "./punctuation-checker.js";
-import LengthChecker from "./length-checker.js";
+import LengthChecker, { LengthCheckOptions } from "./length-checker.js";
 import TextSanitizer from "./text-sanitizer.js";
 import QuoteBalanceChecker from "./quote-balance-checker.js";
 import StyleGuideChecker from "./style-guide-checker.js";
@@ -25,7 +32,7 @@ class QualityChecker extends BaseChecker {
 	private markdownChecker!: MarkdownChecker;
 	private codeBlockChecker!: CodeBlockChecker;
 	private specialCharactersChecker!: SpecialCharactersChecker;
-	private context: Record<string, any>;
+	private context: Partial<ContextConfig>;
 
 	/**
 	 * Initialize QualityChecker with options.
@@ -46,7 +53,10 @@ class QualityChecker extends BaseChecker {
 		this.lengthChecker = new LengthChecker();
 		this.textSanitizer = new TextSanitizer();
 		this.quoteBalanceChecker = new QuoteBalanceChecker();
-		this.styleGuideChecker = new StyleGuideChecker(this.styleGuide);
+		this.styleGuideChecker = new StyleGuideChecker({
+			...this.styleGuide,
+			conventions: this.rules.styleGuide?.conventions,
+		});
 		this.markdownChecker = new MarkdownChecker();
 		this.codeBlockChecker = new CodeBlockChecker();
 		this.specialCharactersChecker = new SpecialCharactersChecker();
@@ -58,87 +68,57 @@ class QualityChecker extends BaseChecker {
 	validate(
 		sourceText: string,
 		translatedText: string,
-		options: Record<string, any> = {}
+		options: LengthCheckOptions = {}
 	): ValidationResult {
-		const issues: Issue[] = [];
+		const issues: QualityIssue[] = [];
 
 		if (this.rules.placeholderConsistency) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(
-				...(this.placeholderChecker.checkPlaceholders(sourceText, translatedText) as any)
-			);
+			issues.push(...this.placeholderChecker.checkPlaceholders(sourceText, translatedText));
 		}
 
 		if (this.rules.htmlTagsConsistency) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(this.htmlTagChecker.checkHtmlTags(sourceText, translatedText) as any));
+			issues.push(...this.htmlTagChecker.checkHtmlTags(sourceText, translatedText));
 		}
 
 		if (this.rules.punctuationCheck) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(
-				...(this.punctuationChecker.checkPunctuation(sourceText, translatedText) as any)
-			);
+			issues.push(...this.punctuationChecker.checkPunctuation(sourceText, translatedText));
 		}
 
 		// Quote balance validation
 		if (this.rules.quoteBalanceCheck !== false) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(this.quoteBalanceChecker.checkQuoteBalance(translatedText) as any));
+			issues.push(...this.quoteBalanceChecker.checkQuoteBalance(translatedText));
 			issues.push(
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				...(this.quoteBalanceChecker.validateQuoteConsistency(
-					sourceText,
-					translatedText
-				) as any)
+				...this.quoteBalanceChecker.validateQuoteConsistency(sourceText, translatedText)
 			);
 		}
 
 		if (this.rules.lengthValidation) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(
-				...(this.lengthChecker.checkLength(sourceText, translatedText, options) as any)
-			);
+			issues.push(...this.lengthChecker.checkLength(sourceText, translatedText, options));
 		}
 
 		// Style guide validation
 		if (this.styleGuide && this.styleGuideChecker) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(
-				...(this.styleGuideChecker.checkStyleGuide(sourceText, translatedText) as any)
-			);
+			issues.push(...this.styleGuideChecker.checkStyleGuide(sourceText, translatedText));
 		}
 
 		// Markdown preservation
 		if (this.rules.markdownPreservation) {
 			issues.push(
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				...(this.markdownChecker.checkMarkdownPreservation(
-					sourceText,
-					translatedText
-				) as any)
+				...this.markdownChecker.checkMarkdownPreservation(sourceText, translatedText)
 			);
 		}
 
 		// Code block preservation
 		if (this.rules.codeBlockPreservation) {
 			issues.push(
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				...(this.codeBlockChecker.checkCodeBlockPreservation(
-					sourceText,
-					translatedText
-				) as any)
+				...this.codeBlockChecker.checkCodeBlockPreservation(sourceText, translatedText)
 			);
 		}
 
 		// Special characters preservation
 		if (this.rules.specialCharacters) {
 			issues.push(
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				...(this.specialCharactersChecker.checkSpecialCharacters(
-					sourceText,
-					translatedText
-				) as any)
+				...this.specialCharactersChecker.checkSpecialCharacters(sourceText, translatedText)
 			);
 		}
 
@@ -160,8 +140,8 @@ class QualityChecker extends BaseChecker {
 	 */
 	validateAndFix(sourceText: string, translatedText: string): FixResult {
 		let fixedText = translatedText;
-		const issues: Issue[] = [];
-		const fixes: any[] = [];
+		const issues: QualityIssue[] = [];
+		const fixes: QualityFix[] = [];
 
 		if (this.rules.sanitizeOutput) {
 			fixedText = this.sanitizeTranslation(fixedText);
@@ -170,24 +150,21 @@ class QualityChecker extends BaseChecker {
 		if (this.rules.placeholderConsistency) {
 			const result = this.placeholderChecker.fixPlaceholders(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
 		if (this.rules.htmlTagsConsistency) {
 			const result = this.htmlTagChecker.fixHtmlTags(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
 		if (this.rules.punctuationCheck) {
 			const result = this.punctuationChecker.fixPunctuation(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
@@ -195,8 +172,7 @@ class QualityChecker extends BaseChecker {
 		if (this.rules.quoteBalanceCheck !== false) {
 			const result = this.quoteBalanceChecker.fixQuoteBalance(fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
@@ -204,8 +180,7 @@ class QualityChecker extends BaseChecker {
 		if (this.styleGuide && this.styleGuideChecker) {
 			const result = this.styleGuideChecker.fixStyleGuide(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
@@ -213,8 +188,7 @@ class QualityChecker extends BaseChecker {
 		if (this.rules.markdownPreservation) {
 			const result = this.markdownChecker.fixMarkdownPreservation(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
@@ -222,8 +196,7 @@ class QualityChecker extends BaseChecker {
 		if (this.rules.codeBlockPreservation) {
 			const result = this.codeBlockChecker.fixCodeBlockPreservation(sourceText, fixedText);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 
@@ -234,8 +207,7 @@ class QualityChecker extends BaseChecker {
 				fixedText
 			);
 			fixedText = result.text;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			issues.push(...(result.foundIssues as any));
+			issues.push(...result.foundIssues);
 			fixes.push(...result.appliedFixes);
 		}
 

@@ -1,61 +1,65 @@
-import { OrchestratorOptions } from "../core/orchestrator.js";
-import { ContextConfig } from "../core/context-processor.js";
+import type { OrchestratorOptions } from "../core/orchestrator.js";
+import type { FlatTranslationValue } from "../utils/object-transformer.js";
+import type { ProgressStatus } from "../utils/progress-tracker.js";
+import type { QualityIssue } from "../utils/quality/base-checker.js";
+import type { StateOptions } from "../utils/state-manager.js";
+import type {
+	GlobalStats as CollectedStats,
+	LanguageStats as LanguageCounters,
+} from "../utils/statistics-manager.js";
 
-export interface TranslationOptions extends Omit<OrchestratorOptions, "context"> {
-	source: string;
+/** The `syncOptions` configuration section: keeping target files in sync with the source. */
+export interface SyncOptions {
+	enabled?: boolean;
+	removeDeletedKeys?: boolean;
+	retranslateModified?: boolean;
+	stateTracking?: StateOptions;
+}
+
+/** Options of a translate or fix run: the orchestrator options plus file and sync settings. */
+export interface TranslationOptions extends OrchestratorOptions {
 	targets?: string[];
 	localesDir?: string;
 	debug?: boolean;
 	forceUpdate?: boolean;
-	syncOptions?: {
-		enabled?: boolean;
-		removeDeletedKeys?: boolean;
-	};
-	concurrencyLimit?: number;
-	saveReviewQueue?: boolean;
-	minConfidence?: number;
+	syncOptions?: SyncOptions;
 	fileExtensions?: string[];
-	// Add other implicit options used in code but not originally defined
-	progressOptions?: any;
-	qualityChecks?: any;
-	styleGuide?: any;
-	context?: ContextConfig;
-	lengthControl?: any;
 }
 
-export interface GlobalStats {
-	total: number;
-	success: number;
-	failed: number;
-	skipped: number;
-	languages: Record<string, any>;
-	byCategory: Record<string, number>;
-	details: Record<string, { totalConfidence: number; samples: number }>;
+/** Per-language counters, plus the error message when the language failed as a whole. */
+export interface LanguageStats extends LanguageCounters {
+	error?: string;
+}
+
+/** Statistics of a translate run, completed by the translation service. */
+export interface GlobalStats extends CollectedStats {
+	languages: Record<string, LanguageStats>;
 	error?: {
 		message: string;
 		time: string;
 		stack?: string;
 	};
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	orchestrators: any[];
 	endTime?: string;
 	totalDuration?: number;
-	totalTime: number;
-	startTime: string;
 }
 
+/** A source key that needs translating (or re-translating) into one target language. */
 export interface MissingKey {
 	key: string;
 	text: string;
 	targetLang: string;
-	existingTranslation?: string;
+	/** Current value of the key in the target file, if any. */
+	existingTranslation?: FlatTranslationValue;
 	isModified: boolean;
 	isNew: boolean;
-	issueDetails?: any;
+	/** The quality issue that requires the existing translation to be redone. */
+	issueDetails?: QualityIssue;
 }
 
+/** Outcome of translating one target language. */
 export interface LanguageProcessResult {
-	status: any;
+	/** Final progress counters; null when the language failed. */
+	status: Pick<ProgressStatus, "completed" | "total" | "language"> | null;
 	savedMessage?: string;
 	error?: string;
 }

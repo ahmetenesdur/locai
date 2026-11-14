@@ -3,16 +3,37 @@
  * Provides detailed, actionable error messages with context and solutions
  */
 
+/**
+ * Context attached to a helper error. The named fields are the ones the
+ * message templates read; callers may attach any extra debug fields.
+ */
+export interface ErrorDetails {
+	provider?: string;
+	statusCode?: number | string;
+	apiMessage?: string | null;
+	retryAfter?: number | string;
+	limit?: number | string;
+	current?: number | string | null;
+	currentConcurrency?: number;
+	timeout?: number;
+	validationErrors?: string[];
+	filePath?: string;
+	expectedSource?: string;
+	key?: string;
+	language?: string;
+	reason?: string;
+	langCode?: string;
+	field?: string;
+	message?: string;
+	[key: string]: unknown;
+}
+
 export interface HelperError extends Error {
 	code?: string;
 	type?: string;
-	details?: Record<string, any>;
+	details?: ErrorDetails;
 	solutions?: string[];
 	context?: string[];
-}
-
-export interface ErrorDetails {
-	[key: string]: any;
 }
 
 class ErrorHelper {
@@ -264,7 +285,7 @@ class ErrorHelper {
 			CONFIG_VALIDATION: {
 				code: this.ErrorCodes.CONFIG_VALIDATION,
 				message: details.validationErrors
-					? `Configuration has ${details.validationErrors.length} error(s):\n${details.validationErrors.map((e: string, i: number) => `   ${i + 1}. ${e}`).join("\n")}`
+					? `Configuration has ${details.validationErrors.length} error(s):\n${details.validationErrors.map((e, i) => `   ${i + 1}. ${e}`).join("\n")}`
 					: "Configuration validation failed",
 				context: [
 					"One or more configuration values are invalid",
@@ -373,7 +394,7 @@ class ErrorHelper {
 	/**
 	 * Get environment variable name for provider
 	 */
-	private static _getEnvKeyName(provider: string): string {
+	private static _getEnvKeyName(provider?: string): string {
 		const envMap: Record<string, string> = {
 			openai: "OPENAI_API_KEY",
 			gemini: "GEMINI_API_KEY",
@@ -382,13 +403,13 @@ class ErrorHelper {
 			xai: "XAI_API_KEY",
 			anthropic: "ANTHROPIC_API_KEY",
 		};
-		return envMap[provider?.toLowerCase()] || `${provider?.toUpperCase()}_API_KEY`;
+		return envMap[provider?.toLowerCase() ?? ""] || `${provider?.toUpperCase()}_API_KEY`;
 	}
 
 	/**
 	 * Get provider console URL
 	 */
-	private static _getProviderConsoleUrl(provider: string): string {
+	private static _getProviderConsoleUrl(provider?: string): string {
 		const urlMap: Record<string, string> = {
 			openai: "https://platform.openai.com/api-keys",
 			gemini: "https://makersuite.google.com/app/apikey",
@@ -397,16 +418,16 @@ class ErrorHelper {
 			xai: "https://console.x.ai/",
 			anthropic: "https://console.anthropic.com/settings/keys",
 		};
-		return urlMap[provider?.toLowerCase()] || "provider console";
+		return urlMap[provider?.toLowerCase() ?? ""] || "provider console";
 	}
 
 	/**
 	 * Suggest fallback provider
 	 */
-	private static _suggestFallbackProvider(currentProvider: string): string {
+	private static _suggestFallbackProvider(currentProvider?: string): string {
 		const fallbackOrder = ["openai", "anthropic", "gemini", "deepseek", "dashscope", "xai"];
 		const current = currentProvider?.toLowerCase();
-		const index = fallbackOrder.indexOf(current);
+		const index = current ? fallbackOrder.indexOf(current) : -1;
 
 		if (index === -1 || index === fallbackOrder.length - 1) {
 			return fallbackOrder[0];
@@ -425,7 +446,7 @@ class ErrorHelper {
 	static authError(
 		provider: string,
 		statusCode?: number | string,
-		apiMessage?: string
+		apiMessage?: string | null
 	): HelperError {
 		return this.createError("API_AUTH_FAILED", { provider, statusCode, apiMessage });
 	}
@@ -433,7 +454,7 @@ class ErrorHelper {
 	static serverError(
 		provider: string,
 		statusCode?: number | string,
-		apiMessage?: string
+		apiMessage?: string | null
 	): HelperError {
 		return this.createError("API_SERVER_ERROR", { provider, statusCode, apiMessage });
 	}

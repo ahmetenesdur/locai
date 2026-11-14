@@ -9,17 +9,26 @@ export interface VectorMemoryStats {
 	misses: number;
 }
 
+/** Vector memory settings read by the vector cache steps. */
+export interface VectorCacheOptions {
+	enabled?: boolean;
+	/** Similarity at which a stored translation is reused as-is (default 0.98). */
+	exactMatchThreshold?: number;
+	/** Similarity at which a stored translation is offered to the provider as reference (default 0.85). */
+	similarityThreshold?: number;
+}
+
 export class VectorCacheReadStep extends PipelineStep {
 	private vectorStore: VectorStore;
 	private embeddingProvider: EmbeddingProvider;
 	private stats: VectorMemoryStats;
-	private options: any;
+	private options: VectorCacheOptions;
 
 	constructor(
 		vectorStore: VectorStore,
 		embeddingProvider: EmbeddingProvider,
 		stats: VectorMemoryStats,
-		options: any = {}
+		options: VectorCacheOptions = {}
 	) {
 		super();
 		this.vectorStore = vectorStore;
@@ -96,8 +105,9 @@ export class VectorCacheReadStep extends PipelineStep {
 			} else {
 				this.stats.misses++;
 			}
-		} catch (error: any) {
-			console.warn(`Vector cache read failed: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.warn(`Vector cache read failed: ${message}`);
 			// Continue pipeline on error
 		}
 

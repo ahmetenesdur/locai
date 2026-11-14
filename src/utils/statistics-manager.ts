@@ -2,6 +2,8 @@
  * Statistics manager to track translation progress and metrics
  */
 
+import type Orchestrator from "../core/orchestrator.js";
+
 export interface GlobalStats {
 	total: number;
 	byCategory: Record<string, number>;
@@ -12,7 +14,7 @@ export interface GlobalStats {
 	skipped: number;
 	languages: Record<string, LanguageStats>;
 	startTime: string;
-	orchestrators: any[];
+	orchestrators: Orchestrator[];
 }
 
 export interface LanguageStats {

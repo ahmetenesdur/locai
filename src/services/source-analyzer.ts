@@ -1,4 +1,4 @@
-import { Project, Node, CallExpression } from "ts-morph";
+import { Project, Node, CallExpression, SourceFile } from "ts-morph";
 import { log } from "../utils/logger.js";
 import path from "path";
 import { CodeContext } from "../types/context.js";
@@ -49,8 +49,9 @@ export class SourceCodeAnalyzer {
 				log(
 					`Source analysis complete. Context extracted for ${this.keyUsageMap.size} keys.`
 				);
-			} catch (error: any) {
-				console.warn(`Error during source analysis: ${error.message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.warn(`Error during source analysis: ${message}`);
 				// Don't throw to prevent blocking the whole app, just log
 			}
 		})();
@@ -64,8 +65,8 @@ export class SourceCodeAnalyzer {
 		}
 	}
 
-	private processFile(sourceFile: any) {
-		sourceFile.forEachDescendant((node: any) => {
+	private processFile(sourceFile: SourceFile) {
+		sourceFile.forEachDescendant((node) => {
 			if (Node.isCallExpression(node)) {
 				this.processCallExpression(node, sourceFile.getFilePath());
 			}

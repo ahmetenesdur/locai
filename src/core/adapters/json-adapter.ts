@@ -1,4 +1,5 @@
-import { FileFormatAdapter } from "./base-adapter.js";
+import type { TranslationObject } from "../../utils/object-transformer.js";
+import { FileFormatAdapter, SerializeOptions } from "./base-adapter.js";
 
 /**
  * Adapter for JSON files
@@ -6,17 +7,17 @@ import { FileFormatAdapter } from "./base-adapter.js";
 export class JsonAdapter implements FileFormatAdapter {
 	extensions = [".json", ".arb"];
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async parse(content: string): Promise<Record<string, any>> {
+	async parse(content: string): Promise<TranslationObject> {
 		try {
-			return JSON.parse(content);
-		} catch (error: any) {
-			throw new Error(`JSON parse error: ${error.message}`);
+			return JSON.parse(content) as TranslationObject;
+		} catch (error) {
+			throw new Error(
+				`JSON parse error: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async serialize(data: Record<string, any>, options: any = {}): Promise<string> {
+	async serialize(data: TranslationObject, options: SerializeOptions = {}): Promise<string> {
 		const indent = options.indent || 4;
 		return JSON.stringify(data, null, indent);
 	}

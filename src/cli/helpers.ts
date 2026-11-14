@@ -295,7 +295,7 @@ export const runCommand = async (
 			},
 			context: {
 				...defaultConfig.context,
-				enabled: true,
+				enabled: defaultConfig.context.enabled !== false,
 				debug: mergedOpts.contextDebug || defaultConfig.context.debug || false,
 				useAI:
 					mergedOpts.useAi ||

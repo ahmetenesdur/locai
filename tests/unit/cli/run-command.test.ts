@@ -125,6 +125,32 @@ describe("runCommand", () => {
 		);
 	});
 
+	it("keeps a config-file `context.enabled: false`", async () => {
+		await runCommand(
+			{ ...config, context: { ...config.context, enabled: false } },
+			{},
+			"translate"
+		);
+
+		expect(translateFile).toHaveBeenCalledWith(
+			"locales/en.json",
+			expect.objectContaining({ context: expect.objectContaining({ enabled: false }) })
+		);
+	});
+
+	it("enables context detection when the config leaves `context.enabled` unset", async () => {
+		await runCommand(
+			{ ...config, context: { ...config.context, enabled: undefined } },
+			{},
+			"translate"
+		);
+
+		expect(translateFile).toHaveBeenCalledWith(
+			"locales/en.json",
+			expect.objectContaining({ context: expect.objectContaining({ enabled: true }) })
+		);
+	});
+
 	describe("CLI flags", () => {
 		it("passes the global --debug flag into the config", async () => {
 			await runCli(["translate", "--debug"]);

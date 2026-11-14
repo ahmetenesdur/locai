@@ -26,7 +26,6 @@ class DashScopeProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 
 		// Generation client for analysis
@@ -38,7 +37,6 @@ class DashScopeProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 	}
 

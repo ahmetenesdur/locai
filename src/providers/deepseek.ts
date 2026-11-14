@@ -25,7 +25,6 @@ class DeepSeekProvider extends BaseProvider {
 			},
 			timeout: config.timeoutMs || 60000,
 			maxRedirects: 0,
-			validateStatus: (status) => status < 500,
 		});
 	}
 

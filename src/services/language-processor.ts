@@ -6,6 +6,7 @@ import ObjectTransformer, {
 } from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
 import InputValidator from "../utils/input-validator.js";
+import { targetLocaleFile } from "../utils/locale-paths.js";
 import uiManager from "../utils/ui-manager.js";
 import statisticsManager from "../utils/statistics-manager.js";
 import { TranslationResult } from "../core/pipeline/context.js";
@@ -71,28 +72,9 @@ export class LanguageProcessor {
 
 			statisticsManager.initLanguageStats(safeTargetLang);
 
-			const sourceDir = path.dirname(sourceFile);
-
-			// Detect structure based on source file name
-			const isNestedStructure = path.basename(sourceFile) === "translation.json";
-
-			let targetPath: string;
-			if (isNestedStructure) {
-				// Nested: locales/tr/translation.json
-				// We assume sourceDir ends with the language code (e.g. .../en)
-				// So we need to go up one level and then into target lang
-				const localesRoot = path.dirname(sourceDir);
-				const targetDir = path.join(localesRoot, safeTargetLang);
-
-				// Ensure target directory exists for nested structure
-				await FileManager.ensureDir(targetDir);
-
-				targetPath = path.join(targetDir, "translation.json");
-			} else {
-				// Flat: locales/tr.json
-				const safeTargetFilename = `${safeTargetLang}.json`;
-				targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
-			}
+			// Same layout as the source: locales/tr/translation.json or locales/tr.json
+			const targetPath = targetLocaleFile(sourceFile, safeTargetLang);
+			await FileManager.ensureDir(path.dirname(targetPath));
 
 			let targetContent: TranslationObject = {};
 			try {

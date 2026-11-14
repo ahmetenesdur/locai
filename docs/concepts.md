@@ -95,7 +95,7 @@ It is then scaled by fixed factors for the content category (e.g. legal), the la
 
 At the end of a run Locai prints how many translations were scored, auto-approved, flagged and rejected. With `--save-review-queue` (or `confidenceScoring.saveReviewQueue: true`) the flagged and rejected translations are added to `.localize-cache/review-queue.json`; otherwise the first 20 are listed in the output. When a key is translated again, its new result replaces the queued one.
 
-`locai review` steps through that queue: approve a translation or edit it, and it is written to `<localesDir>/<language>.json` and leaves the queue; skipped ones stay queued for the next review. Translations reused from vector memory are not scored.
+`locai review` steps through that queue: approve a translation or edit it, and it is written to the file `locai translate` writes that language to (`<localesDir>/<language>.json`, or `<localesDir>/<language>/translation.json` when the source is `<localesDir>/<source>/translation.json`) and leaves the queue; skipped ones stay queued for the next review. Translations reused from vector memory are not scored.
 
 ### Example: Quote Balance Fix
 

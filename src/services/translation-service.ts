@@ -7,6 +7,7 @@ import { updateReviewQueue } from "../utils/review-queue.js";
 import QualityChecker from "../utils/quality/index.js";
 import StateManager, { StateComparison } from "../utils/state-manager.js";
 import InputValidator from "../utils/input-validator.js";
+import { targetLocaleFile } from "../utils/locale-paths.js";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 import uiManager from "../utils/ui-manager.js";
 import statisticsManager from "../utils/statistics-manager.js";
@@ -420,27 +421,12 @@ class TranslationService {
 		deletedKeys: string[],
 		options: TranslationOptions
 	) {
-		const sourceDir = path.dirname(sourceFile);
-		// Detect structure based on source file name
-		const isNestedStructure = path.basename(sourceFile) === "translation.json";
-
 		let totalRemoved = 0;
 		let filesProcessed = 0;
 
 		for (const targetLang of options.targets || []) {
 			try {
-				let targetPath: string;
-
-				if (isNestedStructure) {
-					// Nested: locales/tr/translation.json
-					const localesRoot = path.dirname(sourceDir);
-					const targetDir = path.join(localesRoot, targetLang);
-					targetPath = path.join(targetDir, "translation.json");
-				} else {
-					// Flat: locales/tr.json
-					const safeTargetFilename = `${targetLang}.json`;
-					targetPath = InputValidator.createSafeFilePath(sourceDir, safeTargetFilename);
-				}
+				const targetPath = targetLocaleFile(sourceFile, targetLang);
 
 				// Check if target file exists
 				const fileExists = await FileManager.exists(targetPath);
@@ -499,19 +485,10 @@ class TranslationService {
 		const flattenedSource = ObjectTransformer.flatten(sourceContent);
 		const orchestrator = new Orchestrator(options);
 
-		const sourceDir = path.dirname(file);
-		const isNestedStructure = path.basename(file) === "translation.json";
-
 		const languageResults = await Promise.all(
 			(options.targets || []).map(async (targetLang) => {
 				try {
-					let targetPath: string;
-					if (isNestedStructure) {
-						const localesRoot = path.dirname(sourceDir);
-						targetPath = path.join(localesRoot, targetLang, "translation.json");
-					} else {
-						targetPath = path.join(sourceDir, `${targetLang}.json`);
-					}
+					const targetPath = targetLocaleFile(file, targetLang);
 
 					const targetContent = await FileManager.readJSON(targetPath);
 					return { targetLang, targetPath, content: targetContent, success: true };

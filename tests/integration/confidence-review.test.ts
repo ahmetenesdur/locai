@@ -109,6 +109,7 @@ describe("confidence scoring and review (end to end)", () => {
 
 	beforeEach(() => {
 		vi.mocked(console.log).mockClear();
+		vi.mocked(prompts).mockClear();
 
 		// The run writes .localize-cache/ into the working directory: use a temp project.
 		projectDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "locai-review-")));
@@ -239,5 +240,35 @@ describe("confidence scoring and review (end to end)", () => {
 				expect.stringMatching(/es files\.delete: \[VLOW\] .*\(rejected\)/),
 			])
 		);
+	});
+
+	it("reviews into the file the run wrote with the nested <language>/translation.json layout", async () => {
+		const sourceFile = path.join(localesDir, "en", "translation.json");
+		fs.mkdirSync(path.dirname(sourceFile));
+		fs.renameSync(path.join(localesDir, "en.json"), sourceFile);
+
+		await translateFile(sourceFile, {
+			...translateOptions(localesDir),
+			confidenceScoring: { enabled: true, saveReviewQueue: true },
+		});
+
+		const targetFile = path.join(localesDir, "es", "translation.json");
+		const translated = readJson(targetFile);
+		expect(Object.keys(translated).sort()).toEqual(["greeting", "inbox"]);
+		const queue: ReviewQueueFile = readJson(
+			path.join(projectDir, ".localize-cache", "review-queue.json")
+		);
+		const rejected = queue.items.find((item) => item.key === "files.delete");
+		expect(rejected).toMatchObject({ rejected: true });
+
+		vi.mocked(prompts).mockResolvedValue({ action: "approve" });
+		await new ReviewCommand({ localesDir, source: "en" }).startReview();
+
+		expect(readJson(targetFile)).toEqual({
+			...translated,
+			files: { delete: rejected?.translation },
+		});
+		expect(fs.existsSync(path.join(localesDir, "es.json"))).toBe(false);
+		expect(readReviewQueue()).toEqual([]);
 	});
 });

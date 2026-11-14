@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import prompts from "prompts";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
+import { targetLocaleFile } from "../utils/locale-paths.js";
 import { readReviewQueue, removeFromReviewQueue } from "../utils/review-queue.js";
 
 /** A queued translation as the review reads it: the fields of a ReviewQueueItem it uses. */
@@ -83,6 +84,20 @@ class ReviewCommand {
 	}
 
 	/**
+	 * The locale file `locai translate` writes `language` to. As in
+	 * FileManager.findLocaleFiles, a `<localesDir>/<source>/translation.json` source means the
+	 * nested layout, anything else the flat `<localesDir>/<language>.json` one.
+	 */
+	private localeFile(language: string): string {
+		const { localesDir, source } = this.config;
+		const nestedSource = path.join(localesDir, source, "translation.json");
+		const sourceFile = fs.existsSync(nestedSource)
+			? nestedSource
+			: path.join(localesDir, `${source}.json`);
+		return targetLocaleFile(sourceFile, language);
+	}
+
+	/**
 	 * Remove the reviewed items from the review queue: the rejected ones, and the accepted or
 	 * edited ones whose translation is now in the locale file. Skipped items, items the session
 	 * did not reach and items applyDecisions did not write stay queued.
@@ -92,7 +107,7 @@ class ReviewCommand {
 		const isWritten = (item: ReviewItem): boolean => {
 			let tree = localeTrees.get(item.language);
 			if (!tree) {
-				const localeFile = path.join(this.config.localesDir, `${item.language}.json`);
+				const localeFile = this.localeFile(item.language);
 				tree = fs.existsSync(localeFile)
 					? (JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree)
 					: {};
@@ -239,7 +254,7 @@ class ReviewCommand {
 
 		let skipped = 0;
 		Object.entries(byLanguage).forEach(([lang, items]) => {
-			const localeFile = path.join(this.config.localesDir, `${lang}.json`);
+			const localeFile = this.localeFile(lang);
 
 			let localeData: LocaleTree = {};
 			if (fs.existsSync(localeFile)) {
@@ -260,8 +275,11 @@ class ReviewCommand {
 			});
 
 			if (applied === 0) return;
+			fs.mkdirSync(path.dirname(localeFile), { recursive: true });
 			fs.writeFileSync(localeFile, JSON.stringify(localeData, null, 2) + "\n");
-			console.log(`   Updated ${lang}.json (${applied} translations)`);
+			console.log(
+				`   Updated ${path.relative(process.cwd(), localeFile)} (${applied} translations)`
+			);
 		});
 
 		console.log(

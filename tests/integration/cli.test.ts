@@ -8,13 +8,12 @@ import packageJson from "../../package.json" with { type: "json" };
 
 const execAsync = util.promisify(exec);
 const cliPath = path.resolve("src/cli.ts");
+// The project's own tsx: `npx tsx` from a directory outside the repo would try to download it.
+const tsxPath = path.resolve("node_modules/.bin/tsx");
 
 describe("CLI Integration", () => {
 	it("should display help message", async () => {
-		// Run the compiled CLI command
-		// Note: This assumes the project is built or we use tsx to run source
-		// Since we are in dev, let's try running via tsx
-		const { stdout } = await execAsync("npx tsx src/cli.ts --help");
+		const { stdout } = await execAsync(`"${tsxPath}" "${cliPath}" --help`);
 
 		expect(stdout).toContain("Usage: locai [options] [command]");
 		expect(stdout).toContain("AI-powered localization tool");
@@ -27,7 +26,7 @@ describe("CLI Integration", () => {
 				path.join(dir, "localize.config.json"),
 				JSON.stringify({ version: "0.0.1" })
 			);
-			const { stdout } = await execAsync(`npx tsx "${cliPath}" -V`, { cwd: dir });
+			const { stdout } = await execAsync(`"${tsxPath}" "${cliPath}" -V`, { cwd: dir });
 			expect(stdout.trim().split("\n").pop()).toBe(packageJson.version);
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true });

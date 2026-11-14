@@ -42,13 +42,21 @@ This rich context is sent to the AI, resulting in significantly more accurate tr
 
 ## 2. Smart Synchronization
 
-Instead of translating every file from scratch, Locai maintains a content graph.
+Locai stores a SHA-256 hash of each source string in `.localize-cache/localization.state.json` (`syncOptions.stateTracking`). On each run it compares the source file with these hashes. A key is translated when:
+
+- it is missing from the target file, or
+- its source text changed since the last run, or
+- you pass `--force` (all keys are translated again).
+
+Keys that were removed from the source file are removed from the target files (`syncOptions.removeDeletedKeys`, on by default).
 
 **Example:**
 
-- You have 500 keys.
+- You have 500 translated keys.
 - You add 3 new keys and change 1 existing key.
-- Locai detects this and only sends **4 requests** to the AI, not 504.
+- Locai sends only these 4 keys to the AI, not 504.
+
+The state file is shared by all target languages and is updated after every run. If you change a source string and run only some targets, the other targets keep their old translation of it; run them with `--force` to update them. Deleting `.localize-cache` resets change tracking: on the next run, keys missing from target files are still translated, but source text changed since the previous run is not detected.
 
 ## 3. Confidence Scoring & Quality Checks
 

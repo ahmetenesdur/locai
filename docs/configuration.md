@@ -373,12 +373,13 @@ Locai validates translations before saving.
 - **HTML**: Check for broken tags like `</b>` without `<b>`.
 - **Fix**: Run `locai fix` to attempt auto-repair.
 
-### Cache Issues
+### Translations Not Updating
 
-If translations aren't updating:
+Locai skips keys that already exist in the target file unless their source text changed since the last run (see [Smart Synchronization](./concepts.md#2-smart-synchronization)).
 
-- Run with `--force` to ignore cache: `locai translate --force`.
-- Delete the `.localize-cache` folder manually.
+- Run with `--force` to re-translate keys that already exist in the target files: `locai translate --force`.
+- The translation cache (`cacheEnabled`) is kept in memory for the current run only; `--no-cache` turns it off. It is not stored between runs.
+- `.localize-cache/` holds the change-tracking state file and, if enabled, the vector memory database. Deleting it resets both; it does not force re-translation of existing keys.
 
 ### TypeScript Config Errors
 

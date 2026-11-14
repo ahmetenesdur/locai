@@ -35,7 +35,7 @@ export interface CommandOptions {
 	/** `--no-cache` sets `cache: false`. */
 	cache?: boolean;
 	force?: boolean;
-	/** `translate --length <mode>` passes a mode; `fix --length` is a boolean flag. */
+	/** `fix --length` is a boolean flag ("fix length issues"); a string is a length mode. */
 	length?: string | boolean;
 	autoOptimize?: boolean;
 	stats?: boolean;
@@ -196,14 +196,20 @@ export const runCommand = async (
 			sanitizedCommandOptions.contextConfidence = confidence;
 		}
 
-		if (sanitizedCommandOptions.length) {
-			const validLengthModes = ["strict", "flexible", "exact", "relaxed", "smart"];
-			if (
-				typeof sanitizedCommandOptions.length !== "string" ||
-				!validLengthModes.includes(sanitizedCommandOptions.length)
-			) {
+		let lengthMode: LengthMode | undefined;
+		if (typeof sanitizedCommandOptions.length === "string") {
+			const validLengthModes: LengthMode[] = [
+				"strict",
+				"flexible",
+				"exact",
+				"relaxed",
+				"smart",
+			];
+			const requested = sanitizedCommandOptions.length;
+			lengthMode = validLengthModes.find((mode) => mode === requested);
+			if (!lengthMode) {
 				throw new Error(
-					`Invalid length mode: ${sanitizedCommandOptions.length}. Valid modes: ${validLengthModes.join(", ")}`
+					`Invalid length mode: ${requested}. Valid modes: ${validLengthModes.join(", ")}`
 				);
 			}
 		}
@@ -267,10 +273,7 @@ export const runCommand = async (
 			qualityChecks: defaultConfig.qualityChecks,
 			lengthControl: {
 				...defaultConfig.lengthControl,
-				// `length` was checked against the valid modes above
-				mode: (mergedOpts.length ||
-					defaultConfig.lengthControl?.mode ||
-					"smart") as LengthMode,
+				mode: lengthMode || defaultConfig.lengthControl?.mode || "smart",
 			},
 			retryOptions: {
 				...defaultConfig.retryOptions,

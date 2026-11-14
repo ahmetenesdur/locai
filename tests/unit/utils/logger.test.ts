@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import Logger from "../../../src/utils/logger.js";
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs, type Stats } from "fs";
 
 vi.mock("fs", () => ({
 	promises: {
@@ -13,6 +12,9 @@ vi.mock("fs", () => ({
 		unlink: vi.fn(),
 	},
 }));
+
+// Logger calls readdir(dir) without options, i.e. the overload resolving to file names.
+const readdirMock = vi.mocked(fs.readdir as (dir: string) => Promise<string[]>);
 
 describe("Logger", () => {
 	let logger: Logger;
@@ -28,11 +30,11 @@ describe("Logger", () => {
 		});
 
 		// Mock stats to prevent errors
-		(fs.stat as any).mockResolvedValue({
+		vi.mocked(fs.stat).mockResolvedValue({
 			size: 100,
 			mtime: new Date(),
-		});
-		(fs.readdir as any).mockResolvedValue([]);
+		} as Stats);
+		readdirMock.mockResolvedValue([]);
 	});
 
 	it("should initialize correctly", async () => {
@@ -44,24 +46,24 @@ describe("Logger", () => {
 		await logger.error("test error", { detail: "info" });
 
 		expect(fs.appendFile).toHaveBeenCalled();
-		const callArgs = (fs.appendFile as any).mock.calls[0];
+		const callArgs = vi.mocked(fs.appendFile).mock.calls[0];
 		expect(callArgs[0]).toContain("errors.log");
 		expect(callArgs[1]).toContain("test error");
 	});
 
 	it("should rotate logs when size exceeded", async () => {
 		// Force rotation condition
-		(fs.stat as any).mockResolvedValue({
+		vi.mocked(fs.stat).mockResolvedValue({
 			size: 1024 * 1024 * 20, // 20MB, larger than default 10MB
 			mtime: new Date(),
-		});
+		} as Stats);
 
 		await logger.checkAndRotateLogs();
 		expect(fs.rename).toHaveBeenCalled();
 	});
 
 	it("should clean up old logs", async () => {
-		(fs.readdir as any).mockResolvedValue([
+		readdirMock.mockResolvedValue([
 			"error.1.log",
 			"error.2.log",
 			"error.3.log",

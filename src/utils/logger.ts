@@ -86,8 +86,10 @@ class Logger {
 			}
 
 			this.initialized = true;
-		} catch (error: any) {
-			console.warn(`Logger initialization warning: ${error.message}`);
+		} catch (error) {
+			console.warn(
+				`Logger initialization warning: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
@@ -95,8 +97,7 @@ class Logger {
 	 * Parse size string (e.g., "10MB") to bytes.
 	 * @param sizeStr - Size string to parse.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	parseSize(sizeStr: any): number {
+	parseSize(sizeStr: unknown): number {
 		if (typeof sizeStr === "number") return sizeStr;
 		if (typeof sizeStr !== "string") return 10 * 1024 * 1024;
 
@@ -126,8 +127,10 @@ class Logger {
 				if (stats.size >= this.config.logRotation.maxSize) {
 					await this.rotateLog(logPath);
 				}
-			} catch (error: any) {
-				console.warn(`Log rotation failed for ${logPath}: ${error.message}`);
+			} catch (error) {
+				console.warn(
+					`Log rotation failed for ${logPath}: ${error instanceof Error ? error.message : String(error)}`
+				);
 				this.currentLogSizes[level] = 0;
 			}
 		}
@@ -155,8 +158,10 @@ class Logger {
 			if (level) {
 				this.currentLogSizes[level] = 0;
 			}
-		} catch (error: any) {
-			console.warn(`Log rotation failed for ${logPath}: ${error.message}`);
+		} catch (error) {
+			console.warn(
+				`Log rotation failed for ${logPath}: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
@@ -193,8 +198,10 @@ class Logger {
 					await fsPromises.unlink(file.path);
 				}
 			}
-		} catch (error: any) {
-			console.warn(`Cleanup old logs failed: ${error.message}`);
+		} catch (error) {
+			console.warn(
+				`Cleanup old logs failed: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
@@ -204,8 +211,7 @@ class Logger {
 	 * @param message - Log message.
 	 * @param data - Additional data to log.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	formatMessage(level: string, message: string, data: any = null): string {
+	formatMessage(level: string, message: string, data: unknown = null): string {
 		const timestamp = this.config.includeTimestamps ? new Date().toISOString() : null;
 
 		switch (this.config.outputFormat) {
@@ -236,8 +242,7 @@ class Logger {
 	 * @param message - Log message.
 	 * @param data - Additional data to log.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async writeToFile(level: string, message: string, data: any = null): Promise<void> {
+	async writeToFile(level: string, message: string, data: unknown = null): Promise<void> {
 		if (!this.config.saveErrorLogs) return;
 
 		await this.initialize();
@@ -261,8 +266,10 @@ class Logger {
 			) {
 				await this.rotateLog(logPath);
 			}
-		} catch (error: any) {
-			console.warn(`Failed to write to log file: ${error.message}`);
+		} catch (error) {
+			console.warn(
+				`Failed to write to log file: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
@@ -283,8 +290,7 @@ class Logger {
 	 * @param message - Error message.
 	 * @param data - Additional data.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async error(message: string, data: any = null): Promise<void> {
+	async error(message: string, data: unknown = null): Promise<void> {
 		console.error(`ERROR: ${message}`);
 		if (data && this.config.verbose) {
 			console.error(data);
@@ -297,8 +303,7 @@ class Logger {
 	 * @param message - Warning message.
 	 * @param data - Additional data.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async warn(message: string, data: any = null): Promise<void> {
+	async warn(message: string, data: unknown = null): Promise<void> {
 		console.warn(`WARNING: ${message}`);
 		if (data && this.config.verbose) {
 			console.warn(data);
@@ -311,8 +316,7 @@ class Logger {
 	 * @param message - Info message.
 	 * @param data - Additional data.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async info(message: string, data: any = null): Promise<void> {
+	async info(message: string, data: unknown = null): Promise<void> {
 		if (this.config.diagnosticsLevel !== "minimal" || this.config.verbose) {
 			console.log(`INFO: ${message}`);
 			if (data && this.config.verbose) {
@@ -327,8 +331,7 @@ class Logger {
 	 * @param message - Debug message.
 	 * @param data - Additional data.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async debug(message: string, data: any = null): Promise<void> {
+	async debug(message: string, data: unknown = null): Promise<void> {
 		if (this.config.verbose || this.config.diagnosticsLevel === "detailed") {
 			console.log(`DEBUG: ${message}`);
 			if (data) {
@@ -344,8 +347,7 @@ class Logger {
 	 * @param message - Log message.
 	 * @param data - Additional data.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async diagnostics(level: string, message: string, data: any = null): Promise<void> {
+	async diagnostics(level: string, message: string, data: unknown = null): Promise<void> {
 		const levels: Record<string, number> = {
 			minimal: 1,
 			normal: 2,
@@ -375,8 +377,10 @@ class Logger {
 					sizeFormatted: this.formatSize(fileStats.size),
 					modified: fileStats.mtime,
 				};
-			} catch (error: any) {
-				console.warn(`Failed to get stats for ${logPath}: ${error.message}`);
+			} catch (error) {
+				console.warn(
+					`Failed to get stats for ${logPath}: ${error instanceof Error ? error.message : String(error)}`
+				);
 				stats[level] = {
 					size: 0,
 					sizeFormatted: "0 B",
@@ -412,8 +416,10 @@ class Logger {
 		for (const logPath of Object.values(this.logFiles)) {
 			try {
 				await fsPromises.unlink(logPath);
-			} catch (error: any) {
-				console.warn(`Failed to clear log ${logPath}: ${error.message}`);
+			} catch (error) {
+				console.warn(
+					`Failed to clear log ${logPath}: ${error instanceof Error ? error.message : String(error)}`
+				);
 			}
 		}
 

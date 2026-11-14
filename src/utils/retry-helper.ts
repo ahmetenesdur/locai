@@ -2,6 +2,26 @@
  * Retry helper for API operations with exponential backoff
  */
 
+/**
+ * Error-like value thrown by a retried operation. The retry logic reads
+ * `status` / `code` / `message` and annotates the error with retry metadata.
+ */
+export interface RetryableError {
+	status?: number;
+	code?: string;
+	message?: string;
+	retryInfo?: RetryInfo;
+	retryStats?: RetryStats;
+}
+
+export interface RetryInfo {
+	attemptNumber: number;
+	maxRetries: number;
+	willRetry: boolean;
+	context: Record<string, unknown>;
+	provider?: string;
+}
+
 export interface RetryOptions {
 	provider?: string;
 	perProviderRetry?: Record<string, Partial<RetryConfig>>;
@@ -10,9 +30,9 @@ export interface RetryOptions {
 	initialDelay?: number;
 	maxDelay?: number;
 	context?: string;
-	logContext?: Record<string, any>;
+	logContext?: Record<string, unknown>;
 	retryCondition?: (
-		error: any,
+		error: RetryableError,
 		attempts: number,
 		maxRetries: number
 	) => boolean | Promise<boolean>;
@@ -67,9 +87,9 @@ class RetryHelper {
 		const logContext = options.logContext ?? {};
 		const retryCondition =
 			options.retryCondition ??
-			((error: any) => this.defaultRetryCondition(error, retryableErrors));
+			((error: RetryableError) => this.defaultRetryCondition(error, retryableErrors));
 
-		let lastError: any = null;
+		let lastError: RetryableError | null = null;
 		let attempts = 0;
 		const startTime = Date.now();
 		const retryStats: RetryStats = { attempts: 0, totalTime: 0, provider: providerName };
@@ -104,7 +124,10 @@ class RetryHelper {
 				}
 
 				return result;
-			} catch (error: any) {
+			} catch (caught) {
+				// Operations reject with Error objects (or axios-style errors); treat them
+				// as error-like so they can be classified and annotated below.
+				const error = caught as RetryableError;
 				attempts++;
 				lastError = error;
 
@@ -158,7 +181,7 @@ class RetryHelper {
 	 * Default retry condition based on error type.
 	 * Checks against retryableErrors list.
 	 */
-	static defaultRetryCondition(error: any, retryableErrors: string[] = []): boolean {
+	static defaultRetryCondition(error: RetryableError, retryableErrors: string[] = []): boolean {
 		// Check for rate_limit errors
 		if (
 			retryableErrors.includes("rate_limit") &&
@@ -191,7 +214,12 @@ class RetryHelper {
 		}
 
 		// Check for server errors (5xx)
-		if (retryableErrors.includes("server") && error.status >= 500 && error.status < 600) {
+		if (
+			retryableErrors.includes("server") &&
+			error.status !== undefined &&
+			error.status >= 500 &&
+			error.status < 600
+		) {
 			return true;
 		}
 
@@ -221,7 +249,7 @@ class RetryHelper {
 				return true;
 			}
 
-			return error.status >= 500 || !error.status;
+			return (error.status !== undefined && error.status >= 500) || !error.status;
 		}
 
 		return false;

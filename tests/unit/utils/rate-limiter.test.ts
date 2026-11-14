@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 // We need to access the Class from the default export instance usually,
 // but looking at source it exports "new RateLimiter(config)".
 // To test thoroughly we might want to interact with that singleton.
@@ -33,8 +33,8 @@ describe("RateLimiter", () => {
 			},
 		});
 
-		let resolveTask1: (val: any) => void;
-		const task1 = new Promise((resolve) => {
+		let resolveTask1: (value: string) => void = () => {};
+		const task1 = new Promise<string>((resolve) => {
 			resolveTask1 = resolve;
 		});
 
@@ -51,7 +51,6 @@ describe("RateLimiter", () => {
 		expect(rateLimiter.getQueueSize("openai")).toBe(1); // Task 1 running, Task 2 queued
 
 		// Finish task 1
-		// @ts-ignore
 		resolveTask1("result1");
 		await p1;
 

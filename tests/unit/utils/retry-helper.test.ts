@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import RetryHelper, { RetryOptions } from "../../../src/utils/retry-helper.js";
+import RetryHelper from "../../../src/utils/retry-helper.js";
 
 describe("RetryHelper", () => {
 	// Mock RetryHelper.delay to speed up tests (so we don't actually wait seconds)

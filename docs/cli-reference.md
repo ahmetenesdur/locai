@@ -6,16 +6,16 @@ All commands support `--help` to show their options.
 
 These options apply to every command. They can be given before or after the command name (`locai --debug translate` and `locai translate --debug` are the same).
 
-| Option                  | Description                                                      | Default                                |
-| ----------------------- | ---------------------------------------------------------------- | -------------------------------------- |
-| `-s, --source <lang>`   | Source language code                                             | `config.source`                        |
-| `-t, --targets <langs>` | Comma-separated target languages                                 | `config.targets`                       |
-| `--localesDir <dir>`    | Path to the locales directory                                    | `config.localesDir` (or auto-detected) |
-| `--no-deep-context`     | Disable deep context analysis (source code scanning)             | `config.deepContext` (on)              |
-| `--debug`               | Debug output; sets `debug` and `advanced.debug`                  | `config.debug`                         |
-| `--verbose`             | Detailed diagnostic output; sets `verbose` and `logging.verbose` | `config.logging.verbose`               |
-| `-V, --version`         | Print the version                                                |                                        |
-| `-h, --help`            | Show help                                                        |                                        |
+| Option                  | Description                                                      | Default                           |
+| ----------------------- | ---------------------------------------------------------------- | --------------------------------- |
+| `-s, --source <lang>`   | Source language code                                             | `config.source`                   |
+| `-t, --targets <langs>` | Comma-separated target languages                                 | `config.targets`                  |
+| `--localesDir <dir>`    | Path to the locales directory                                    | `config.localesDir` (`./locales`) |
+| `--no-deep-context`     | Disable deep context analysis (source code scanning)             | `config.deepContext` (on)         |
+| `--debug`               | Debug output; sets `debug` and `advanced.debug`                  | `config.debug`                    |
+| `--verbose`             | Detailed diagnostic output; sets `verbose` and `logging.verbose` | `config.logging.verbose`          |
+| `-V, --version`         | Print the version                                                |                                   |
+| `-h, --help`            | Show help                                                        |                                   |
 
 An option you do not pass keeps the value from your config file.
 
@@ -84,7 +84,7 @@ Not implemented yet. The command loads the config and finds the source files, th
 
 ### `validate-config`
 
-Validates your configuration file and environment without running any translations. Useful for CI/CD pipelines.
+Validates the configuration values and prints a summary, without running any translations. Exits with code 1 if the configuration is invalid, so it can be used in CI. API keys are not checked by this command (Locai warns about missing keys at the start of every command).
 
 ```bash
 locai validate-config --show-warnings

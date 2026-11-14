@@ -30,6 +30,9 @@ export interface ReviewQueueFile {
 export const reviewQueuePath = (): string =>
 	path.join(process.cwd(), ".localize-cache", "review-queue.json");
 
+/** Identity of a queued translation: its language and key. */
+const refId = ({ language, key }: TranslationRef): string => JSON.stringify([language, key]);
+
 /**
  * Read the review queue.
  * @returns The queued items, or null when there is no queue file.
@@ -44,6 +47,15 @@ export function readReviewQueue(): ReviewQueueItem[] | null {
 	return data.items || [];
 }
 
+/** Write `items` as the review queue. */
+function writeReviewQueue(items: ReviewQueueItem[]): string {
+	const file = reviewQueuePath();
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	const data: ReviewQueueFile = { timestamp: new Date().toISOString(), items };
+	fs.writeFileSync(file, JSON.stringify(data, null, 2));
+	return file;
+}
+
 /**
  * Add the flagged translations of a run to the review queue. Queued items for translations the
  * run scored again are dropped first: the new score replaces them.
@@ -55,17 +67,25 @@ export function updateReviewQueue(
 	scored: TranslationRef[],
 	flagged: ReviewQueueItem[]
 ): { file: string; size: number } {
-	const id = ({ language, key }: TranslationRef) => JSON.stringify([language, key]);
-	const rescored = new Set(scored.map(id));
+	const rescored = new Set(scored.map(refId));
 	const items = [
-		...(readReviewQueue() || []).filter((item) => !rescored.has(id(item))),
+		...(readReviewQueue() || []).filter((item) => !rescored.has(refId(item))),
 		...flagged,
 	];
 
-	const file = reviewQueuePath();
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	const data: ReviewQueueFile = { timestamp: new Date().toISOString(), items };
-	fs.writeFileSync(file, JSON.stringify(data, null, 2));
+	return { file: writeReviewQueue(items), size: items.length };
+}
 
-	return { file, size: items.length };
+/**
+ * Remove reviewed translations from the review queue.
+ * @param reviewed - The translations a review approved, edited or rejected.
+ */
+export function removeFromReviewQueue(reviewed: TranslationRef[]): void {
+	const items = readReviewQueue();
+	if (!items || reviewed.length === 0) {
+		return;
+	}
+
+	const done = new Set(reviewed.map(refId));
+	writeReviewQueue(items.filter((item) => !done.has(refId(item))));
 }

@@ -12,7 +12,7 @@ import ReviewCommand from "../../src/commands/review.js";
 import Orchestrator from "../../src/core/orchestrator.js";
 import type { TranslationResult } from "../../src/core/pipeline/context.js";
 import RetryHelper from "../../src/utils/retry-helper.js";
-import type { ReviewQueueFile } from "../../src/utils/review-queue.js";
+import { readReviewQueue, ReviewQueueFile } from "../../src/utils/review-queue.js";
 import type { TranslationOptions } from "../../src/types/index.js";
 
 // Every axios client the providers create talks to the local server below instead of the
@@ -212,6 +212,8 @@ describe("confidence scoring and review (end to end)", () => {
 			inbox: { count: translated.inbox.count },
 			files: { delete: rejected.translation },
 		});
+		// Both reviewed items left the queue
+		expect(readReviewQueue()).toEqual([]);
 	});
 
 	it("lists low scores without saving a review queue when only minConfidence is set", async () => {

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import prompts from "prompts";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
-import { readReviewQueue } from "../utils/review-queue.js";
+import { readReviewQueue, removeFromReviewQueue } from "../utils/review-queue.js";
 
 /** A queued translation as the review reads it: the fields of a ReviewQueueItem it uses. */
 export interface ReviewItem {
@@ -83,6 +83,34 @@ class ReviewCommand {
 	}
 
 	/**
+	 * Remove the reviewed items from the review queue: the rejected ones, and the accepted or
+	 * edited ones whose translation is now in the locale file. Skipped items, items the session
+	 * did not reach and items applyDecisions did not write stay queued.
+	 */
+	private pruneReviewQueue(): void {
+		const localeTrees = new Map<string, LocaleTree>();
+		const isWritten = (item: ReviewItem): boolean => {
+			let tree = localeTrees.get(item.language);
+			if (!tree) {
+				const localeFile = path.join(this.config.localesDir, `${item.language}.json`);
+				tree = fs.existsSync(localeFile)
+					? (JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree)
+					: {};
+				localeTrees.set(item.language, tree);
+			}
+
+			let value: string | LocaleTree | undefined = tree;
+			for (const segment of item.key.split(".")) {
+				value = value !== null && typeof value === "object" ? value[segment] : undefined;
+			}
+			return value === item.translation;
+		};
+
+		const written = [...this.decisions.accepted, ...this.decisions.edited].filter(isWritten);
+		removeFromReviewQueue([...written, ...this.decisions.rejected]);
+	}
+
+	/**
 	 * Start interactive review session.
 	 */
 	async startReview(): Promise<void> {
@@ -159,7 +187,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Save review decisions to disk and apply them.
+	 * Save review decisions to disk, apply them and remove the reviewed items from the queue.
 	 */
 	saveDecisions(): void {
 		const cacheDir = path.join(process.cwd(), ".localize-cache");
@@ -183,8 +211,9 @@ class ReviewCommand {
 		fs.writeFileSync(decisionsFile, JSON.stringify(data, null, 2));
 		console.log(`\nReview complete! Decisions saved to ${decisionsFile}`);
 
-		// Apply accepted and edited translations
+		// Apply accepted and edited translations, then drop the reviewed items from the queue
 		this.applyDecisions();
+		this.pruneReviewQueue();
 	}
 
 	/**

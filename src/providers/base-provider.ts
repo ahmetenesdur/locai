@@ -278,7 +278,7 @@ class BaseProvider {
 			translation = response.output.text.trim();
 		} else if (response.text) {
 			translation = response.text.trim();
-		} else if (response.content) {
+		} else if (typeof response.content === "string" && response.content) {
 			translation = response.content.trim();
 		} else if (
 			response.data &&

@@ -656,10 +656,11 @@ class InputValidator {
 			}
 		}
 
-		// Compares the raw values (numbers in a well-formed config)
-		const initialDelay = retryOptions.initialDelay as number | undefined;
-		const maxDelay = retryOptions.maxDelay as number | undefined;
-		if (initialDelay !== undefined && maxDelay !== undefined && initialDelay > maxDelay) {
+		// Compare the parsed numbers like the range checks above: raw strings compare lexically.
+		// A missing or unparseable delay is NaN, which never compares greater.
+		const initialDelay = parseInt(String(retryOptions.initialDelay));
+		const maxDelay = parseInt(String(retryOptions.maxDelay));
+		if (initialDelay > maxDelay) {
 			errors.push("retryOptions.initialDelay cannot be greater than maxDelay");
 		}
 	}

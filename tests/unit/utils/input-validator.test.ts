@@ -148,6 +148,29 @@ describe("InputValidator", () => {
 				expect(warn).not.toHaveBeenCalled();
 			});
 		});
+
+		describe("retryOptions delay order", () => {
+			const base = { source: "en", targets: ["tr"], localesDir: "./locales" };
+			const validate = (initialDelay: unknown, maxDelay: unknown) => () =>
+				InputValidator.validateConfig({
+					...base,
+					retryOptions: { initialDelay, maxDelay },
+				});
+
+			it("should compare string delays numerically", () => {
+				expect(validate("5000", "10000")).not.toThrow();
+				expect(validate("9000", "2000")).toThrow(
+					"retryOptions.initialDelay cannot be greater than maxDelay"
+				);
+			});
+
+			it("should reject an initialDelay greater than maxDelay", () => {
+				expect(validate(5000, 2000)).toThrow(
+					"retryOptions.initialDelay cannot be greater than maxDelay"
+				);
+				expect(validate(1000, 1000)).not.toThrow();
+			});
+		});
 	});
 
 	describe("validateProvider", () => {

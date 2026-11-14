@@ -122,6 +122,8 @@ locai advanced [options]
 
 A failed key prints one line with its error message; run with `--debug` to also see the stack trace.
 
+Any command exits with `1` when its output can no longer be written, for example because the program that started Locai stopped reading its output or was killed. Locai then stops instead of continuing without anyone to report to.
+
 ## Examples
 
 **Production Build Run:**

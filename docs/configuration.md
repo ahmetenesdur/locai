@@ -316,14 +316,14 @@ export default defineConfig({
 		debug: false,
 	},
 
-	// Confidence Scoring
+	// Confidence Scoring (see Core Concepts); --min-confidence and --save-review-queue
+	// also turn it on
 	confidenceScoring: {
-		enabled: false,
-		minConfidence: 0.7,
-		saveReviewQueue: false,
-		autoApproveThreshold: 0.9,
-		reviewThreshold: 0.7,
-		rejectThreshold: 0.5,
+		enabled: false, // Score every new translation (0-1) from checks on the translation itself
+		minConfidence: 0.7, // Flag translations scoring below this for review (older name: reviewThreshold)
+		saveReviewQueue: false, // Add flagged translations to .localize-cache/review-queue.json for `locai review`
+		autoApproveThreshold: 0.9, // Mark translations scoring at or above this as auto-approved
+		rejectThreshold: 0.5, // Do not write translations scoring below this
 	},
 
 	// Glossary

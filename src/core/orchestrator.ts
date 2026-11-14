@@ -14,24 +14,20 @@ import GlossaryManager, { GlossaryConfig } from "../utils/glossary-manager.js";
 import type { FlatTranslationValue } from "../utils/object-transformer.js";
 import type { RetryConfig } from "../utils/retry-helper.js";
 import type { ProviderConfig } from "../providers/base-provider.js";
-import fs from "fs";
-import path from "path";
 import { log } from "../utils/logger.js";
 
 // Pipeline imports
 import Pipeline from "./pipeline/Pipeline.js";
 import {
 	createTranslationContext,
+	TranslationContext,
 	TranslationMeta,
 	TranslationResult,
 } from "./pipeline/context.js";
 import InputValidationStep from "./pipeline/steps/InputValidationStep.js";
 import CacheReadStep, { CacheStats } from "./pipeline/steps/CacheReadStep.js";
 import GlossaryPreStep from "./pipeline/steps/GlossaryPreStep.js";
-import TranslationStep, {
-	ConfidenceSettings,
-	ReviewQueueItem,
-} from "./pipeline/steps/TranslationStep.js";
+import TranslationStep, { ConfidenceSettings } from "./pipeline/steps/TranslationStep.js";
 import GlossaryPostStep from "./pipeline/steps/GlossaryPostStep.js";
 import QualityCheckStep from "./pipeline/steps/QualityCheckStep.js";
 import ToneCheckStep from "./pipeline/steps/ToneCheckStep.js";
@@ -39,6 +35,7 @@ import ConfidenceCheckStep from "./pipeline/steps/ConfidenceCheckStep.js";
 import CacheWriteStep from "./pipeline/steps/CacheWriteStep.js";
 import ContextEnrichmentStep from "./pipeline/steps/ContextEnrichmentStep.js";
 import { SourceCodeAnalyzer } from "../services/source-analyzer.js";
+import { updateReviewQueue } from "../utils/review-queue.js";
 
 /** The `rateLimiter` configuration section. */
 export interface RateLimiterOptions extends RateLimiterConfig {
@@ -93,14 +90,22 @@ export interface OrchestratorOptions {
 	allowStaleCache?: boolean;
 	/** @deprecated Has no effect: the cache never refreshes entries in the background. */
 	staleWhileRevalidate?: boolean;
+	/** Turns confidence scoring on; translations scoring below it need review (`--min-confidence`). */
 	minConfidence?: number;
+	/** Turns confidence scoring on and saves the flagged translations for `locai review`. */
 	saveReviewQueue?: boolean;
 	confidenceScoring?: {
+		/** Score every new translation (default false). */
 		enabled?: boolean;
+		/** Translations scoring below it need review (default 0.7); the top-level minConfidence wins. */
 		minConfidence?: number;
+		/** Save the flagged translations to .localize-cache/review-queue.json for `locai review`. */
 		saveReviewQueue?: boolean;
+		/** Translations scoring at or above it are marked auto-approved (default 0.9). */
 		autoApproveThreshold?: number;
+		/** Older name of minConfidence; when both are set, the higher one applies. */
 		reviewThreshold?: number;
+		/** Translations scoring below it are rejected and not written (default 0.5). */
 		rejectThreshold?: number;
 	};
 	concurrencyLimit?: number;
@@ -244,29 +249,27 @@ class Orchestrator {
 			stored: 0,
 		};
 
-		// Confidence scoring settings
+		// Confidence scoring: turned on by `confidenceScoring.enabled` or by the top-level
+		// minConfidence / saveReviewQueue (the --min-confidence / --save-review-queue flags)
+		const scoring = options.confidenceScoring;
+		const sectionReviewThresholds = [scoring?.minConfidence, scoring?.reviewThreshold].filter(
+			(threshold) => threshold !== undefined
+		);
 		this.confidenceSettings = {
 			enabled:
 				options.minConfidence !== undefined ||
-				options.saveReviewQueue ||
-				options.confidenceScoring?.enabled ||
-				false,
-			autoApproveThreshold: options.confidenceScoring?.autoApproveThreshold || 0.9,
-			reviewThreshold: options.confidenceScoring?.reviewThreshold || 0.7,
-			rejectThreshold: options.confidenceScoring?.rejectThreshold || 0.5,
-			saveReviewQueue:
-				options.saveReviewQueue || options.confidenceScoring?.saveReviewQueue || false,
+				Boolean(options.saveReviewQueue || scoring?.enabled),
+			autoApproveThreshold: scoring?.autoApproveThreshold ?? 0.9,
+			reviewThreshold:
+				options.minConfidence ??
+				(sectionReviewThresholds.length > 0 ? Math.max(...sectionReviewThresholds) : 0.7),
+			rejectThreshold: scoring?.rejectThreshold ?? 0.5,
+			saveReviewQueue: Boolean(options.saveReviewQueue || scoring?.saveReviewQueue),
 			reviewQueue: [],
+			scored: [],
 			autoApprovedCount: 0,
 			rejectedCount: 0,
 		};
-
-		// Use minConfidence from options if present as specific threshold logic override or mapping
-		if (options.minConfidence) {
-			// This logic was slightly fuzzy in JS, preserved here:
-			// If minConfidence is set, it might override others or act as a floor.
-			// The original code used it.
-		}
 
 		this.concurrencyLimit = options.concurrencyLimit || 5;
 
@@ -400,7 +403,7 @@ class Orchestrator {
 			})
 		);
 
-		// 7. Confidence Score Calculationk
+		// 7. Confidence thresholds (scores are computed by TranslationStep)
 		this.pipeline.use(new ConfidenceCheckStep(this.confidenceSettings, this.advanced.debug));
 
 		// 8. Cache Write
@@ -431,8 +434,42 @@ class Orchestrator {
 		);
 
 		await this.pipeline.execute(context);
+		this._recordConfidence(context);
 
 		return context.result;
+	}
+
+	/** Count a scored translation and queue it when it needs review or was rejected. */
+	private _recordConfidence({
+		key,
+		sourceText,
+		sourceLang,
+		targetLang,
+		meta,
+		result,
+	}: TranslationContext): void {
+		const settings = this.confidenceSettings;
+		if (!settings.enabled || !result.confidence) {
+			return;
+		}
+
+		settings.scored.push({ language: targetLang, key });
+		if (result.autoApproved) settings.autoApprovedCount++;
+		if (result.rejected) settings.rejectedCount++;
+
+		if ((result.needsReview || result.rejected) && result.translated) {
+			settings.reviewQueue.push({
+				key,
+				language: targetLang,
+				source: sourceText,
+				translation: result.translated,
+				confidence: result.confidence,
+				sourceLang,
+				category: meta.category || "general",
+				rejected: result.rejected === true,
+				timestamp: new Date().toISOString(),
+			});
+		}
 	}
 
 	async processTranslations(items: TranslationItem[]): Promise<TranslationResult[]> {
@@ -579,65 +616,27 @@ class Orchestrator {
 		};
 	}
 
+	/**
+	 * Add the translations this orchestrator flagged to `.localize-cache/review-queue.json`,
+	 * when saving the review queue is enabled.
+	 */
 	saveReviewQueue(): void {
-		if (
-			!this.confidenceSettings.saveReviewQueue ||
-			this.confidenceSettings.reviewQueue.length === 0
-		) {
+		if (!this.confidenceSettings.saveReviewQueue) {
 			return;
 		}
 
 		try {
-			const cacheDir = path.join(process.cwd(), ".localize-cache");
-			if (!fs.existsSync(cacheDir)) {
-				fs.mkdirSync(cacheDir, { recursive: true });
-			}
-
-			const reviewFile = path.join(cacheDir, "review-queue.json");
-			const data = {
-				timestamp: new Date().toISOString(),
-				minConfidence: this.options.minConfidence,
-				items: this.confidenceSettings.reviewQueue,
-				stats: {
-					total: this.confidenceSettings.reviewQueue.length,
-					byLanguage: this._groupByLanguage(this.confidenceSettings.reviewQueue),
-					byConfidenceLevel: this._groupByConfidenceLevel(
-						this.confidenceSettings.reviewQueue
-					),
-				},
-			};
-
-			fs.writeFileSync(reviewFile, JSON.stringify(data, null, 2));
-			console.log(
-				`\nReview queue saved: ${this.confidenceSettings.reviewQueue.length} items need review`
+			const { file, size } = updateReviewQueue(
+				this.confidenceSettings.scored,
+				this.confidenceSettings.reviewQueue
 			);
-			console.log(`   File: ${reviewFile}`);
-			console.log(`   Run 'localize review' to start interactive review\n`);
+			console.log(`\nReview queue saved: ${size} items need review`);
+			console.log(`   File: ${file}`);
+			console.log(`   Run 'locai review' to start interactive review\n`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			console.warn(`Warning: Failed to save review queue: ${message}`);
 		}
-	}
-
-	private _groupByLanguage(items: ReviewQueueItem[]): Record<string, number> {
-		const grouped: Record<string, number> = {};
-		items.forEach((item) => {
-			if (!grouped[item.language]) {
-				grouped[item.language] = 0;
-			}
-			grouped[item.language]++;
-		});
-		return grouped;
-	}
-
-	private _groupByConfidenceLevel(items: ReviewQueueItem[]): Record<string, number> {
-		const grouped: Record<string, number> = { high: 0, medium: 0, low: 0, very_low: 0 };
-		items.forEach((item) => {
-			if (grouped[item.confidence.level] !== undefined) {
-				grouped[item.confidence.level]++;
-			}
-		});
-		return grouped;
 	}
 
 	destroy(): void {

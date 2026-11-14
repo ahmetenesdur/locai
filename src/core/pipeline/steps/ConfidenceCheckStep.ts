@@ -3,6 +3,11 @@ import { log } from "../../../utils/logger.js";
 import { TranslationContext } from "../context.js";
 import { ConfidenceSettings } from "./TranslationStep.js";
 
+/**
+ * Classifies a scored translation by the confidence thresholds: below rejectThreshold it is
+ * rejected (the result fails, so the translation is not written), below reviewThreshold it
+ * needs review, at or above autoApproveThreshold it is auto-approved.
+ */
 class ConfidenceCheckStep extends PipelineStep {
 	private confidenceSettings: Partial<ConfidenceSettings>;
 	private debug: boolean;
@@ -14,68 +19,38 @@ class ConfidenceCheckStep extends PipelineStep {
 	}
 
 	async execute(context: TranslationContext, next: () => Promise<void>): Promise<void> {
-		if (!context.confidence || !this.confidenceSettings.enabled) {
+		const { confidence, result } = context;
+		if (!this.confidenceSettings.enabled || !confidence || !result.success) {
 			await next();
 			return;
 		}
 
-		const confidence = context.confidence;
-		const result = context.result;
+		const {
+			autoApproveThreshold = 0.9,
+			reviewThreshold = 0.7,
+			rejectThreshold = 0.5,
+		} = this.confidenceSettings;
+		const score = confidence.score;
 
 		result.confidence = confidence;
 
-		// Auto-approve if above threshold
-		if (
-			this.confidenceSettings.autoApproveThreshold !== undefined &&
-			confidence.score >= this.confidenceSettings.autoApproveThreshold
-		) {
-			result.autoApproved = true;
-			if (this.confidenceSettings.autoApprovedCount !== undefined) {
-				this.confidenceSettings.autoApprovedCount++;
-			}
-
-			if (this.debug) {
-				log(`Auto-approved: ${context.key} (score: ${confidence.score.toFixed(3)})`, true);
-			}
-		}
-		// Auto-reject if below threshold
-		else if (
-			this.confidenceSettings.rejectThreshold !== undefined &&
-			confidence.score < this.confidenceSettings.rejectThreshold
-		) {
+		let outcome = "Accepted";
+		if (score < rejectThreshold) {
+			outcome = "Rejected";
 			result.rejected = true;
-			result.rejectionReason = `Quality score too low: ${confidence.score.toFixed(3)}`;
-			if (this.confidenceSettings.rejectedCount !== undefined) {
-				this.confidenceSettings.rejectedCount++;
-			}
-
-			if (this.debug) {
-				log(`Auto-rejected: ${context.key} (score: ${confidence.score.toFixed(3)})`, true);
-			}
-
-			// Keep original text for rejected translations
-			result.translated = context.sourceText;
-		}
-		// Add to review queue if below review threshold
-		else if (
-			this.confidenceSettings.saveReviewQueue &&
-			this.confidenceSettings.reviewThreshold !== undefined &&
-			confidence.score < this.confidenceSettings.reviewThreshold
-		) {
+			result.rejectionReason = `Confidence ${score.toFixed(3)} is below the reject threshold ${rejectThreshold}`;
+			result.error = result.rejectionReason;
+			result.success = false;
+		} else if (score < reviewThreshold) {
+			outcome = "Needs review";
 			result.needsReview = true;
+		} else if (score >= autoApproveThreshold) {
+			outcome = "Auto-approved";
+			result.autoApproved = true;
+		}
 
-			if (this.confidenceSettings.reviewQueue) {
-				this.confidenceSettings.reviewQueue.push({
-					key: context.key,
-					source: context.sourceText,
-					translation: context.translatedText,
-					confidence,
-					language: context.targetLang,
-					sourceLang: context.options.source,
-					category: context.meta?.category || "general",
-					timestamp: new Date().toISOString(),
-				});
-			}
+		if (this.debug) {
+			log(`${outcome}: ${context.key} (score: ${score.toFixed(3)})`, true);
 		}
 
 		await next();

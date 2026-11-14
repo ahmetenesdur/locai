@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import TranslationStep from "../../../../../src/core/pipeline/steps/TranslationStep.js";
 import ProviderFactory from "../../../../../src/core/provider-factory.js";
+import FallbackProvider from "../../../../../src/core/fallback-provider.js";
 import {
 	createTranslationContext,
 	PipelineOptions,
@@ -78,29 +79,35 @@ describe("TranslationStep", () => {
 		expect(context.result.translated).toBe("Hello"); // Fallback to source
 	});
 
-	it("should handle confidence scoring if enabled", async () => {
-		const mockProvider = {
-			translate: vi.fn().mockResolvedValue('{"translation":"Hola","confidence":0.9}'),
-			extractTranslationWithConfidence: vi
-				.fn()
-				.mockReturnValue({ translation: "Hola", confidence: 0.9 }),
-		};
-		vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider);
+	it("should score what a fallback-chain provider returns when confidence scoring is enabled", async () => {
+		// ProviderFactory hands out a FallbackProvider by default: a plain translate() that
+		// returns the translation text, nothing more
+		const provider = new FallbackProvider([
+			{ name: "openai", implementation: { translate: vi.fn().mockResolvedValue("Hola") } },
+		]);
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue(provider);
+		context = createTranslationContext("greeting", "Hello {name}", "en", "es", pipelineOptions);
 
-		const step = new TranslationStep(
-			{ apiProvider: "mock" },
-			{ enabled: true, autoApproveThreshold: 0.8 }
-		);
-
+		const step = new TranslationStep({ apiProvider: "OpenAI" }, { enabled: true });
 		await step.execute(context, async () => {});
 
-		expect(mockProvider.translate).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.anything(),
-			expect.anything(),
-			expect.objectContaining({ returnRawResponse: true })
-		);
-		expect(context.confidence).toBe(0.9);
 		expect(context.translatedText).toBe("Hola");
+		expect(context.confidence).toMatchObject({
+			details: { providerReliability: 0.95 },
+			issues: [expect.objectContaining({ type: "placeholder" })],
+		});
+		expect(context.confidence?.score).toBeLessThan(0.7);
+	});
+
+	it("should not score when confidence scoring is disabled", async () => {
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue({
+			translate: vi.fn().mockResolvedValue("Hola"),
+		});
+
+		const step = new TranslationStep({ apiProvider: "mock" });
+		await step.execute(context, async () => {});
+
+		expect(context.translatedText).toBe("Hola");
+		expect(context.confidence).toBeUndefined();
 	});
 });

@@ -2,6 +2,8 @@ import path from "path";
 import { FileManager } from "../utils/file-manager.js";
 import ObjectTransformer, { FlatTranslations } from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
+import ConfidenceScorer from "../utils/confidence-scorer.js";
+import { updateReviewQueue } from "../utils/review-queue.js";
 import QualityChecker from "../utils/quality/index.js";
 import StateManager, { StateComparison } from "../utils/state-manager.js";
 import InputValidator from "../utils/input-validator.js";
@@ -334,29 +336,7 @@ class TranslationService {
 
 		await uiManager.displayGlobalSummary(globalStats, (options.targets || []).length);
 
-		// Save review queue if confidence scoring was enabled
-		if (options.saveReviewQueue || options.minConfidence !== undefined) {
-			if (globalStats.orchestrators && globalStats.orchestrators.length > 0) {
-				// Collect all review queues from all orchestrators
-				const allReviewItems: Orchestrator["confidenceSettings"]["reviewQueue"] = [];
-				globalStats.orchestrators.forEach((orchestrator) => {
-					if (
-						orchestrator.confidenceSettings &&
-						orchestrator.confidenceSettings.reviewQueue
-					) {
-						allReviewItems.push(...orchestrator.confidenceSettings.reviewQueue);
-					}
-				});
-
-				// If we have items to review, save them
-				if (allReviewItems.length > 0) {
-					// Use first orchestrator to save, but update its review queue
-					const orchestrator = globalStats.orchestrators[0];
-					orchestrator.confidenceSettings.reviewQueue = allReviewItems;
-					orchestrator.saveReviewQueue();
-				}
-			}
-		}
+		await this.reportConfidence(globalStats.orchestrators);
 
 		try {
 			await stateManager.saveState(projectRoot, currentState);
@@ -366,6 +346,66 @@ class TranslationService {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await uiManager.log(`Warning: Could not save state: ${message}`);
+		}
+	}
+
+	/**
+	 * Print the confidence scores of the run and, when the review queue is enabled, add the
+	 * flagged translations to `.localize-cache/review-queue.json`.
+	 * @param {Orchestrator[]} orchestrators - The run's orchestrators (they share the settings).
+	 */
+	async reportConfidence(orchestrators: Orchestrator[]): Promise<void> {
+		const settings = orchestrators[0]?.confidenceSettings;
+		if (!settings?.enabled) {
+			return;
+		}
+
+		const scored = orchestrators.flatMap((o) => o.confidenceSettings.scored);
+		const flagged = orchestrators.flatMap((o) => o.confidenceSettings.reviewQueue);
+		const rejected = flagged.filter((item) => item.rejected).length;
+		const autoApproved = orchestrators.reduce(
+			(sum, o) => sum + o.confidenceSettings.autoApprovedCount,
+			0
+		);
+
+		if (scored.length > 0) {
+			await uiManager.log(`\nConfidence scores: ${scored.length} translations scored`);
+			await uiManager.log(
+				`   Auto-approved (score >= ${settings.autoApproveThreshold}): ${autoApproved}`
+			);
+			await uiManager.log(
+				`   Need review (score < ${settings.reviewThreshold}): ${flagged.length - rejected}`
+			);
+			await uiManager.log(
+				`   Rejected, not written (score < ${settings.rejectThreshold}): ${rejected}`
+			);
+		}
+
+		if (!settings.saveReviewQueue) {
+			if (flagged.length > 0) {
+				const listed = 20;
+				for (const item of flagged.slice(0, listed)) {
+					await uiManager.log(
+						`   ${item.language} ${item.key}: ${ConfidenceScorer.formatConfidence(item.confidence.score)}${item.rejected ? " (rejected)" : ""}`
+					);
+				}
+				if (flagged.length > listed) {
+					await uiManager.log(`   ...and ${flagged.length - listed} more`);
+				}
+				await uiManager.log("   Save them for 'locai review' with --save-review-queue");
+			}
+			return;
+		}
+
+		try {
+			const { file, size } = updateReviewQueue(scored, flagged);
+			await uiManager.log(`Review queue: ${size} items in ${file}`);
+			if (size > 0) {
+				await uiManager.log("   Run 'locai review' to approve or edit them");
+			}
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await uiManager.log(`Warning: Failed to save review queue: ${message}`);
 		}
 	}
 
@@ -573,6 +613,8 @@ class TranslationService {
 			} else {
 				await uiManager.log(`\nNo length issues found in any language`);
 			}
+
+			await this.reportConfidence([orchestrator]);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await uiManager.log(`\nValidation error: ${message}`);

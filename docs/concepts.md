@@ -71,7 +71,31 @@ The state file is shared by all target languages and is updated after every run.
 
 ## 3. Confidence Scoring & Quality Checks
 
-Locai calculates a **Confidence Score (0.0 - 1.0)**. It also performs automated checks to prevent broken apps.
+Locai performs automated checks to prevent broken apps, and can score each translation so you know which ones to look at.
+
+### Confidence Scoring
+
+Scoring is off by default. Turn it on with `confidenceScoring.enabled: true` in the config, or with `--min-confidence <0-1>` or `--save-review-queue`.
+
+Each new translation from the provider then gets a **confidence score (0.0 - 1.0)**, computed from the translation itself (the model's own confidence is not used). The score starts at 1 and loses:
+
+- 0.4 for each problem that breaks or invalidates the text: a placeholder or HTML tag count different from the source, text identical to the source, leftover model commentary ("Here is the translation: ..."), an empty or one-character result
+- 0.2 when the length is under 30% or over 300% of the source
+- 0.1 when the ending punctuation differs from the source
+
+It is then scaled by fixed factors for the content category (e.g. legal), the language pair and the provider. One serious problem puts a translation below 0.7; two put it below 0.5. The score is taken before Locai's automatic fixes, so a translation whose placeholder had to be re-inserted is still flagged.
+
+| Score                                    | What happens                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| at or above `autoApproveThreshold` (0.9) | Written and marked auto-approved                                      |
+| below `minConfidence` (0.7)              | Written and flagged for review                                        |
+| below `rejectThreshold` (0.5)            | Rejected: not written, so the key is translated again on the next run |
+
+`--min-confidence` sets `minConfidence` for one run. `reviewThreshold`, the older name of `confidenceScoring.minConfidence`, still works; when both are set, the higher one applies.
+
+At the end of a run Locai prints how many translations were scored, auto-approved, flagged and rejected. With `--save-review-queue` (or `confidenceScoring.saveReviewQueue: true`) the flagged and rejected translations are added to `.localize-cache/review-queue.json`; otherwise the first 20 are listed in the output. When a key is translated again, its new result replaces the queued one.
+
+`locai review` steps through that queue: approve a translation or edit it, and it is written to `<localesDir>/<language>.json`. Translations reused from vector memory are not scored.
 
 ### Example: Quote Balance Fix
 

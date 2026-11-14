@@ -46,8 +46,8 @@ How Locai's features work:
 - **Glossary & Brand Safety**: Define protected terms (like "Locai", "API", "SaaS"). Locai swaps them for placeholder tokens in the text being translated, then restores your configured translation, so the model does not see or translate those terms in that text. (Source code sent by Deep Context Analysis is not tokenized.)
 - **Auto-Fix**: After each translation, rule-based checks repair what they can: unbalanced quotes, missing or damaged placeholders (`{name}`, `${name}`, `%s`, `%d`), HTML tags and ending punctuation, plus markdown, code blocks and special characters if you turn those rules on. The checks do not reject a translation.
 - **Provider Fallback**: With `useFallback` (on by default), a failed request is retried with the other providers that have an API key set.
-- **Confidence Scoring**: Every translation gets a score (0-1). Low confidence translations are flagged for your review.
-- **Interactive Review**: A built-in Terminal UI (TUI) to manually approve or edit translations that need attention.
+- **Confidence Scoring** (opt-in): Each new translation gets a score (0-1) computed from checks on the translation itself: lost placeholders or HTML tags, untranslated text, leftover model commentary, unusual length or punctuation. Low scores are flagged for review; very low ones are not written to the locale file.
+- **Interactive Review**: `locai review` steps through the saved review queue in the terminal so you can approve or edit flagged translations; the ones you approve or edit are written to the locale file.
 
 ### [Development Guide](./docs/development.md)
 

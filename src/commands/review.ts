@@ -2,7 +2,9 @@ import fs from "fs";
 import path from "path";
 import prompts from "prompts";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
+import { readReviewQueue } from "../utils/review-queue.js";
 
+/** A queued translation as the review reads it: the fields of a ReviewQueueItem it uses. */
 export interface ReviewItem {
 	key: string;
 	language: string;
@@ -29,11 +31,6 @@ export interface ReviewDecisions {
 export interface ReviewCommandConfig {
 	localesDir: string;
 	source: string;
-}
-
-/** Shape of `.localize-cache/review-queue.json` written by Orchestrator.saveReviewQueue. */
-interface ReviewQueueFile {
-	items?: ReviewItem[];
 }
 
 /** Nested locale file content: leaves are translations, branches are key segments. */
@@ -66,19 +63,17 @@ class ReviewCommand {
 	 * @returns {boolean} - True if loaded successfully, else false.
 	 */
 	loadReviewQueue(): boolean {
-		const reviewFile = path.join(process.cwd(), ".localize-cache", "review-queue.json");
-
-		if (!fs.existsSync(reviewFile)) {
-			console.log("\nNo review queue found.");
-			console.log(
-				"   Run translation with confidence scoring first: localize translate --min-confidence 0.8"
-			);
-			return false;
-		}
-
 		try {
-			const data = JSON.parse(fs.readFileSync(reviewFile, "utf8")) as ReviewQueueFile;
-			this.reviewQueue = data.items || [];
+			const items = readReviewQueue();
+			if (!items) {
+				console.log("\nNo review queue found.");
+				console.log(
+					"   Run a translation that saves one first: locai translate --save-review-queue"
+				);
+				return false;
+			}
+
+			this.reviewQueue = items;
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

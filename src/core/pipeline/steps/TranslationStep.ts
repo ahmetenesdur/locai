@@ -2,19 +2,8 @@ import PipelineStep from "../PipelineStep.js";
 import ProviderFactory, { AIProvider } from "../../provider-factory.js";
 import { TranslationContext } from "../context.js";
 import type { TranslateOptions } from "../../../providers/base-provider.js";
-import type { ConfidenceResult } from "../../../utils/confidence-scorer.js";
-
-/** A low-confidence translation saved for manual review (`localize review`). */
-export interface ReviewQueueItem {
-	key: string;
-	source: string;
-	translation?: string;
-	confidence: ConfidenceResult;
-	language: string;
-	sourceLang: string;
-	category: string;
-	timestamp: string;
-}
+import ConfidenceScorer from "../../../utils/confidence-scorer.js";
+import type { ReviewQueueItem, TranslationRef } from "../../../utils/review-queue.js";
 
 export interface ConfidenceSettings {
 	enabled: boolean;
@@ -22,7 +11,10 @@ export interface ConfidenceSettings {
 	rejectThreshold: number;
 	reviewThreshold: number;
 	saveReviewQueue: boolean;
+	/** Translations scored below reviewThreshold in this run, rejected ones included. */
 	reviewQueue: ReviewQueueItem[];
+	/** Every translation scored in this run. */
+	scored: TranslationRef[];
 	autoApprovedCount: number;
 	rejectedCount: number;
 }
@@ -33,32 +25,6 @@ export interface TranslationStepOptions extends TranslateOptions {
 	useFallback?: boolean;
 	fallbackOrder?: string[];
 }
-
-/**
- * A provider that can score its own translations: it returns the raw response when asked
- * and extracts the translation plus a confidence score from it.
- */
-interface ConfidenceScoringProvider extends AIProvider {
-	name?: string;
-	translate(
-		text: string,
-		sourceLang: string,
-		targetLang: string,
-		options?: TranslateOptions & { returnRawResponse?: boolean }
-	): Promise<string>;
-	extractTranslationWithConfidence(
-		response: string,
-		providerName: string,
-		sourceText: string,
-		sourceLang: string,
-		targetLang: string,
-		category?: string
-	): { translation: string; confidence: ConfidenceResult };
-}
-
-const supportsConfidenceScoring = (provider: AIProvider): provider is ConfidenceScoringProvider =>
-	"extractTranslationWithConfidence" in provider &&
-	typeof provider.extractTranslationWithConfidence === "function";
 
 class TranslationStep extends PipelineStep {
 	private options: TranslationStepOptions;
@@ -76,6 +42,7 @@ class TranslationStep extends PipelineStep {
 	async execute(context: TranslationContext, next: () => Promise<void>): Promise<void> {
 		try {
 			const provider = this._getProvider();
+			const text = context.protectedText || context.sourceText;
 
 			// Setup translation options
 			const translationOpts = {
@@ -86,35 +53,23 @@ class TranslationStep extends PipelineStep {
 				},
 			};
 
-			// Handling Confidence Scoring if enabled
-			if (this.confidenceSettings.enabled && supportsConfidenceScoring(provider)) {
-				const rawResponse = await provider.translate(
-					context.protectedText || context.sourceText,
-					context.sourceLang,
-					context.targetLang,
-					{ ...translationOpts, returnRawResponse: true }
-				);
+			context.translatedText = await provider.translate(
+				text,
+				context.sourceLang,
+				context.targetLang,
+				translationOpts
+			);
 
-				const result = provider.extractTranslationWithConfidence(
-					rawResponse,
-					provider.name || "unknown",
-					context.protectedText || context.sourceText,
-					context.sourceLang,
-					context.targetLang,
-					context.meta?.category
-				);
-
-				context.translatedText = result.translation;
-				context.confidence = result.confidence;
-			} else {
-				// Standard translation
-				context.translatedText = await provider.translate(
-					context.protectedText || context.sourceText,
-					context.sourceLang,
-					context.targetLang,
-					translationOpts
-				);
-				context.confidence = undefined; // Use undefined instead of null for optional typings often
+			// Score what the provider returned, before glossary restoration and quality fixes
+			if (this.confidenceSettings.enabled) {
+				context.confidence = ConfidenceScorer.calculateConfidence({
+					sourceText: text,
+					translation: context.translatedText,
+					sourceLang: context.sourceLang,
+					targetLang: context.targetLang,
+					provider: this.options.apiProvider?.toLowerCase() || "unknown",
+					category: context.meta?.category,
+				});
 			}
 
 			// Continue to next steps (restore glossary, quality check, etc.)

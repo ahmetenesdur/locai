@@ -2,7 +2,6 @@
  * Base class for translation providers
  */
 import ErrorHelper from "../utils/error-helper.js";
-import ConfidenceScorer, { ConfidenceResult } from "../utils/confidence-scorer.js";
 import type { PromptOptions } from "../utils/prompt-templates.js";
 import type { ProviderResponseBody } from "./api-types.js";
 
@@ -36,12 +35,6 @@ export interface TranslateOptions extends PromptOptions {
 export interface ChatMessage {
 	role: "system" | "user" | "assistant";
 	content: string;
-}
-
-export interface TranslationResult {
-	translation: string;
-	confidence: ConfidenceResult;
-	rawResponse: ProviderResponseBody;
 }
 
 /** HTTP client error (AxiosError or compatible) as read by `handleApiError`. */
@@ -305,40 +298,6 @@ class BaseProvider {
 		}
 
 		return translation;
-	}
-
-	/**
-	 * Extract translation with confidence score
-	 */
-	extractTranslationWithConfidence(
-		response: ProviderResponseBody,
-		providerName: string,
-		sourceText: string,
-		sourceLang: string,
-		targetLang: string,
-		category: string = "general"
-	): TranslationResult {
-		const translation = this.extractTranslation(response, providerName);
-
-		// Extract AI confidence from response
-		const aiConfidence = ConfidenceScorer.extractAIConfidence(response, providerName);
-
-		// Calculate comprehensive confidence score
-		const confidenceResult = ConfidenceScorer.calculateConfidence({
-			aiConfidence,
-			sourceText,
-			translation,
-			sourceLang,
-			targetLang,
-			provider: providerName,
-			category,
-		});
-
-		return {
-			translation,
-			confidence: confidenceResult,
-			rawResponse: response,
-		};
 	}
 
 	sanitizeTranslation(translation: string): string {

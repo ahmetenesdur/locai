@@ -86,7 +86,7 @@ const main = async () => {
 			defaultConfig.lengthControl?.mode || "smart"
 		)
 		.option("--auto-optimize", "Auto-optimize system parameters based on hardware", false)
-		.option("--stats", "Show detailed stats after completion", false)
+		.option("--stats", "No effect: the full summary is always shown", false)
 		.option("--min-confidence <score>", "Minimum confidence threshold (0-1)", parseFloat)
 		.option("--save-review-queue", "Save low-confidence items for manual review", false)
 		.action(async (options: CommandOptions) => {
@@ -114,8 +114,8 @@ const main = async () => {
 
 	program
 		.command("fix")
-		.description("Fix issues in existing translations")
-		.option("--length", "Fix length issues in existing translations", true)
+		.description("Re-translate existing translations that fail the length check")
+		.option("--length", "Fix length issues in existing translations (always on)", true)
 		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "fix");
@@ -137,16 +137,20 @@ const main = async () => {
 
 	program
 		.command("analyze")
-		.description("Analyze context patterns")
-		.option("--use-ai", "Enable AI-based context analysis", defaultConfig.context?.useAI)
+		.description("Not implemented yet: only loads the config and finds the source files")
+		.option(
+			"--use-ai",
+			"No effect yet (analyze is not implemented)",
+			defaultConfig.context?.useAI
+		)
 		.option(
 			"--context-provider <provider>",
-			"AI provider for analysis",
+			"No effect yet (analyze is not implemented)",
 			defaultConfig.context?.aiProvider
 		)
 		.option(
 			"--context-threshold <number>",
-			"Minimum match count",
+			"No effect yet (analyze is not implemented)",
 			Number,
 			defaultConfig.context?.detection?.threshold
 		)
@@ -171,14 +175,14 @@ const main = async () => {
 
 	program
 		.command("advanced")
-		.description("Access advanced configuration options")
+		.description("Translate (like `translate`) with advanced context and retry settings")
 		.option(
 			"--context-confidence <number>",
 			"Minimum confidence score",
 			Number,
 			defaultConfig.context?.detection?.minConfidence
 		)
-		.option("--context-debug", "Show context details", defaultConfig.context?.debug)
+		.option("--context-debug", "No effect (not implemented)", defaultConfig.context?.debug)
 		.option(
 			"--min-text-length <number>",
 			"Minimum text length for AI analysis",

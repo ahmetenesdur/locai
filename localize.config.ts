@@ -297,8 +297,8 @@ export default defineConfig({
 	// Synchronization
 	syncOptions: {
 		enabled: true,
-		removeDeletedKeys: true,
-		retranslateModified: true,
+		removeDeletedKeys: true, // Remove keys deleted from the source file from the target files
+		// Keys whose source text changed are always re-translated (`retranslateModified` has no effect).
 		stateTracking: {
 			enabled: true, // Enable state tracking for change detection
 			stateFileName: "localization.state.json", // State file name

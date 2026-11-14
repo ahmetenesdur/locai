@@ -137,10 +137,10 @@ export default defineConfig({
 	},
 
 	// Performance Optimization
-	concurrencyLimit: 1,
-	cacheEnabled: true,
-	cacheTTL: 24 * 60 * 60 * 1000,
-	cacheSize: 2000,
+	concurrencyLimit: 1, // Default: 5. Overridden by --concurrency (1-20)
+	cacheEnabled: true, // In-memory cache for the current run; --no-cache turns it off
+	cacheTTL: 24 * 60 * 60 * 1000, // Default: 24 hours
+	cacheSize: 2000, // Default: 1000 entries
 	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
 	// Expired entries are translated again. `allowStaleCache` and `staleWhileRevalidate`
 	// are still accepted for compatibility but have no effect.
@@ -170,14 +170,14 @@ export default defineConfig({
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
-		queueTimeout: 10000,
+		queueTimeout: 120000, // ms; validation accepts 1000-120000
 	},
 
 	// Error Handling
 	retryOptions: {
-		maxRetries: 2,
-		initialDelay: 1000,
-		maxDelay: 10000,
+		maxRetries: 2, // Default: 2
+		initialDelay: 1000, // ms; default 1000, validation accepts 100-10000
+		maxDelay: 60000, // ms; default 10000, validation accepts 1000-60000
 		retryableErrors: ["rate_limit", "timeout", "network", "server", "unknown"],
 		perProviderRetry: {
 			dashscope: { maxRetries: 3 },
@@ -276,7 +276,7 @@ export default defineConfig({
 		},
 	},
 
-	// Loggging & Progress
+	// Logging & Progress
 	progressOptions: {
 		logToConsole: true,
 		logFrequency: 1,
@@ -300,7 +300,6 @@ export default defineConfig({
 	syncOptions: {
 		enabled: true,
 		removeDeletedKeys: true,
-		retranslateModified: true,
 		stateTracking: {
 			enabled: true,
 			stateFileName: "localization.state.json",
@@ -310,9 +309,9 @@ export default defineConfig({
 
 	// Advanced Settings
 	advanced: {
-		timeoutMs: 15000,
-		maxKeyLength: 10000,
-		maxBatchSize: 30,
+		timeoutMs: 60000, // ms; default 60000, validation accepts 1000-300000
+		maxKeyLength: 10000, // Default: 10000
+		maxBatchSize: 30, // Default: 50
 		autoOptimize: true,
 		debug: false,
 	},
@@ -355,6 +354,16 @@ export default defineConfig({
 ```
 
 > **Note:** This is a partial example. The values are not defaults. See [`localize.config.ts`](../localize.config.ts) in the project root for the repository's own config.
+
+### Options With No Effect
+
+These options are accepted (and type-checked) so existing configs keep working, but Locai does not use them:
+
+- `fileExtensions`
+- `fileOperations.format`, `fileOperations.fileStructure`: files are always read and written as JSON, in the layout of the source file.
+- `qualityChecks.autoFix`: auto-fix runs whenever `qualityChecks.enabled` is not `false`; use `qualityChecks.rules` to turn individual fixes off.
+- `syncOptions.retranslateModified`: keys whose source text changed are always re-translated.
+- `allowStaleCache`, `staleWhileRevalidate`: expired cache entries are always translated again.
 
 ## Troubleshooting
 

@@ -4,9 +4,13 @@ import { program } from "commander";
 import ErrorHelper, { HelperError } from "./utils/error-helper.js";
 import { loadConfig, validateEnvironment } from "./config/index.js";
 import { loadEnvironmentVariables, configureComponents } from "./config/setup.js";
-import { autoDetectConfig, runCommand, CommandOptions } from "./cli/helpers.js";
+import {
+	autoDetectConfig,
+	runCommand,
+	resolveReviewConfig,
+	CommandOptions,
+} from "./cli/helpers.js";
 import InputValidator from "./utils/input-validator.js";
-import type { ReviewCommandConfig } from "./commands/review.js";
 
 interface ValidateConfigOptions {
 	showWarnings: boolean;
@@ -38,12 +42,10 @@ const main = async () => {
 	configureComponents(defaultConfig);
 	validateEnvironment(defaultConfig);
 
-	const toolVersion = defaultConfig.version || version;
-
 	program
 		.name("locai")
-		.description("AI-powered localization tool for Next.js projects")
-		.version(toolVersion);
+		.description("AI-powered localization tool for JSON locale files")
+		.version(version);
 
 	program
 		.option("-s, --source <lang>", "Source language", defaultConfig.source)
@@ -86,7 +88,7 @@ const main = async () => {
 			defaultConfig.lengthControl?.mode || "smart"
 		)
 		.option("--auto-optimize", "Auto-optimize system parameters based on hardware", false)
-		.option("--stats", "Show detailed stats after completion", false)
+		.option("--stats", "No effect: the full summary is always shown", false)
 		.option("--min-confidence <score>", "Minimum confidence threshold (0-1)", parseFloat)
 		.option("--save-review-queue", "Save low-confidence items for manual review", false)
 		.action(async (options: CommandOptions) => {
@@ -114,8 +116,8 @@ const main = async () => {
 
 	program
 		.command("fix")
-		.description("Fix issues in existing translations")
-		.option("--length", "Fix length issues in existing translations", true)
+		.description("Re-translate existing translations that fail the length check")
+		.option("--length", "Fix length issues in existing translations (always on)", true)
 		.action(async (options: CommandOptions) => {
 			try {
 				await runCommand(defaultConfig, options, "fix");
@@ -137,16 +139,20 @@ const main = async () => {
 
 	program
 		.command("analyze")
-		.description("Analyze context patterns")
-		.option("--use-ai", "Enable AI-based context analysis", defaultConfig.context?.useAI)
+		.description("Not implemented yet: only loads the config and finds the source files")
+		.option(
+			"--use-ai",
+			"No effect yet (analyze is not implemented)",
+			defaultConfig.context?.useAI
+		)
 		.option(
 			"--context-provider <provider>",
-			"AI provider for analysis",
+			"No effect yet (analyze is not implemented)",
 			defaultConfig.context?.aiProvider
 		)
 		.option(
 			"--context-threshold <number>",
-			"Minimum match count",
+			"No effect yet (analyze is not implemented)",
 			Number,
 			defaultConfig.context?.detection?.threshold
 		)
@@ -171,14 +177,14 @@ const main = async () => {
 
 	program
 		.command("advanced")
-		.description("Access advanced configuration options")
+		.description("Translate (like `translate`) with advanced context and retry settings")
 		.option(
 			"--context-confidence <number>",
 			"Minimum confidence score",
 			Number,
 			defaultConfig.context?.detection?.minConfidence
 		)
-		.option("--context-debug", "Show context details", defaultConfig.context?.debug)
+		.option("--context-debug", "No effect (not implemented)", defaultConfig.context?.debug)
 		.option(
 			"--min-text-length <number>",
 			"Minimum text length for AI analysis",
@@ -287,14 +293,7 @@ const main = async () => {
 		.action(async (options: ReviewOptions) => {
 			try {
 				const ReviewCommand = (await import("./commands/review.js")).default;
-				// ReviewCommandConfig requires localesDir and source to be strings (not undefined)
-				const reviewConfig: ReviewCommandConfig = {
-					...defaultConfig,
-					localesDir: defaultConfig.localesDir || "./locales",
-					source: defaultConfig.source || "en",
-				};
-
-				const review = new ReviewCommand(reviewConfig);
+				const review = new ReviewCommand(resolveReviewConfig(defaultConfig));
 
 				if (options.export) {
 					review.exportReviewQueue(options.export);

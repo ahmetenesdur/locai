@@ -5,11 +5,8 @@ import { TranslationContext, TranslationResult } from "../context.js";
 /** Translation cache counters, shared by the orchestrator and the cache steps. */
 export interface CacheStats {
 	hits: number;
-	staleHits: number;
 	misses: number;
 	stored: number;
-	/** Background refreshes of stale entries (counted by the orchestrator). */
-	refreshes: number;
 }
 
 /** The part of the translation cache (an LRUCache) the cache steps use. */
@@ -18,7 +15,6 @@ export interface Cache {
 	get(key: string): TranslationResult | undefined;
 	set(key: string, value: TranslationResult): void;
 	delete(key: string): void;
-	getRemainingTTL?(key: string): number;
 }
 
 export interface CacheStepOptions {
@@ -39,7 +35,7 @@ class CacheReadStep extends PipelineStep {
 	}
 
 	async execute(context: TranslationContext, next: () => Promise<void>): Promise<void> {
-		if (this.options.enabled === false || context.options?.skipCache) {
+		if (this.options.enabled === false) {
 			await next();
 			return;
 		}
@@ -55,16 +51,6 @@ class CacheReadStep extends PipelineStep {
 
 			if (cachedResult && typeof cachedResult === "object") {
 				this.stats.hits++;
-
-				// Check for stale hit
-				try {
-					const ttl = this.cache.getRemainingTTL?.(cacheKey);
-					if (typeof ttl === "number" && ttl <= 0) {
-						this.stats.staleHits++;
-					}
-				} catch (_error) {
-					// Ignore cache errors
-				}
 
 				// Hydrate context result from cache
 				context.result = {

@@ -10,13 +10,12 @@ describe("ConfidenceScorer", () => {
 			targetLang: "es",
 			provider: "openai",
 			category: "general",
-			aiConfidence: 0.9,
 		};
 
-		it("should calculate high confidence for good translations", () => {
+		it("should score a clean translation at the default auto-approve threshold (0.9) or above", () => {
 			const result = ConfidenceScorer.calculateConfidence(baseOptions);
 
-			expect(result.score).toBeGreaterThan(0.8);
+			expect(result.score).toBeGreaterThanOrEqual(0.9);
 			expect(result.level).toBe("high");
 			expect(result.issues).toHaveLength(0);
 		});
@@ -96,26 +95,50 @@ describe("ConfidenceScorer", () => {
 				expect.arrayContaining([expect.objectContaining({ type: "length" })])
 			);
 		});
-	});
 
-	describe("extractAIConfidence", () => {
-		it("should extract from openai logprobs", () => {
-			const response = {
-				choices: [
-					{
-						logprobs: {
-							token_logprobs: [-0.01, -0.02, -0.05], // All non-zero close to 0
-						},
-					},
-				],
-			};
-			const conf = ConfidenceScorer.extractAIConfidence(response, "openai");
-			expect(conf).toBeGreaterThan(0.9);
+		it.each([
+			["placeholder", "You have {count} new messages.", "Tienes mensajes nuevos."],
+			["html_tag", 'Read the <a href="/terms">terms</a> first.', "Lee primero los términos."],
+			["untranslated", "Settings saved.", "Settings saved."],
+			["ai_artifact", "Save your changes.", "Here is the translation: Guarda tus cambios."],
+			["too_short", "Continue", "C"],
+		])(
+			"should score a translation with a %s problem below the default review threshold (0.7)",
+			(type, sourceText, translation) => {
+				const result = ConfidenceScorer.calculateConfidence({
+					...baseOptions,
+					sourceText,
+					translation,
+				});
+
+				expect(result.score).toBeLessThan(0.7);
+				expect(result.issues).toEqual(
+					expect.arrayContaining([expect.objectContaining({ type })])
+				);
+			}
+		);
+
+		it("should score a translation with several problems below the default reject threshold (0.5)", () => {
+			const result = ConfidenceScorer.calculateConfidence({
+				...baseOptions,
+				sourceText: "Delete <b>{file}</b>?",
+				translation: "¿Eliminar?",
+			});
+
+			expect(result.score).toBeLessThan(0.5);
+			expect(result.issues.map((issue) => issue.type)).toEqual(["placeholder", "html_tag"]);
 		});
 
-		it("should fallback correctly", () => {
-			const conf = ConfidenceScorer.extractAIConfidence({}, "unknown");
-			expect(conf).toBe(0.8);
+		it("should keep a translation with only a punctuation difference between the default thresholds", () => {
+			const result = ConfidenceScorer.calculateConfidence({
+				...baseOptions,
+				sourceText: "Save changes.",
+				translation: "Guardar cambios",
+			});
+
+			expect(result.score).toBeGreaterThanOrEqual(0.7);
+			expect(result.score).toBeLessThan(0.9);
+			expect(result.issues).toEqual([expect.objectContaining({ type: "punctuation" })]);
 		});
 	});
 

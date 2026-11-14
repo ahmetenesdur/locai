@@ -1,23 +1,19 @@
 /**
- * Localization Tool Configuration
- * Version: 2.5.0 - ES Module format
- * Controls API providers, performance settings, and quality controls
+ * Localization Tool Configuration (the repository's own example).
+ * Controls API providers, performance settings, and quality controls.
  */
 
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	version: "2.6.2",
-	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json) structures.
+	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json; the file must be named translation.json) structures.
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
 
 	// Deep Context (Source Code Analysis)
-	// Scans source code for context (component name, comments, props)
+	// Adds where each key is used in src/, app/ and components/ (.ts/.tsx) to the prompt:
+	// file and line, component, comments, JSX props and a code snippet
 	deepContext: true,
-
-	// Optional: Filter by specific file extensions
-	// fileExtensions: [".json", ".arb"],
 
 	// API Provider Configuration
 	apiProvider: "openai",
@@ -62,17 +58,16 @@ export default defineConfig({
 	cacheTTL: 24 * 60 * 60 * 1000,
 	cacheSize: 2000,
 	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
-	allowStaleCache: true, // Allow returning stale cache while refreshing
-	staleWhileRevalidate: true, // Serve stale content while revalidating in background
 
-	// Vector Memory (Infinite Memory)
-	// Semantic caching using embeddings to find similar translations
+	// Vector Memory (optional, off unless enabled: true)
+	// Reuses stored translations of similar strings. Needs OPENAI_API_KEY and costs one
+	// embedding request per new string.
 	vectorMemory: {
 		enabled: true,
 		similarityThreshold: 0.85, // Minimum similarity to use as context
 		exactMatchThreshold: 0.98, // Minimum similarity to use directly as translation
 		vectorDbPath: "./.localize-cache/vector-memory",
-		embeddingProvider: "openai", // Provider for generating embeddings
+		embeddingProvider: "openai", // Only "openai" is supported
 		embeddingModel: "text-embedding-3-small",
 	},
 
@@ -89,7 +84,7 @@ export default defineConfig({
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
-		queueTimeout: 300000,
+		queueTimeout: 120000, // ms; config validation accepts 1000-120000
 	},
 
 	// Error Handling
@@ -108,10 +103,10 @@ export default defineConfig({
 	// Translation Quality and Context
 	context: {
 		enabled: true,
-		useAI: true,
+		useAI: true, // Default: false. AI classifies strings >= minTextLength when the keyword match is weak (extra API calls)
 		aiProvider: "openai",
-		minTextLength: 200,
-		allowNewCategories: true,
+		minTextLength: 200, // Default: 50
+		allowNewCategories: true, // Let AI analysis suggest categories that are not defined below
 		debug: false,
 		analysisOptions: {
 			model: "gpt-4o",
@@ -119,9 +114,10 @@ export default defineConfig({
 			maxTokens: 1000,
 		},
 		detection: {
-			threshold: 2,
-			minConfidence: 0.6,
+			threshold: 2, // Keyword matches needed for a category
+			minConfidence: 0.6, // Share of the total score the best category needs
 		},
+		// No built-in categories: only the ones defined here are used
 		categories: {
 			technical: {
 				keywords: [
@@ -205,21 +201,21 @@ export default defineConfig({
 	},
 
 	// Quality Checks
-	// Automated validation and fixing to ensure translation quality
+	// Run on every new translation and repair what they can. They never reject a
+	// translation or stop it from being saved. `enabled: false` turns off all checks and auto-fixes.
 	qualityChecks: {
-		enabled: true, // Enable quality checks
+		enabled: true,
 		rules: {
-			placeholderConsistency: true, // Check placeholders
-			htmlTagsConsistency: true, // Check HTML tags
-			punctuationCheck: true, // Check punctuation
-			quoteBalanceCheck: true, // Check quote balance (prevents missing quotes that cause JSON parse errors)
-			lengthValidation: true, // Check text length
-			sanitizeOutput: true, // Clean output text
-			markdownPreservation: true, // Preserve markdown
-			specialCharacters: true, // Maintain special characters
-			codeBlockPreservation: true, // Preserve code blocks
+			placeholderConsistency: true, // Restore {name}, ${name}, %s, %d placeholders
+			htmlTagsConsistency: true, // Repair HTML tags
+			punctuationCheck: true, // Match the source's ending punctuation
+			quoteBalanceCheck: true, // Close unbalanced quotes
+			lengthValidation: true, // Detect length issues; used by `locai fix`, not fixed during translate
+			sanitizeOutput: true, // Remove model artifacts such as <think> tags
+			markdownPreservation: true, // Repair markdown (default off)
+			specialCharacters: true, // Keep special characters (default off)
+			codeBlockPreservation: true, // Keep code blocks (default off)
 		},
-		autoFix: true, // Auto-fix common issues
 	},
 
 	// Style Guide
@@ -290,17 +286,8 @@ export default defineConfig({
 
 	// File Operations
 	fileOperations: {
-		/**
-		 * File format to use (json, yaml, po, properties, etc.)
-		 * Set to "auto" to detect from file extension
-		 */
-		// format: "auto", // "json" | "yaml" | "po" | "properties" | "arb" | "auto"
-
-		/**
-		 * File structure (flat, nested, namespaced)
-		 * Set to "auto" to detect from content
-		 */
-		// fileStructure: "auto", // "flat" | "nested" | "namespaced" | "auto"
+		// Locale files are always read and written as JSON. `format` and `fileStructure`
+		// are accepted for compatibility but have no effect; the layout follows the source file.
 
 		backupFiles: false,
 		backupDir: "./.backups",
@@ -311,8 +298,8 @@ export default defineConfig({
 	// Synchronization
 	syncOptions: {
 		enabled: true,
-		removeDeletedKeys: true,
-		retranslateModified: true,
+		removeDeletedKeys: true, // Remove keys deleted from the source file from the target files
+		// Keys whose source text changed are always re-translated (`retranslateModified` has no effect).
 		stateTracking: {
 			enabled: true, // Enable state tracking for change detection
 			stateFileName: "localization.state.json", // State file name
@@ -329,14 +316,14 @@ export default defineConfig({
 		debug: false,
 	},
 
-	// Quality Confidence Scoring
+	// Confidence Scoring (see docs/concepts.md); the flags --min-confidence and
+	// --save-review-queue also turn it on
 	confidenceScoring: {
-		enabled: false, // Enable confidence scoring for translations
-		minConfidence: 0.7, // Minimum confidence threshold (0-1)
-		saveReviewQueue: false, // Save low-confidence items for manual review
-		autoApproveThreshold: 0.9, // Auto-approve translations above this score
-		reviewThreshold: 0.7, // Flag for review below this score
-		rejectThreshold: 0.5, // Auto-reject translations below this score
+		enabled: false, // Score every new translation (0-1) from checks on the translation itself
+		minConfidence: 0.7, // Flag translations scoring below this for review (older name: reviewThreshold)
+		saveReviewQueue: false, // Add flagged translations to .localize-cache/review-queue.json for `locai review`
+		autoApproveThreshold: 0.9, // Mark translations scoring at or above this as auto-approved
+		rejectThreshold: 0.5, // Do not write translations scoring below this
 	},
 
 	// Glossary/Terminology Management
@@ -359,6 +346,9 @@ export default defineConfig({
 			DeFi: {
 				translation: "DeFi",
 				caseSensitive: true, // Must match exact case
+				// Optional: only apply for these target languages (whole codes, case-insensitive;
+				// "zh" does not match "zh-CN"). Omitted or empty = every target language.
+				// languages: ["de", "pt-BR"],
 			},
 			NFT: {
 				translation: "NFT",

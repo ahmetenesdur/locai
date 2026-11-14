@@ -66,20 +66,8 @@ export interface TranslationResult {
 	needsReview?: boolean;
 }
 
-/** Options visible to the pipeline steps: the orchestrator options plus per-run flags. */
-export interface PipelineOptions extends OrchestratorOptions {
-	/** Bypass the cache reads, forcing a fresh translation (background cache refresh). */
-	skipCache?: boolean;
-}
-
-/** Source-code usage of a key, as added by ContextEnrichmentStep. */
-export interface VisualContext {
-	component?: string;
-	file: string;
-	comments?: string[];
-	props?: Record<string, string>;
-	snippet?: string;
-}
+/** Options visible to the pipeline steps: the orchestrator options. */
+export type PipelineOptions = OrchestratorOptions;
 
 /** State shared by the pipeline steps while one key is translated. */
 export interface TranslationContext {
@@ -103,10 +91,6 @@ export interface TranslationContext {
 	/** Confidence score of the translation, when the provider supports scoring. */
 	confidence?: ConfidenceResult;
 	qualityResult?: QualityReport;
-	/** Extra prompt context; ContextEnrichmentStep adds the key's source-code usage. */
-	contextData?: {
-		visualContext?: VisualContext;
-	};
 }
 
 export const createTranslationContext = (

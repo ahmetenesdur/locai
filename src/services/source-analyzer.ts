@@ -1,7 +1,37 @@
-import { Project, Node, CallExpression, SourceFile } from "ts-morph";
+import {
+	Project,
+	Node,
+	CallExpression,
+	SourceFile,
+	JsxOpeningElement,
+	JsxSelfClosingElement,
+	ts,
+} from "ts-morph";
 import { log } from "../utils/logger.js";
 import path from "path";
 import { CodeContext } from "../types/context.js";
+
+/** Longest usage snippet kept for a key, in characters. */
+const MAX_SNIPPET_LENGTH = 200;
+/** Source spans wider than this cannot shrink to a snippet, so they are not printed. */
+const MAX_SNIPPET_SOURCE_WIDTH = 10 * MAX_SNIPPET_LENGTH;
+/** Tooling directives (`eslint-disable-next-line`, `@ts-expect-error`, ...) say nothing about the text. */
+const DIRECTIVE_COMMENT =
+	/^(eslint-|@ts-|prettier-ignore\b|istanbul ignore\b|c8 ignore\b|biome-ignore\b)/;
+/** Prints code without comments, for the usage snippet. */
+const printer = ts.createPrinter({ removeComments: true });
+
+/** Comment text without its markers (`//`, `/*`, `*\/`, JSDoc `*`), on one line. */
+const commentText = (comment: string): string =>
+	comment
+		.replace(/^\/\/+|^\/\*+|\*+\/$/g, "")
+		.replace(/^\s*\*+/gm, "")
+		.replace(/\s+/g, " ")
+		.trim();
+
+/** Functions and methods: code in them runs later, not where they are written. */
+const isFunction = (node: Node): boolean =>
+	Node.isFunctionLikeDeclaration(node) || Node.isFunctionExpression(node);
 
 export class SourceCodeAnalyzer {
 	private project: Project;
@@ -93,68 +123,14 @@ export class SourceCodeAnalyzer {
 	}
 
 	private extractContext(key: string, node: Node, fullFilePath: string) {
-		const relativePath = path.relative(this.rootDir, fullFilePath);
-		const line = node.getStartLineNumber();
+		const component = this.findComponent(node);
+		const comments = this.getComments(node, component?.declaration);
 
-		// Extract component name
-		let componentName = undefined;
-		// Use getAncestors() to find the parent safely
-		const componentNode = node
-			.getAncestors()
-			.find(
-				(n) =>
-					Node.isFunctionDeclaration(n) ||
-					Node.isClassDeclaration(n) ||
-					Node.isVariableDeclaration(n)
-			);
-
-		if (componentNode) {
-			if (
-				Node.isFunctionDeclaration(componentNode) ||
-				Node.isClassDeclaration(componentNode)
-			) {
-				componentName = componentNode.getName();
-			} else if (Node.isVariableDeclaration(componentNode)) {
-				componentName = componentNode.getName();
-			}
-		}
-
-		// Extract comments
-		// Look for leading comments on the statement
-		const statement = node
-			.getAncestors()
-			.find(
-				(n) =>
-					Node.isExpressionStatement(n) ||
-					Node.isVariableStatement(n) ||
-					Node.isJsxElement(n) ||
-					Node.isJsxExpression(n)
-			);
-		const comments: string[] = [];
-
-		const targetNode = statement || node;
-		const ranges = targetNode.getLeadingCommentRanges();
-		for (const range of ranges) {
-			comments.push(
-				range
-					.getText()
-					.replace(/^\/\/\s*/, "")
-					.replace(/^\/\*\s*/, "")
-					.replace(/\s*\*\/$/, "")
-			);
-		}
-
-		// Get props (simple heuristic for JSX)
+		// Props of the JSX element the text belongs to
 		const props: Record<string, string> = {};
-		const jsxElement = node
-			.getAncestors()
-			.find((n) => Node.isJsxOpeningElement(n) || Node.isJsxSelfClosingElement(n));
-
-		if (
-			jsxElement &&
-			(Node.isJsxOpeningElement(jsxElement) || Node.isJsxSelfClosingElement(jsxElement))
-		) {
-			jsxElement.getAttributes().forEach((attr) => {
+		this.findJsxElement(node)
+			?.getAttributes()
+			.forEach((attr) => {
 				if (Node.isJsxAttribute(attr)) {
 					// Safe name extraction
 					const nameNode = attr.getNameNode();
@@ -172,18 +148,12 @@ export class SourceCodeAnalyzer {
 					props[name] = value;
 				}
 			});
-		}
-
-		// Code Snippet (surrounding lines)
-		// Check for node.getParent() to avoid error if node is root (unlikely for call expression)
-		const parent = node.getParent();
-		const snippet = parent ? parent.getText() : node.getText();
 
 		const context: CodeContext = {
-			filePath: relativePath,
-			line,
-			component: componentName,
-			usageSnippet: snippet.length > 200 ? snippet.substring(0, 200) + "..." : snippet,
+			filePath: path.relative(this.rootDir, fullFilePath),
+			line: node.getStartLineNumber(),
+			component: component?.name,
+			usageSnippet: this.getSnippet(node),
 			comments: comments.length > 0 ? comments : undefined,
 			props: Object.keys(props).length > 0 ? props : undefined,
 		};
@@ -192,6 +162,140 @@ export class SourceCodeAnalyzer {
 			this.keyUsageMap.set(key, []);
 		}
 		this.keyUsageMap.get(key)?.push(context);
+	}
+
+	/**
+	 * The component the call is in: the nearest enclosing function, class or function-valued
+	 * variable whose name starts with an uppercase letter, otherwise the nearest one of any name.
+	 * A variable counts only when the call is inside a function in its initializer
+	 * (`const Dialog = () => ...`), so `const label = t("key")` does not name a component.
+	 */
+	private findComponent(node: Node): { name: string; declaration: Node } | undefined {
+		let nearest: { name: string; declaration: Node } | undefined;
+		let insideFunction = false;
+
+		for (const ancestor of node.getAncestors()) {
+			let found: { name: string; declaration: Node } | undefined;
+			if (
+				Node.isFunctionDeclaration(ancestor) ||
+				Node.isFunctionExpression(ancestor) ||
+				Node.isClassDeclaration(ancestor)
+			) {
+				const name = ancestor.getName();
+				if (name) found = { name, declaration: ancestor };
+			} else if (
+				insideFunction &&
+				Node.isVariableDeclaration(ancestor) &&
+				Node.isIdentifier(ancestor.getNameNode())
+			) {
+				found = {
+					name: ancestor.getName(),
+					declaration: ancestor.getVariableStatement() ?? ancestor,
+				};
+			}
+			insideFunction ||= isFunction(ancestor);
+
+			if (found && /^[A-Z]/.test(found.name)) return found;
+			nearest ??= found;
+		}
+		return nearest;
+	}
+
+	/**
+	 * The JSX element the text belongs to: the one whose attribute holds the call
+	 * (`<Button title={t("key")} />`) or whose child it is (`<Button>{t("key")}</Button>`).
+	 * A call inside a nested function (`onClick={() => alert(t("key"))}`) belongs to none.
+	 */
+	private findJsxElement(node: Node): JsxOpeningElement | JsxSelfClosingElement | undefined {
+		for (const ancestor of node.getAncestors()) {
+			if (Node.isJsxOpeningElement(ancestor) || Node.isJsxSelfClosingElement(ancestor)) {
+				return ancestor;
+			}
+			if (Node.isJsxElement(ancestor)) return ancestor.getOpeningElement();
+			if (
+				Node.isJsxFragment(ancestor) ||
+				Node.isStatement(ancestor) ||
+				isFunction(ancestor)
+			) {
+				return undefined;
+			}
+		}
+		return undefined;
+	}
+
+	/**
+	 * Comments about the call, nearest first: comments right above the call's expression, JSX
+	 * attribute, JSX element or statement, `{/* ... *\/}` comments right before its JSX element,
+	 * and the comment above its component. Tooling directives are left out.
+	 */
+	private getComments(node: Node, component: Node | undefined): string[] {
+		// Raw comments by start position; nested nodes share their leading comments
+		const found = new Map<number, string>();
+
+		for (
+			let current: Node | undefined = node;
+			current && !Node.isSourceFile(current);
+			current = current.getParent()
+		) {
+			for (const range of current.getLeadingCommentRanges()) {
+				found.set(range.getPos(), range.getText());
+			}
+			const parent = current.getParent();
+			if (Node.isJsxElement(parent) || Node.isJsxFragment(parent)) {
+				// `{/* ... */}` children right before this one. Compiler nodes, so a long list
+				// of children is not wrapped again for every call in it.
+				const sourceFile = current.getSourceFile().compilerNode;
+				const siblings = parent.compilerNode.children;
+				const self = current.compilerNode;
+				for (let i = siblings.findIndex((child) => child === self) - 1; i >= 0; i--) {
+					const sibling = siblings[i];
+					if (ts.isJsxText(sibling) && sibling.containsOnlyTriviaWhiteSpaces) continue;
+					if (!ts.isJsxExpression(sibling) || sibling.expression) break;
+					const text = sibling.getText(sourceFile);
+					for (const match of text.matchAll(/\/\*[\s\S]*?\*\/|\/\/.*/g)) {
+						found.set(sibling.getStart(sourceFile) + match.index, match[0]);
+					}
+				}
+			}
+			if (Node.isStatement(current)) break;
+		}
+		for (const range of component?.getLeadingCommentRanges() ?? []) {
+			found.set(range.getPos(), range.getText());
+		}
+
+		return [...found.values()]
+			.map(commentText)
+			.filter((text) => text && !DIRECTIVE_COMMENT.test(text));
+	}
+
+	/**
+	 * The code around the call with comments removed: the largest of the call, its enclosing
+	 * expressions and its statement that fits in MAX_SNIPPET_LENGTH characters.
+	 */
+	private getSnippet(node: Node): string {
+		const print = (target: Node) =>
+			printer
+				.printNode(
+					ts.EmitHint.Unspecified,
+					target.compilerNode,
+					target.getSourceFile().compilerNode
+				)
+				.replace(/\s+/g, " ")
+				.trim();
+
+		let snippet = print(node);
+		for (const ancestor of node.getAncestors()) {
+			if (Node.isSourceFile(ancestor) || ancestor.getWidth() > MAX_SNIPPET_SOURCE_WIDTH) {
+				break;
+			}
+			const text = print(ancestor);
+			if (text.length > MAX_SNIPPET_LENGTH) break;
+			snippet = text;
+			if (Node.isStatement(ancestor)) break;
+		}
+		return snippet.length > MAX_SNIPPET_LENGTH
+			? `${snippet.substring(0, MAX_SNIPPET_LENGTH)}...`
+			: snippet;
 	}
 
 	public getContext(key: string): CodeContext | undefined {

@@ -1,21 +1,21 @@
 # Getting Started with Locai
 
-**Locai** is designed to be the easiest localization tool you'll ever use. Whether you're a solo developer or part of a large enterprise team, getting started takes seconds.
+**Locai** is a CLI that translates JSON locale files with an AI provider.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 
-- **Node.js**: v14.13.0 or higher (v18+ recommended for ESM support).
+- **Node.js**: 20.19 or later, or 22 and later.
 - **API Key**: At least one AI provider key (OpenAI, Gemini, DeepSeek, Anthropic, XAI, or Dashscope).
 
 ## Installation
 
-Locai is designed to be used without installation via `npx` (Zero-Config), but you can also install it globally or as a dev dependency.
+You can run Locai without installing it via `npx`, or install it globally or as a dev dependency.
 
-### 1. Zero-Install (Recommended)
+### 1. Without Installing
 
-Run it directly in your project root. It will detect your framework and settings automatically.
+Run it in your project root. By default Locai reads `./locales`; set `localesDir` in your config (or pass `--localesDir`) if your files are elsewhere.
 
 ```bash
 npx locai translate --source en --targets tr,es,de
@@ -46,7 +46,7 @@ npm install --save-dev locai
 
 ## Setup API Keys
 
-Creates a `.env` file in your project root. Locai will automatically load it.
+Create a `.env` file (or `.env.local`) in your project root. Locai loads both. Values in `.env.local` override `.env` and variables already set in your shell; values in `.env` do not override your shell.
 
 ```env
 # Required: At least one of these
@@ -57,25 +57,25 @@ DEEPSEEK_API_KEY=sk-...
 DASHSCOPE_API_KEY=sk-...
 XAI_API_KEY=xai-...
 
-# Optional: Debugging
+# Optional: extra output
 DEBUG=true
+VERBOSE=true
 ```
 
 ## First Run
 
-Navigate to your project directory (where your locales are, e.g., `./locales` or `./src/locales`) and run:
+Run Locai from your project root. If you have no config file, pass the languages:
 
 ```bash
-npx locai
+npx locai --source en --targets tr,es,de
 ```
 
 Locai will:
 
-1.  Detect your locale directory (supports flat `en.json` or nested `en/translation.json`).
-2.  Identify your source language files (e.g., `en.json`).
-3.  Look for missing keys in target languages.
-4.  Translate them using the configured AI.
-5.  Generate or update your target files.
+1.  Find the source file in `localesDir` (default `./locales`): `<source>/translation.json` first, then `<source>.json`. The nested layout requires the file name `translation.json`.
+2.  Compare each target file with the source and collect keys that are new, whose source text changed, or that are missing from the target.
+3.  Translate them using the configured AI provider.
+4.  Create or update the target files (`<target>.json` or `<target>/translation.json`, matching the source layout).
 
 ## Next Steps
 

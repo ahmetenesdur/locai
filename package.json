@@ -13,8 +13,8 @@
 		"localize": "./dist/cli.js"
 	},
 	"scripts": {
-		"start": "node dist/core/orchestrator.js",
-		"dev": "tsx src/core/orchestrator.js",
+		"start": "node dist/cli.js",
+		"dev": "tsx src/cli.ts",
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc",
 		"lint": "eslint .",
@@ -69,7 +69,8 @@
 	"exports": {
 		".": "./dist/core/orchestrator.js",
 		"./orchestrator": "./dist/core/orchestrator.js",
-		"./translator": "./dist/commands/translator.js"
+		"./translator": "./dist/commands/translator.js",
+		"./config": "./dist/config/index.js"
 	},
 	"dependencies": {
 		"axios": "1.13.6",

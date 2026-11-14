@@ -1,16 +1,19 @@
 /**
- * Quality Confidence Scoring System
- * Calculates confidence scores for translations based on AI response and quality checks
+ * Confidence scoring for translations.
+ *
+ * The score is computed from the translation itself: checks for problems a model commonly
+ * introduces (lost placeholders or HTML tags, untranslated text, leftover commentary, unusual
+ * length or ending punctuation), scaled by fixed factors for the content category, the language
+ * pair and the provider. The model's own confidence (e.g. logprobs) is not used.
  */
 
 export interface ConfidenceIssue {
 	type: string;
-	severity: "critical" | "warning" | "error";
+	severity: "warning" | "error";
 	message: string;
 }
 
 export interface ConfidenceOptions {
-	aiConfidence?: number;
 	sourceText: string;
 	translation: string;
 	sourceLang: string;
@@ -20,43 +23,28 @@ export interface ConfidenceOptions {
 }
 
 export interface ConfidenceResult {
+	/** 0-1: the quality score scaled by the category, language pair and provider factors. */
 	score: number;
 	level: "high" | "medium" | "low" | "very_low";
-	aiConfidence: number;
+	/** 0-1: 1 minus the penalties of the failed checks. */
 	qualityScore: number;
 	details: {
 		categoryAdjustment: number;
 		languageFactor: number;
 		providerReliability: number;
 	};
+	/** One entry per failed check. */
 	issues: ConfidenceIssue[];
-	needsReview: boolean;
-	autoApprove: boolean;
-}
-
-/**
- * Optional fields of raw provider responses that carry confidence signals:
- * OpenAI-style `choices` (logprobs, finish_reason), Gemini `candidates`, or a
- * top-level `finishReason`.
- */
-interface ProviderConfidenceFields {
-	choices?: {
-		logprobs?: { token_logprobs?: (number | null)[] } | null;
-		finish_reason?: string;
-	}[];
-	candidates?: { finishReason?: string }[];
-	finishReason?: string;
 }
 
 class ConfidenceScorer {
 	/**
-	 * Calculate final confidence score
+	 * Score a translation against its source text.
 	 * @param {ConfidenceOptions} options
-	 * @returns {ConfidenceResult} { score, details, issues }
+	 * @returns {ConfidenceResult} { score, level, qualityScore, details, issues }
 	 */
 	static calculateConfidence(options: ConfidenceOptions): ConfidenceResult {
 		const {
-			aiConfidence = 0.8,
 			sourceText,
 			translation,
 			sourceLang,
@@ -65,39 +53,19 @@ class ConfidenceScorer {
 			category = "general",
 		} = options;
 
-		// Quality checks
-		const qualityScore = this._calculateQualityScore(sourceText, translation);
-
-		// Category-specific adjustments
+		const { qualityScore, issues } = this._checkTranslation(sourceText, translation);
 		const categoryAdjustment = this._getCategoryAdjustment(category, provider);
-
-		// Language pair complexity
 		const languageFactor = this._getLanguagePairFactor(sourceLang, targetLang);
-
-		// Provider-specific reliability
 		const providerReliability = this._getProviderReliability(provider, category);
 
-		// Calculate weighted final score
-		const finalScore =
-			aiConfidence * 0.4 + // AI's own confidence
-			qualityScore * 0.3 + // Our quality checks
-			categoryAdjustment * 0.15 + // Category-specific adjustment
-			languageFactor * 0.1 + // Language pair complexity
-			providerReliability * 0.05; // Provider reliability
-
-		// Clamp to 0-1 range
-		const score = Math.max(0, Math.min(1, finalScore));
-
-		// Determine confidence level
-		const level = this._getConfidenceLevel(score);
-
-		// Collect issues
-		const issues = this._detectIssues(sourceText, translation, score);
+		// Harder categories, language pairs and providers lower the score (weighted 3:2:1)
+		const contextFactor =
+			(categoryAdjustment * 3 + languageFactor * 2 + providerReliability) / 6;
+		const score = parseFloat((qualityScore * contextFactor).toFixed(3));
 
 		return {
-			score: parseFloat(score.toFixed(3)),
-			level,
-			aiConfidence,
+			score,
+			level: this._getConfidenceLevel(score),
 			qualityScore,
 			details: {
 				categoryAdjustment,
@@ -105,62 +73,76 @@ class ConfidenceScorer {
 				providerReliability,
 			},
 			issues,
-			needsReview: score < 0.7,
-			autoApprove: score >= 0.9,
 		};
 	}
 
 	/**
-	 * Calculate quality score based on internal checks
+	 * Check the translation against its source. Each failed check adds an issue and lowers the
+	 * quality score from 1: by 0.4 for a problem that breaks or invalidates the translation, by
+	 * 0.2 for an unusual length and by 0.1 for different ending punctuation.
 	 */
-	private static _calculateQualityScore(sourceText: string, translation: string): number {
-		let score = 1.0;
-		const issues: string[] = [];
+	private static _checkTranslation(
+		sourceText: string,
+		translation: string
+	): { qualityScore: number; issues: ConfidenceIssue[] } {
+		const issues: ConfidenceIssue[] = [];
+		let penalty = 0;
+		const fail = (
+			type: string,
+			severity: ConfidenceIssue["severity"],
+			cost: number,
+			message: string
+		) => {
+			issues.push({ type, severity, message });
+			penalty += cost;
+		};
 
-		// Check 1: Placeholder preservation
 		const sourcePlaceholders = (sourceText.match(/\{[^}]+\}/g) || []).length;
 		const translationPlaceholders = (translation.match(/\{[^}]+\}/g) || []).length;
 		if (sourcePlaceholders !== translationPlaceholders) {
-			score -= 0.3;
-			issues.push("placeholder_mismatch");
+			fail(
+				"placeholder",
+				"error",
+				0.4,
+				`Placeholder count mismatch: ${sourcePlaceholders} → ${translationPlaceholders}`
+			);
 		}
 
-		// Check 2: HTML tag preservation
 		const sourceTags = (sourceText.match(/<[^>]+>/g) || []).length;
 		const translationTags = (translation.match(/<[^>]+>/g) || []).length;
 		if (sourceTags !== translationTags) {
-			score -= 0.2;
-			issues.push("html_tag_mismatch");
+			fail(
+				"html_tag",
+				"error",
+				0.4,
+				`HTML tag count mismatch: ${sourceTags} → ${translationTags}`
+			);
 		}
 
-		// Check 3: Length appropriateness
 		const lengthRatio = translation.length / sourceText.length;
 		if (lengthRatio < 0.3 || lengthRatio > 3.0) {
-			score -= 0.2;
-			issues.push("extreme_length_difference");
+			fail(
+				"length",
+				"warning",
+				0.2,
+				`Translation is ${Math.round(lengthRatio * 100)}% of source length`
+			);
 		}
 
-		// Check 4: Punctuation consistency
 		const sourceEndsWithPunctuation = /[.!?;:]$/.test(sourceText.trim());
 		const translationEndsWithPunctuation = /[.!?;:]$/.test(translation.trim());
 		if (sourceEndsWithPunctuation !== translationEndsWithPunctuation) {
-			score -= 0.1;
-			issues.push("punctuation_inconsistency");
+			fail("punctuation", "warning", 0.1, "Ending punctuation differs from the source");
 		}
 
-		// Check 5: Empty or too short translation
 		if (translation.trim().length < 2) {
-			score -= 0.4;
-			issues.push("translation_too_short");
+			fail("too_short", "error", 0.4, "Translation is empty or a single character");
 		}
 
-		// Check 6: Same as source (no translation occurred)
 		if (sourceText.toLowerCase().trim() === translation.toLowerCase().trim()) {
-			score -= 0.3;
-			issues.push("identical_to_source");
+			fail("untranslated", "error", 0.4, "Translation is identical to the source");
 		}
 
-		// Check 7: Contains AI artifacts
 		const artifacts = [
 			/^translation:/i,
 			/^translated text:/i,
@@ -168,11 +150,10 @@ class ConfidenceScorer {
 			/^the translation is/i,
 		];
 		if (artifacts.some((pattern) => pattern.test(translation))) {
-			score -= 0.2;
-			issues.push("contains_ai_artifacts");
+			fail("ai_artifact", "error", 0.4, "Translation starts with model commentary");
 		}
 
-		return Math.max(0, score);
+		return { qualityScore: parseFloat(Math.max(0, 1 - penalty).toFixed(3)), issues };
 	}
 
 	/**
@@ -272,54 +253,6 @@ class ConfidenceScorer {
 	}
 
 	/**
-	 * Detect specific issues with translation
-	 */
-	private static _detectIssues(
-		sourceText: string,
-		translation: string,
-		score: number
-	): ConfidenceIssue[] {
-		const issues: ConfidenceIssue[] = [];
-
-		if (score < 0.5) {
-			issues.push({
-				type: "quality",
-				severity: "critical",
-				message: "Translation quality is very low, manual review required",
-			});
-		} else if (score < 0.7) {
-			issues.push({
-				type: "quality",
-				severity: "warning",
-				message: "Translation quality is below threshold, review recommended",
-			});
-		}
-
-		// Check for specific patterns
-		const sourcePlaceholders = (sourceText.match(/\{[^}]+\}/g) || []).length;
-		const translationPlaceholders = (translation.match(/\{[^}]+\}/g) || []).length;
-
-		if (sourcePlaceholders !== translationPlaceholders) {
-			issues.push({
-				type: "placeholder",
-				severity: "error",
-				message: `Placeholder count mismatch: ${sourcePlaceholders} → ${translationPlaceholders}`,
-			});
-		}
-
-		const lengthRatio = translation.length / sourceText.length;
-		if (lengthRatio > 2.5) {
-			issues.push({
-				type: "length",
-				severity: "warning",
-				message: `Translation is ${Math.round(lengthRatio * 100)}% of source length`,
-			});
-		}
-
-		return issues;
-	}
-
-	/**
 	 * Get confidence color for terminal display
 	 */
 	static getConfidenceColor(score: number): string {
@@ -336,42 +269,6 @@ class ConfidenceScorer {
 		const color = this.getConfidenceColor(score);
 		const percentage = (score * 100).toFixed(1);
 		return `${color} ${percentage}%`;
-	}
-
-	/**
-	 * Extract AI confidence from provider response
-	 */
-	static extractAIConfidence(response: unknown, provider: string): number {
-		// Raw provider payloads are not validated; only the optional fields above are read.
-		const res = response as ProviderConfidenceFields;
-
-		// OpenAI logprobs-based confidence
-		if (provider === "openai" && res.choices?.[0]?.logprobs) {
-			const logprobs = res.choices[0].logprobs.token_logprobs || [];
-			if (logprobs.length > 0) {
-				// Convert log probabilities to confidence
-				const avgLogProb =
-					logprobs.reduce((sum: number, lp) => sum + (lp || -1), 0) / logprobs.length;
-				return Math.exp(avgLogProb); // Convert back to probability
-			}
-		}
-
-		// Gemini confidence scores
-		if (provider === "gemini" && res.candidates?.[0]) {
-			const finishReason = res.candidates[0].finishReason;
-
-			if (finishReason === "STOP") return 0.9; // Normal completion
-			if (finishReason === "MAX_TOKENS") return 0.75; // Incomplete
-			return 0.8; // Default
-		}
-
-		// Default confidence based on finish reason
-		const finishReason = res.choices?.[0]?.finish_reason || res.finishReason;
-		if (finishReason === "stop" || finishReason === "STOP") return 0.85;
-		if (finishReason === "length") return 0.7;
-
-		// Fallback
-		return 0.8;
 	}
 }
 

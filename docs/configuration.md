@@ -1,16 +1,26 @@
 # Configuration Guide
 
-Locai follows a "Zero-Config" philosophy but offers deep customization when you need it. It uses [`c12`](https://github.com/unjs/c12) to load configuration, supporting `.js`, `.ts`, and `.json` extensions.
+Locai runs without a config file (pass `--source` and `--targets`), or reads its settings from a config file in the directory you run it from. Command-line options override the config file.
 
 ## Supported Files
 
-- `localize.config.ts` (Recommended)
-- `localize.config.js`
-- `.localizerc`
+Configuration is loaded with [`c12`](https://github.com/unjs/c12), which looks for `localize.config` with one of these extensions:
 
-## Supported Directory Structures
+- `localize.config.ts` (recommended; loaded with `jiti`, which is bundled, so no extra setup is needed)
+- `localize.config.js`, `.mjs`, `.cjs`, `.mts`, `.cts`
+- `localize.config.json`, `.jsonc`, `.json5`, `.yaml`, `.yml`, `.toml`
 
-Locai automatically detects your project's locale structure. No configuration needed.
+## Locale Files
+
+`translate` and `fix` read and write JSON only. The source file is looked up in `localesDir` (default `./locales`) in this order:
+
+1. `<localesDir>/<source>/translation.json`
+2. `<localesDir>/<source>.json`
+3. Any file in `localesDir` whose name starts with `<source>.`, or a `<localesDir>/<source>/` directory that contains `translation.json`
+
+Target files are written in the same layout as the source file: `<localesDir>/<target>/translation.json` for the nested layout, `<target>.json` next to the source file for the flat layout. Locai does not search other directories; set `localesDir` (or pass `--localesDir`) if your files are elsewhere, for example `public/locales` or `messages`.
+
+The codebase also contains adapters for YAML, PO, `.properties`, Android XML and iOS `.strings` files, but `translate` and `fix` do not use them.
 
 ### 1. Flat Structure (Standard)
 
@@ -25,7 +35,7 @@ locales/
 
 ### 2. Nested Structure
 
-Common in larger projects (like `react-i18next` setups).
+Common in `react-i18next` setups. The file in each language directory must be named `translation.json`.
 
 ```
 locales/
@@ -47,14 +57,14 @@ Suitable for simple projects or `npx` usage.
 // localize.config.js
 export default {
 	source: "en",
-	targets: ["tr", "es", "de"], // Changed from ["tr", "es", "de", "fr"]
+	targets: ["tr", "es", "de"],
 
-	// Scans source code for rich context (enabled by default)
+	// Sends where each key is used in your source code with the prompt (enabled by default)
 	deepContext: true,
 
 	// API Provider
 	apiProvider: "openai",
-	localesDir: "./locales", // Tool auto-detects this usually
+	localesDir: "./locales", // Default: "./locales"
 };
 ```
 
@@ -64,7 +74,7 @@ Provides full type safety and autocomplete.
 
 ```typescript
 // localize.config.ts
-import { defineConfig } from "locai";
+import { defineConfig } from "locai/config";
 
 export default defineConfig({
 	source: "en",
@@ -73,22 +83,21 @@ export default defineConfig({
 });
 ```
 
-## Complete Configuration Reference
+## Configuration Reference
 
-Below is the full list of available options, including advanced performance, quality, and context settings.
+Below is an example with most options, including performance, quality, and context settings. The values are examples, not defaults; where a default matters it is noted in a comment.
 
-> **Tip:** For a living example, check out the [`localize.config.ts`](../localize.config.ts) file in the project root. It contains every available option with detailed comments.
+> **Tip:** The [`localize.config.ts`](../localize.config.ts) file in the project root is the repository's own config. It uses the same options with comments.
 
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.6.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language (BCP 47 tag, e.g. "en", "pt-BR", "zh-Hant")
 	targets: ["tr", "de", "es"], // Target language tags; also used as output file names (e.g. pt-BR.json)
 
 	// Deep Context (Source Code Analysis)
-	deepContext: true, // Scans source code for context (component name, comments, props)
+	deepContext: true, // Adds each key's usage in src/, app/, components/ (file, component, comments, JSX props, code) to the prompt
 
 	// API Provider Configuration
 	apiProvider: "openai",
@@ -128,22 +137,23 @@ export default defineConfig({
 	},
 
 	// Performance Optimization
-	concurrencyLimit: 1,
-	cacheEnabled: true,
-	cacheTTL: 24 * 60 * 60 * 1000,
-	cacheSize: 2000,
+	concurrencyLimit: 1, // Default: 5. Overridden by --concurrency (1-20)
+	cacheEnabled: true, // In-memory cache for the current run; --no-cache turns it off
+	cacheTTL: 24 * 60 * 60 * 1000, // Default: 24 hours
+	cacheSize: 2000, // Default: 1000 entries
 	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
-	allowStaleCache: true, // Allow returning stale cache while refreshing
-	staleWhileRevalidate: true, // Serve stale content while revalidating in background
+	// Expired entries are translated again. `allowStaleCache` and `staleWhileRevalidate`
+	// are still accepted for compatibility but have no effect.
 
-	// Vector Memory (Infinite Memory)
-	// Semantic caching using embeddings to find similar translations
+	// Vector Memory (optional, off unless enabled: true)
+	// Reuses stored translations of similar strings. Needs OPENAI_API_KEY and costs one
+	// embedding request per new string. Only "openai" embeddings are supported.
 	vectorMemory: {
 		enabled: true,
 		similarityThreshold: 0.85, // Minimum similarity to use as context
 		exactMatchThreshold: 0.98, // Minimum similarity to use directly as translation
 		vectorDbPath: "./.localize-cache/vector-memory",
-		embeddingProvider: "openai", // Provider for generating embeddings
+		embeddingProvider: "openai", // Only "openai" is supported
 		embeddingModel: "text-embedding-3-small",
 	},
 
@@ -160,14 +170,14 @@ export default defineConfig({
 		},
 		queueStrategy: "fifo",
 		adaptiveThrottling: false,
-		queueTimeout: 10000,
+		queueTimeout: 120000, // ms; validation accepts 1000-120000
 	},
 
 	// Error Handling
 	retryOptions: {
-		maxRetries: 2,
-		initialDelay: 1000,
-		maxDelay: 10000,
+		maxRetries: 2, // Default: 2
+		initialDelay: 1000, // ms; default 1000, validation accepts 100-10000
+		maxDelay: 60000, // ms; default 10000, validation accepts 1000-60000
 		retryableErrors: ["rate_limit", "timeout", "network", "server", "unknown"],
 		perProviderRetry: {
 			dashscope: { maxRetries: 3 },
@@ -179,10 +189,10 @@ export default defineConfig({
 	// Translation Quality and Context
 	context: {
 		enabled: true,
-		useAI: true,
+		useAI: true, // Default: false. AI classifies strings >= minTextLength when the keyword match is weak (extra API calls)
 		aiProvider: "openai",
-		minTextLength: 200,
-		allowNewCategories: true,
+		minTextLength: 200, // Default: 50
+		allowNewCategories: true, // Let AI analysis suggest categories that are not defined below
 		debug: false,
 		analysisOptions: {
 			model: "gpt-4o",
@@ -190,9 +200,10 @@ export default defineConfig({
 			maxTokens: 1000,
 		},
 		detection: {
-			threshold: 2,
-			minConfidence: 0.6,
+			threshold: 2, // Keyword matches needed for a category
+			minConfidence: 0.6, // Share of the total score the best category needs
 		},
+		// No built-in categories: only the ones you define here are used
 		categories: {
 			technical: {
 				keywords: ["API", "backend", "database", "server", "endpoint"],
@@ -208,20 +219,21 @@ export default defineConfig({
 	},
 
 	// Quality Checks
+	// Run on every new translation and repair what they can. They never reject a
+	// translation or stop it from being saved.
 	qualityChecks: {
-		enabled: true, // Enable quality checks
+		enabled: true, // Default: true. `false` turns off all checks and auto-fixes
 		rules: {
-			placeholderConsistency: true, // Check placeholders
-			htmlTagsConsistency: true, // Check HTML tags
-			punctuationCheck: true, // Check punctuation
-			quoteBalanceCheck: true, // Check quote balance
-			lengthValidation: true, // Check text length
-			sanitizeOutput: true, // Clean output text
-			markdownPreservation: true, // Preserve markdown
-			specialCharacters: true, // Maintain special characters
-			codeBlockPreservation: true, // Preserve code blocks
+			placeholderConsistency: true, // Restore {name}, ${name}, %s, %d placeholders (default on)
+			htmlTagsConsistency: true, // Repair HTML tags (default on)
+			punctuationCheck: true, // Match the source's ending punctuation (default on)
+			quoteBalanceCheck: true, // Close unbalanced quotes (default on)
+			lengthValidation: true, // Detect length issues; used by `locai fix`, not fixed during translate (default on)
+			sanitizeOutput: true, // Remove model artifacts such as <think> tags (default on)
+			markdownPreservation: true, // Repair markdown (default off)
+			specialCharacters: true, // Keep special characters (default off)
+			codeBlockPreservation: true, // Keep code blocks (default off)
 		},
-		autoFix: true, // Auto-fix common issues
 	},
 
 	// Style Guide
@@ -264,7 +276,7 @@ export default defineConfig({
 		},
 	},
 
-	// Loggging & Progress
+	// Logging & Progress
 	progressOptions: {
 		logToConsole: true,
 		logFrequency: 1,
@@ -288,7 +300,6 @@ export default defineConfig({
 	syncOptions: {
 		enabled: true,
 		removeDeletedKeys: true,
-		retranslateModified: true,
 		stateTracking: {
 			enabled: true,
 			stateFileName: "localization.state.json",
@@ -298,21 +309,21 @@ export default defineConfig({
 
 	// Advanced Settings
 	advanced: {
-		timeoutMs: 15000,
-		maxKeyLength: 10000,
-		maxBatchSize: 30,
+		timeoutMs: 60000, // ms; default 60000, validation accepts 1000-300000
+		maxKeyLength: 10000, // Default: 10000
+		maxBatchSize: 30, // Default: 50
 		autoOptimize: true,
 		debug: false,
 	},
 
-	// Confidence Scoring
+	// Confidence Scoring (see Core Concepts); --min-confidence and --save-review-queue
+	// also turn it on
 	confidenceScoring: {
-		enabled: false,
-		minConfidence: 0.7,
-		saveReviewQueue: false,
-		autoApproveThreshold: 0.9,
-		reviewThreshold: 0.7,
-		rejectThreshold: 0.5,
+		enabled: false, // Score every new translation (0-1) from checks on the translation itself
+		minConfidence: 0.7, // Flag translations scoring below this for review (older name: reviewThreshold)
+		saveReviewQueue: false, // Add flagged translations to .localize-cache/review-queue.json for `locai review`
+		autoApproveThreshold: 0.9, // Mark translations scoring at or above this as auto-approved
+		rejectThreshold: 0.5, // Do not write translations scoring below this
 	},
 
 	// Glossary
@@ -321,8 +332,18 @@ export default defineConfig({
 		caseSensitive: false,
 		preserveFormatting: true,
 		glossary: {
+			// Simple: the same replacement for every target language
 			API: "API",
 			SDK: "SDK",
+			// Advanced: `languages` limits the entry to these target languages
+			// (whole codes, case-insensitive: "zh" does not match "zh-CN").
+			// Omit it or leave it empty to apply the entry to every target language.
+			NFT: {
+				translation: "NFT",
+				caseSensitive: true,
+				languages: ["de", "pt-BR"],
+			},
+			// Per-language: only applied for the target languages listed as keys
 			Dashboard: {
 				en: "Dashboard",
 				tr: "Kontrol Paneli",
@@ -332,7 +353,17 @@ export default defineConfig({
 });
 ```
 
-> **Note:** This is a partial example showing common configuration options. For the complete configuration with all available options and their default values, see the [`localize.config.ts`](../localize.config.ts) file in the project root.
+> **Note:** This is a partial example. The values are not defaults. See [`localize.config.ts`](../localize.config.ts) in the project root for the repository's own config.
+
+### Options With No Effect
+
+These options are accepted (and type-checked) so existing configs keep working, but Locai does not use them:
+
+- `fileExtensions`
+- `fileOperations.format`, `fileOperations.fileStructure`: files are always read and written as JSON, in the layout of the source file.
+- `qualityChecks.autoFix`: auto-fix runs whenever `qualityChecks.enabled` is not `false`; use `qualityChecks.rules` to turn individual fixes off.
+- `syncOptions.retranslateModified`: keys whose source text changed are always re-translated.
+- `allowStaleCache`, `staleWhileRevalidate`: expired cache entries are always translated again.
 
 ## Troubleshooting
 
@@ -341,27 +372,34 @@ export default defineConfig({
 If you see `Rate limit exceeded` errors:
 
 1.  **Reduce Concurrency**: Set `concurrencyLimit: 1` in your config.
-2.  **Enable Fallback**: Set `useFallback: true` to switch to another provider automatically.
+2.  **Use Fallback**: Keep `useFallback` on (the default) and set API keys for more than one provider, so failed requests go to another provider.
 3.  **Check Plan**: Ensure your API provider account has sufficient credits.
 
-### "Validation Failed" Errors
+### Broken Placeholders or HTML in Translations
 
-Locai validates translations before saving.
+The quality checks repair what they can (see `qualityChecks` above), but they never reject a translation, so a translation they cannot repair is still saved.
 
-- **Placeholders**: Ensure `{{variable}}` exists in the translation.
-- **HTML**: Check for broken tags like `</b>` without `<b>`.
-- **Fix**: Run `locai fix` to attempt auto-repair.
+- **Placeholders**: `{name}`, `${name}`, `%s` and `%d` are recognized. Double-brace placeholders such as `{{name}}` are only partly recognized; check them after translating.
+- **HTML**: Tags from the source that are missing in the translation are inserted by `htmlTagsConsistency`, which can put them in the wrong place; check the result.
+- To redo a single bad translation, delete the key from the target file and run `locai translate` again, or use `--force` to re-translate every key.
+- `locai fix` only re-translates translations whose length is outside the `lengthControl` limits; it does not repair placeholders or HTML.
 
-### Cache Issues
+### "Configuration Validation Failed"
 
-If translations aren't updating:
+`locai validate-config` prints this when a config value is invalid, for example `rateLimiter.queueTimeout` outside 1000–120000 ms. `translate`, `fix` and `advanced` validate the same values before running and stop with an error. The message lists each invalid option.
 
-- Run with `--force` to ignore cache: `locai translate --force`.
-- Delete the `.localize-cache` folder manually.
+### Translations Not Updating
+
+Locai skips keys that already exist in the target file unless their source text changed since the last run (see [Smart Synchronization](./concepts.md#2-smart-synchronization)).
+
+- Run with `--force` to re-translate keys that already exist in the target files: `locai translate --force`.
+- The translation cache (`cacheEnabled`) is kept in memory for the current run only; `--no-cache` turns it off. It is not stored between runs.
+- `.localize-cache/` holds the change-tracking state file and, if enabled, the vector memory database. Deleting it resets both; it does not force re-translation of existing keys.
 
 ### TypeScript Config Errors
 
 If `localize.config.ts` isn't loading:
 
-- Ensure `ts-node` or `jiti` is installed/working (Locai handles this internally usually).
-- Switch to `localize.config.js` if ESM issues persist.
+- TypeScript configs are loaded with `jiti`, which is bundled with Locai; you do not need `ts-node` or `tsx`.
+- Run `locai validate-config` to see whether the values pass validation.
+- If the file still fails to load, try a plain `localize.config.js` or `localize.config.json`.

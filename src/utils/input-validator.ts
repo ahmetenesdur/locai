@@ -516,18 +516,16 @@ class InputValidator {
 		errors: string[],
 		warnings: string[]
 	): void {
-		for (const [provider, rawSettings] of Object.entries(apiConfig)) {
+		for (const [provider, settings] of Object.entries(apiConfig)) {
 			if (!this.VALID_PROVIDERS.includes(provider)) {
 				warnings.push(`Unknown provider in apiConfig: '${provider}'`);
 				continue;
 			}
 
-			if (typeof rawSettings !== "object") {
+			if (!isObject(settings)) {
 				errors.push(`apiConfig.${provider} must be an object`);
 				continue;
 			}
-			// typeof null === "object": a null entry gets through and throws on property access
-			const settings = rawSettings as UnvalidatedSection;
 
 			// Validate temperature
 			if (settings.temperature !== undefined) {
@@ -586,13 +584,23 @@ class InputValidator {
 			if (!isObject(rateLimiter.providerLimits)) {
 				errors.push("rateLimiter.providerLimits must be an object");
 			} else {
-				for (const [provider, rawLimits] of Object.entries(rateLimiter.providerLimits)) {
+				for (const [provider, limits] of Object.entries(rateLimiter.providerLimits)) {
 					if (!this.VALID_PROVIDERS.includes(provider)) {
 						_warnings.push(`Unknown provider in providerLimits: '${provider}'`);
 						continue;
 					}
-					// Not checked to be an object: primitives read as undefined, null throws
-					const limits = rawLimits as UnvalidatedSection;
+					if (limits === null) {
+						errors.push(`rateLimiter.providerLimits.${provider} must be an object`);
+						continue;
+					}
+					// Primitives and arrays always loaded (the rate limiter ignores them), so
+					// they stay accepted with a warning rather than failing validation.
+					if (!isObject(limits) || Array.isArray(limits)) {
+						_warnings.push(
+							`rateLimiter.providerLimits.${provider} should be an object, ignoring it`
+						);
+						continue;
+					}
 
 					if (limits.rpm !== undefined) {
 						const rpm = parseInt(String(limits.rpm));
@@ -648,10 +656,11 @@ class InputValidator {
 			}
 		}
 
-		// Compares the raw values (numbers in a well-formed config)
-		const initialDelay = retryOptions.initialDelay as number | undefined;
-		const maxDelay = retryOptions.maxDelay as number | undefined;
-		if (initialDelay !== undefined && maxDelay !== undefined && initialDelay > maxDelay) {
+		// Compare the parsed numbers like the range checks above: raw strings compare lexically.
+		// A missing or unparseable delay is NaN, which never compares greater.
+		const initialDelay = parseInt(String(retryOptions.initialDelay));
+		const maxDelay = parseInt(String(retryOptions.maxDelay));
+		if (initialDelay > maxDelay) {
 			errors.push("retryOptions.initialDelay cannot be greater than maxDelay");
 		}
 	}

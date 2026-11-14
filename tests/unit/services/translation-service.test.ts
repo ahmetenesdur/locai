@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import translationService from "../../../src/services/translation-service.js";
 import { FileManager } from "../../../src/utils/file-manager.js";
 import Orchestrator from "../../../src/core/orchestrator.js";
+import { SourceCodeAnalyzer } from "../../../src/services/source-analyzer.js";
+import statisticsManager from "../../../src/utils/statistics-manager.js";
 import { TranslationOptions } from "../../../src/types/index.js";
 
 // Mock dependencies
@@ -150,5 +152,36 @@ describe("TranslationService", () => {
 		);
 
 		vi.restoreAllMocks(); // restore process.cwd
+	});
+
+	describe("source code scan (deep context)", () => {
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		/** Runs processAllLanguages without target languages; returns the analyzer's initialize spy. */
+		const scanWith = async (options: TranslationOptions) => {
+			const initialize = vi
+				.spyOn(SourceCodeAnalyzer.prototype, "initialize")
+				.mockResolvedValue();
+			vi.spyOn(console, "log").mockImplementation(() => {});
+
+			await service.processAllLanguages(
+				"/Users/test/project/locales/en.json",
+				{},
+				{ ...options, targets: [] },
+				statisticsManager.getStats(),
+				{ newKeys: [], modifiedKeys: [], deletedKeys: [], hasChanges: false }
+			);
+			return initialize;
+		};
+
+		it("scans the source code by default", async () => {
+			expect(await scanWith(baseOptions)).toHaveBeenCalledTimes(1);
+		});
+
+		it("does not scan the source code when deepContext is false", async () => {
+			expect(await scanWith({ ...baseOptions, deepContext: false })).not.toHaveBeenCalled();
+		});
 	});
 });

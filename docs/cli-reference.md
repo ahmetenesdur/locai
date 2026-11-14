@@ -1,20 +1,25 @@
 # CLI Reference
 
-Locai's CLI is built to be intuitive. All commands support `--help` to show available options.
+All commands support `--help` to show their options.
 
 ## Global Options
 
-These options apply to all commands.
+These options apply to every command. They can be given before or after the command name (`locai --debug translate` and `locai translate --debug` are the same).
 
-| Option                  | Description                       | Default          |
-| ----------------------- | --------------------------------- | ---------------- |
-| `-s, --source <lang>`   | Source language code              | `config.source`  |
-| `-t, --targets <langs>` | Comma-separated target languages  | `config.targets` |
-| `--localesDir <path>`   | Path to locales directory         | Auto-detected    |
-| `--debug`               | Enable verbose debug logging      | `false`          |
-| `--verbose`             | Enable detailed diagnostic output | `false`          |
+| Option                  | Description                                                      | Default                           |
+| ----------------------- | ---------------------------------------------------------------- | --------------------------------- |
+| `-s, --source <lang>`   | Source language code                                             | `config.source`                   |
+| `-t, --targets <langs>` | Comma-separated target languages                                 | `config.targets`                  |
+| `--localesDir <dir>`    | Path to the locales directory                                    | `config.localesDir` (`./locales`) |
+| `--no-deep-context`     | Disable deep context analysis (source code scanning)             | `config.deepContext` (on)         |
+| `--debug`               | Debug output; sets `debug` and `advanced.debug`                  | `config.debug`                    |
+| `--verbose`             | Detailed diagnostic output; sets `verbose` and `logging.verbose` | `config.logging.verbose`          |
+| `-V, --version`         | Print the version                                                |                                   |
+| `-h, --help`            | Show help                                                        |                                   |
 
-## commands
+An option you do not pass keeps the value from your config file.
+
+## Commands
 
 ### `translate` (Default)
 
@@ -22,29 +27,37 @@ Translates missing keys in your locale files.
 
 ```bash
 locai translate [options]
-# OR simply
+# OR simply (global options only)
 locai
 ```
 
 **Options:**
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--provider <name>` | Translation provider (openai, anthropic, etc.) | Configured provider |
-| `--concurrency <num>` | Number of concurrent requests | 5 |
-| `--no-cache` | Disable caching | `false` |
-| `--no-deep-context` | Disable source code context analysis | `false` |
-| `--force` | Force re-translation of existing keys | `false` |
-| `--min-confidence <0-1>` | Set threshold for "Low Confidence" flagging | |
-| `--save-review-queue` | Save flagged translations for later review | |
-| `--stats` | Show detailed statistics after run | |
+| `--provider <name>` | Translation provider (openai, anthropic, etc.) | `config.apiProvider` |
+| `--concurrency <num>` | Number of concurrent translations (1-20) | `config.concurrencyLimit` |
+| `--no-cache` | Disable the translation cache | cache on |
+| `--force` | Re-translate keys that already exist in the target files | `config.forceUpdate` |
+| `--length <mode>` | Length control mode: `strict`, `flexible`, `exact`, `relaxed`, `smart` | `config.lengthControl.mode` or `smart` |
+| `--auto-optimize` | Pick the concurrency from your CPU count and memory | `config.advanced.autoOptimize` |
+| `--min-confidence <0-1>` | Turn on confidence scoring; translations scoring below this value are flagged for review | `config.minConfidence` |
+| `--save-review-queue` | Turn on confidence scoring and save flagged translations to `.localize-cache/review-queue.json` for `locai review` | `config.saveReviewQueue` |
+| `--stats` | No effect: the full summary is always shown | |
+
+`--min-confidence` alone does not write the review queue file; add `--save-review-queue` for that. A `--min-confidence` value outside 0-1 is ignored with a warning, and the config value is used.
 
 ### `fix`
 
-Scans existing translations for common issues (unbalanced quotes, broken placeholders) and fixes them automatically.
+Checks existing translations against the length rules and re-translates the ones that fail. Other issues (quotes, placeholders, etc.) are not fixed by this command.
 
 ```bash
 locai fix
 ```
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--length` | Fix length issues. Always on; accepted for compatibility |
 
 ### `review`
 
@@ -59,45 +72,52 @@ locai review
 |--------|-------------|
 | `--export <format>` | Export the review queue to `json` or `csv` instead of interactive mode |
 
-### `analyze` (Experimental)
+### `analyze` (Not implemented)
 
-Analyzes your content to detect context patterns using AI.
+Not implemented yet. The command loads the config and finds the source files, then stops; it does not analyze anything. Its options are accepted but have no effect.
 
-```bash
-locai analyze --use-ai
-```
+| Option                          | Description                  |
+| ------------------------------- | ---------------------------- |
+| `--use-ai`                      | No effect yet                |
+| `--context-provider <provider>` | No effect yet                |
+| `--context-threshold <num>`     | No effect yet (must be 1-10) |
 
 ### `validate-config`
 
-Validates your configuration file and environment without running any translations. Useful for CI/CD pipelines.
+Validates the configuration values and prints a summary, without running any translations. Exits with code 1 if the configuration is invalid, so it can be used in CI. API keys are not checked by this command (Locai warns about missing keys at the start of every command).
 
 ```bash
 locai validate-config --show-warnings
 ```
 
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--show-warnings` | Show configuration warnings |
+
 ### `advanced`
 
-Access advanced configuration and debugging options directly from the CLI.
+Runs a translation like `translate`, with these context and retry settings overridden. It does not accept the `translate` options.
 
 ```bash
 locai advanced [options]
 ```
 
 **Options:**
-| Option | Description |
-|--------|-------------|
-| `--context-confidence <0-1>` | Minimum confidence threshold for context detection |
-| `--context-debug` | Show detailed AI context analysis logs |
-| `--min-text-length <num>` | Minimum text length to trigger AI analysis |
-| `--allow-new-categories` | Allow AI to suggest new context categories |
-| `--max-retries <num>` | Maximum number of API retries |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--context-confidence <0-1>` | Minimum confidence for context detection (`context.detection.minConfidence`) | config value |
+| `--min-text-length <num>` | Minimum text length before AI context analysis is used (`context.minTextLength`) | config value |
+| `--allow-new-categories` | Allow AI context analysis to suggest new categories | config value |
+| `--max-retries <num>` | Maximum number of API retries (`retryOptions.maxRetries`) | config value or 2 |
+| `--context-debug` | No effect (not implemented) | |
 
 ## Examples
 
 **Production Build Run:**
 
 ```bash
-locai translate --min-confidence 0.9 --save-review-queue --stats
+locai translate --min-confidence 0.9 --save-review-queue
 ```
 
 **Quick Fix:**
@@ -109,5 +129,5 @@ locai fix
 **Switch Provider on the Fly:**
 
 ```bash
-locai --provider deepseek
+locai translate --provider deepseek
 ```

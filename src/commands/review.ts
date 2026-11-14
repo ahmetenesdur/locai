@@ -2,7 +2,10 @@ import fs from "fs";
 import path from "path";
 import prompts from "prompts";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
+import { targetLocaleFile } from "../utils/locale-paths.js";
+import { readReviewQueue, removeFromReviewQueue } from "../utils/review-queue.js";
 
+/** A queued translation as the review reads it: the fields of a ReviewQueueItem it uses. */
 export interface ReviewItem {
 	key: string;
 	language: string;
@@ -29,11 +32,6 @@ export interface ReviewDecisions {
 export interface ReviewCommandConfig {
 	localesDir: string;
 	source: string;
-}
-
-/** Shape of `.localize-cache/review-queue.json` written by Orchestrator.saveReviewQueue. */
-interface ReviewQueueFile {
-	items?: ReviewItem[];
 }
 
 /** Nested locale file content: leaves are translations, branches are key segments. */
@@ -66,25 +64,65 @@ class ReviewCommand {
 	 * @returns {boolean} - True if loaded successfully, else false.
 	 */
 	loadReviewQueue(): boolean {
-		const reviewFile = path.join(process.cwd(), ".localize-cache", "review-queue.json");
-
-		if (!fs.existsSync(reviewFile)) {
-			console.log("\nNo review queue found.");
-			console.log(
-				"   Run translation with confidence scoring first: localize translate --min-confidence 0.8"
-			);
-			return false;
-		}
-
 		try {
-			const data = JSON.parse(fs.readFileSync(reviewFile, "utf8")) as ReviewQueueFile;
-			this.reviewQueue = data.items || [];
+			const items = readReviewQueue();
+			if (!items) {
+				console.log("\nNo review queue found.");
+				console.log(
+					"   Run a translation that saves one first: locai translate --save-review-queue"
+				);
+				return false;
+			}
+
+			this.reviewQueue = items;
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			console.error(`Error loading review queue: ${message}`);
 			return false;
 		}
+	}
+
+	/**
+	 * The locale file `locai translate` writes `language` to. As in
+	 * FileManager.findLocaleFiles, a `<localesDir>/<source>/translation.json` source means the
+	 * nested layout, anything else the flat `<localesDir>/<language>.json` one.
+	 */
+	private localeFile(language: string): string {
+		const { localesDir, source } = this.config;
+		const nestedSource = path.join(localesDir, source, "translation.json");
+		const sourceFile = fs.existsSync(nestedSource)
+			? nestedSource
+			: path.join(localesDir, `${source}.json`);
+		return targetLocaleFile(sourceFile, language);
+	}
+
+	/**
+	 * Remove the reviewed items from the review queue: the rejected ones, and the accepted or
+	 * edited ones whose translation is now in the locale file. Skipped items, items the session
+	 * did not reach and items applyDecisions did not write stay queued.
+	 */
+	private pruneReviewQueue(): void {
+		const localeTrees = new Map<string, LocaleTree>();
+		const isWritten = (item: ReviewItem): boolean => {
+			let tree = localeTrees.get(item.language);
+			if (!tree) {
+				const localeFile = this.localeFile(item.language);
+				tree = fs.existsSync(localeFile)
+					? (JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree)
+					: {};
+				localeTrees.set(item.language, tree);
+			}
+
+			let value: string | LocaleTree | undefined = tree;
+			for (const segment of item.key.split(".")) {
+				value = value !== null && typeof value === "object" ? value[segment] : undefined;
+			}
+			return value === item.translation;
+		};
+
+		const written = [...this.decisions.accepted, ...this.decisions.edited].filter(isWritten);
+		removeFromReviewQueue([...written, ...this.decisions.rejected]);
 	}
 
 	/**
@@ -164,7 +202,7 @@ class ReviewCommand {
 	}
 
 	/**
-	 * Save review decisions to disk and apply them.
+	 * Save review decisions to disk, apply them and remove the reviewed items from the queue.
 	 */
 	saveDecisions(): void {
 		const cacheDir = path.join(process.cwd(), ".localize-cache");
@@ -188,8 +226,9 @@ class ReviewCommand {
 		fs.writeFileSync(decisionsFile, JSON.stringify(data, null, 2));
 		console.log(`\nReview complete! Decisions saved to ${decisionsFile}`);
 
-		// Apply accepted and edited translations
+		// Apply accepted and edited translations, then drop the reviewed items from the queue
 		this.applyDecisions();
+		this.pruneReviewQueue();
 	}
 
 	/**
@@ -213,43 +252,76 @@ class ReviewCommand {
 			byLanguage[item.language].push(item);
 		});
 
+		let skipped = 0;
 		Object.entries(byLanguage).forEach(([lang, items]) => {
-			const localeFile = path.join(this.config.localesDir, `${lang}.json`);
+			const localeFile = this.localeFile(lang);
 
 			let localeData: LocaleTree = {};
 			if (fs.existsSync(localeFile)) {
 				localeData = JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree;
 			}
 
+			let applied = 0;
 			items.forEach((item) => {
-				this.setNestedValue(localeData, item.key, item.translation);
+				const conflict = this.setNestedValue(localeData, item.key, item.translation);
+				if (conflict) {
+					skipped++;
+					console.warn(
+						`   Skipped "${item.key}" for ${lang}: ${conflict}; the existing value was kept`
+					);
+				} else {
+					applied++;
+				}
 			});
 
+			if (applied === 0) return;
+			fs.mkdirSync(path.dirname(localeFile), { recursive: true });
 			fs.writeFileSync(localeFile, JSON.stringify(localeData, null, 2) + "\n");
-			console.log(`   Updated ${lang}.json (${items.length} translations)`);
+			console.log(
+				`   Updated ${path.relative(process.cwd(), localeFile)} (${applied} translations)`
+			);
 		});
 
-		console.log("\nAll approved translations applied!");
+		console.log(
+			skipped === 0
+				? "\nAll approved translations applied!"
+				: `\nApplied ${toApply.length - skipped} approved translations; skipped ${skipped} (see warnings above).`
+		);
 	}
 
 	/**
-	 * Set nested value in object using dot notation.
+	 * Set nested value in object using dot notation. Missing parents are created; a parent
+	 * that already holds a non-object value (e.g. a string translation) is never overwritten,
+	 * and neither is a leaf that already holds nested keys.
 	 * @param {LocaleTree} obj - Object to modify.
 	 * @param {string} path - Dot notation path.
 	 * @param {string} value - Value to set.
+	 * @returns {string | null} - Why the value could not be set, or null when it was set.
 	 */
-	setNestedValue(obj: LocaleTree, path: string, value: string): void {
+	setNestedValue(obj: LocaleTree, path: string, value: string): string | null {
 		const keys = path.split(".");
 		let current = obj;
 
 		for (let i = 0; i < keys.length - 1; i++) {
-			if (!current[keys[i]]) {
+			const next: unknown = current[keys[i]];
+			if (next === undefined) {
 				current[keys[i]] = {};
+			} else if (next === null || typeof next !== "object" || Array.isArray(next)) {
+				const kind =
+					next === null ? "null" : Array.isArray(next) ? "an array" : `a ${typeof next}`;
+				return `"${keys.slice(0, i + 1).join(".")}" already holds ${kind}, not nested keys`;
 			}
 			current = current[keys[i]] as LocaleTree;
 		}
 
-		current[keys[keys.length - 1]] = value;
+		const leaf = keys[keys.length - 1];
+		const existing: unknown = current[leaf];
+		if (existing !== null && typeof existing === "object" && !Array.isArray(existing)) {
+			return `"${path}" already holds nested keys, not a translation`;
+		}
+
+		current[leaf] = value;
+		return null;
 	}
 
 	/**

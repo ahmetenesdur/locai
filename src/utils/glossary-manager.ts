@@ -16,7 +16,10 @@ export interface ProtectedTerm {
 	term: string;
 }
 
-/** Advanced format: `{ "API": { translation: "API", caseSensitive: true } }` */
+/**
+ * Advanced format: `{ "API": { translation: "API", caseSensitive: true, languages: ["de"] } }`.
+ * A non-empty `languages` list restricts the entry to those target languages.
+ */
 export type GlossaryEntryConfig = Partial<Omit<GlossaryEntry, "term">>;
 
 /** Language-specific format: `{ "API": { tr: "API", de: "API" } }` */
@@ -57,7 +60,16 @@ class GlossaryManager {
 	private preserveFormatting: boolean;
 
 	constructor(config: GlossaryConfig = {}) {
-		this.glossary = config.glossary || {};
+		// Config files are plain JS/JSON, so a term can map to `null`; skip it instead of
+		// crashing on every translation.
+		this.glossary = {};
+		for (const [term, entry] of Object.entries(config.glossary || {})) {
+			if (entry === null) {
+				console.warn(`Warning: glossary entry "${term}" is null; skipping it.`);
+				continue;
+			}
+			this.glossary[term] = entry;
+		}
 		this.enabled = config.enabled !== false;
 		this.caseSensitive = config.caseSensitive !== false;
 		this.preserveFormatting = config.preserveFormatting !== false;
@@ -95,28 +107,24 @@ class GlossaryManager {
 			const escapedTerm = this.escapeRegex(term);
 			const regex = new RegExp(`\\b${escapedTerm}\\b`, flags);
 
-			// Find all matches
-			const matches = protectedText.match(regex);
-			if (matches) {
-				matches.forEach((match) => {
-					const token = `__GLOSSARY_TOKEN_${tokenIndex}__`;
-					tokenIndex++;
+			// Replace each whole-word match in place with its own token
+			protectedText = protectedText.replace(regex, (match) => {
+				const token = `__GLOSSARY_TOKEN_${tokenIndex}__`;
+				tokenIndex++;
 
-					// Preserve original formatting if needed
-					const preservedTranslation = this.preserveFormatting
-						? this.matchFormatting(match, translation)
-						: translation;
+				// Preserve original formatting if needed
+				const preservedTranslation = this.preserveFormatting
+					? this.matchFormatting(match, translation)
+					: translation;
 
-					termMap.set(token, {
-						original: match,
-						translation: preservedTranslation,
-						term: term,
-					});
-
-					// Replace with token
-					protectedText = protectedText.replace(match, token);
+				termMap.set(token, {
+					original: match,
+					translation: preservedTranslation,
+					term: term,
 				});
-			}
+
+				return token;
+			});
 		}
 
 		return { protectedText, termMap };
@@ -132,19 +140,23 @@ class GlossaryManager {
 
 		let restoredText = translatedText;
 
-		// Replace tokens with translations
+		// Replace tokens with translations; a replacer function keeps `$` patterns literal
 		for (const [token, data] of termMap.entries()) {
-			restoredText = restoredText.replace(new RegExp(token, "g"), data.translation);
+			restoredText = restoredText.replace(new RegExp(token, "g"), () => data.translation);
 		}
 
 		return restoredText;
 	}
 
 	/**
-	 * Get applicable glossary entries for language pair
+	 * Get applicable glossary entries for language pair.
+	 * An advanced entry with a non-empty `languages` list applies only when `targetLang` is in
+	 * that list. Codes are compared as whole tags, ignoring case: `"pt-br"` matches `"pt-BR"`,
+	 * but `"zh"` does not match `"zh-CN"`.
 	 */
 	getApplicableEntries(sourceLang: string, targetLang: string): GlossaryEntry[] {
 		const entries: GlossaryEntry[] = [];
+		const target = targetLang.toLowerCase();
 
 		for (const [term, config] of Object.entries(this.glossary)) {
 			// Simple format: { "API": "API" }
@@ -155,13 +167,21 @@ class GlossaryManager {
 					caseSensitive: this.caseSensitive,
 				});
 			}
-			// Advanced format: { "API": { translation: "API", caseSensitive: true } }
+			// Advanced format: { "API": { translation: "API", caseSensitive: true, languages: ["de"] } }
 			else if (typeof config === "object" && isEntryConfig(config)) {
+				const { languages } = config;
+				if (
+					Array.isArray(languages) &&
+					languages.length > 0 &&
+					!languages.some((lang) => String(lang).toLowerCase() === target)
+				) {
+					continue;
+				}
 				entries.push({
 					term,
 					translation: config.translation,
 					caseSensitive: config.caseSensitive ?? this.caseSensitive,
-					languages: config.languages,
+					languages,
 				});
 			}
 			// Language-specific format

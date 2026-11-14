@@ -224,9 +224,12 @@ class ObjectTransformer {
 				typeof sourceValue === "object" &&
 				sourceValue.constructor === Object
 			) {
-				// A non-object targetValue is returned unchanged by the guard at the top.
-				const nestedTarget = (targetValue || {}) as TranslationObject;
-				result[key] = this.mergeObjects(nestedTarget, sourceValue, overwriteArrays);
+				// Merge into an existing object; anything else at this key (primitive, array,
+				// missing) is replaced by a copy of the source object.
+				result[key] =
+					targetValue !== undefined && isPlainObject(targetValue)
+						? this.mergeObjects(targetValue, sourceValue, overwriteArrays)
+						: this.deepClone(sourceValue);
 			} else {
 				result[key] = sourceValue;
 			}

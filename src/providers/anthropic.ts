@@ -211,8 +211,9 @@ class AnthropicProvider extends BaseProvider {
 		}
 
 		// Fallback to base implementation for other structures (though unlikely for Anthropic).
-		// An Anthropic body without a text block still carries its `content` array here.
-		return super.extractTranslation(response as ProviderResponseBody, providerName);
+		// The base only reads a string `content`, so a reply without a text block ends in its
+		// "Unable to extract translation" error.
+		return super.extractTranslation(response, providerName);
 	}
 }
 

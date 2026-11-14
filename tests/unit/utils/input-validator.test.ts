@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import InputValidator from "../../../src/utils/input-validator.js";
 
 describe("InputValidator", () => {
@@ -84,6 +84,92 @@ describe("InputValidator", () => {
 					localesDir: "./locales",
 				})
 			).toThrow("Invalid target languages");
+		});
+
+		describe("nested provider sections", () => {
+			// apiProvider set so the only possible warning comes from the section under test
+			const base = {
+				source: "en",
+				targets: ["tr"],
+				localesDir: "./locales",
+				apiProvider: "openai",
+			};
+
+			afterEach(() => {
+				vi.restoreAllMocks();
+			});
+
+			it.each([null, "key", 5])(
+				"should report a non-object apiConfig entry (%s)",
+				(settings) => {
+					expect(() =>
+						InputValidator.validateConfig({ ...base, apiConfig: { openai: settings } })
+					).toThrow("apiConfig.openai must be an object");
+				}
+			);
+
+			it("should report a null providerLimits entry instead of crashing", () => {
+				expect(() =>
+					InputValidator.validateConfig({
+						...base,
+						rateLimiter: { providerLimits: { openai: null } },
+					})
+				).toThrow("rateLimiter.providerLimits.openai must be an object");
+			});
+
+			it.each([5, "fast", true, [60]])(
+				"should load a non-object providerLimits entry (%s) with a warning",
+				(limits) => {
+					const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+					expect(() =>
+						InputValidator.validateConfig({
+							...base,
+							verbose: true,
+							rateLimiter: { providerLimits: { openai: limits } },
+						})
+					).not.toThrow();
+					expect(warn).toHaveBeenCalledWith(
+						expect.stringContaining(
+							"rateLimiter.providerLimits.openai should be an object"
+						)
+					);
+				}
+			);
+
+			it("should accept object providerLimits entries without a warning", () => {
+				const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+				expect(() =>
+					InputValidator.validateConfig({
+						...base,
+						verbose: true,
+						rateLimiter: { providerLimits: { openai: { rpm: 60, concurrency: 5 } } },
+					})
+				).not.toThrow();
+				expect(warn).not.toHaveBeenCalled();
+			});
+		});
+
+		describe("retryOptions delay order", () => {
+			const base = { source: "en", targets: ["tr"], localesDir: "./locales" };
+			const validate = (initialDelay: unknown, maxDelay: unknown) => () =>
+				InputValidator.validateConfig({
+					...base,
+					retryOptions: { initialDelay, maxDelay },
+				});
+
+			it("should compare string delays numerically", () => {
+				expect(validate("5000", "10000")).not.toThrow();
+				expect(validate("9000", "2000")).toThrow(
+					"retryOptions.initialDelay cannot be greater than maxDelay"
+				);
+			});
+
+			it("should reject an initialDelay greater than maxDelay", () => {
+				expect(validate(5000, 2000)).toThrow(
+					"retryOptions.initialDelay cannot be greater than maxDelay"
+				);
+				expect(validate(1000, 1000)).not.toThrow();
+			});
 		});
 	});
 

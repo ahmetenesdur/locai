@@ -46,8 +46,9 @@ export interface LocalizeConfig extends Omit<
 	targets?: string[];
 
 	/**
-	 * Deep Context (Source Code Analysis)
-	 * Scans source code for context (component name, comments, props)
+	 * Deep Context (Source Code Analysis): find where each key is used in the `.ts`/`.tsx` files
+	 * under `src/`, `app/` and `components/`, and add the file, component, comments, JSX props and
+	 * a code snippet of that usage to the translation prompt.
 	 * @default true
 	 */
 	deepContext?: boolean;

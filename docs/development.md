@@ -1,6 +1,6 @@
 # Development Guide
 
-Want to contribute to Locai? Here is everything you need to know to set up your environment and understand the codebase.
+How to set up the repository, run it locally, and find your way around the code.
 
 ## Setup
 
@@ -14,43 +14,48 @@ Want to contribute to Locai? Here is everything you need to know to set up your 
 2.  **Install dependencies:**
 
     ```bash
-    pnpm install (recommended)
+    pnpm install
     # or
     npm install
     ```
 
 ## Development Commands
 
-| Command            | Description                                                     |
-| ------------------ | --------------------------------------------------------------- |
-| `pnpm dev`         | Run the CLI locally using `ts-node` (Fast iteration)            |
-| `pnpm build`       | Compile `src/` to JavaScript in `dist/` (`tsconfig.build.json`) |
-| `pnpm start`       | Run the compiled library (orchestrator)                         |
-| `node dist/cli.js` | Run the compiled CLI manually                                   |
-| `pnpm test`        | Run unit tests with Vitest                                      |
-| `pnpm typecheck`   | Type-check `src/` and `tests/` without emitting                 |
-| `pnpm format`      | Format code with Prettier                                       |
-| `pnpm lint`        | Lint `src/` and `tests/` with ESLint and typescript-eslint      |
+| Command              | Description                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm dev`           | Run the CLI from source with `tsx` (`tsx src/cli.ts`), e.g. `pnpm dev translate`     |
+| `pnpm build`         | Compile `src/` to JavaScript in `dist/` (`tsconfig.build.json`)                      |
+| `pnpm start`         | Run the compiled CLI (`node dist/cli.js`); run `pnpm build` first                    |
+| `pnpm test`          | Run the unit and integration tests once with Vitest                                  |
+| `pnpm test:watch`    | Run Vitest in watch mode                                                             |
+| `pnpm test:coverage` | Run the tests with a coverage report                                                 |
+| `pnpm typecheck`     | Type-check `src/`, `tests/` and the root `*.ts` files without emitting               |
+| `pnpm format`        | Format code with Prettier (`pnpm format:check` only checks)                          |
+| `pnpm lint`          | Lint the repository with ESLint and typescript-eslint (`docs/` and fixtures ignored) |
 
 ## Project Structure
 
 ```
 src/
-├── commands/         # CLI command definitions
-│   ├── translator.ts     # Main logic for 'translate'
+├── cli.ts            # Entry point: CLI options and commands
+├── cli/helpers.ts    # Builds the run config from options and dispatches commands
+├── config/           # Config loading (c12), defineConfig, environment setup
+├── commands/
+│   ├── translator.ts     # Thin wrappers used by translate and fix
 │   └── review.ts         # TUI for 'review'
 ├── core/             # Core logic
-│   ├── orchestrator.ts   # The brain: manages pipeline
-│   ├── pipeline/         # Translation steps (Validate -> Cache -> Translate)
-│   ├── context-processor.ts # AI context analysis
+│   ├── orchestrator.ts   # Builds and runs the translation pipeline
+│   ├── pipeline/         # Translation steps (validate, cache, glossary, translate, quality, ...)
+│   ├── context-processor.ts # Keyword and optional AI category detection
 │   └── provider-factory.ts # Manages OpenAI, Gemini, etc.
-├── services/         # Business logic
-│   └── translation-service.ts # High-level coordination
+├── services/
+│   ├── translation-service.ts # Sync analysis, translate and fix runs
+│   └── language-processor.ts  # Per-language translation and file writes
 ├── providers/        # AI API Wrappers
 ├── utils/            # Shared utilities
 │   ├── confidence-scorer.ts
 │   └── glossary-manager.ts
-└── cli.ts            # Entry point
+└── types/
 ```
 
 ## Testing
@@ -58,11 +63,11 @@ src/
 We use **Vitest** for testing.
 
 ```bash
-# Run all tests
+# Run all tests once
 pnpm test
 
 # Run tests in watch mode
-pnpm test --watch
+pnpm test:watch
 ```
 
 ## Contributing Workflow
@@ -70,5 +75,6 @@ pnpm test --watch
 1.  Create a feature branch: `git checkout -b feature/amazing-feature`
 2.  Make your changes.
 3.  Add tests if applicable.
-4.  format code: `pnpm format`
-5.  Push and open a PR!
+4.  Format code: `pnpm format`
+5.  Run `pnpm lint`, `pnpm typecheck` and `pnpm test`.
+6.  Push and open a PR.

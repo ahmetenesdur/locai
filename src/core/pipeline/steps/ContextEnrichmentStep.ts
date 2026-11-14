@@ -21,23 +21,11 @@ export default class ContextEnrichmentStep extends PipelineStep {
 				const codeContext = this.analyzer.getContext(context.key);
 
 				if (codeContext) {
-					// Enrich the context meta
+					// TranslationStep forwards meta to the provider as `detectedContext`,
+					// and the prompt templates render `code` (see prompt-templates.ts).
 					context.meta = {
 						...context.meta,
 						code: codeContext,
-					};
-
-					// Also append to the AI prompt context if it exists
-					// (Assuming existing translation prompt uses contextData)
-					context.contextData = {
-						...(context.contextData || {}),
-						visualContext: {
-							component: codeContext.component,
-							file: codeContext.filePath,
-							comments: codeContext.comments,
-							props: codeContext.props,
-							snippet: codeContext.usageSnippet,
-						},
 					};
 				}
 			} catch {

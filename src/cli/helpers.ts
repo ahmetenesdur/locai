@@ -13,16 +13,34 @@ import { StructureDetector, LocaleStructure } from "../core/detection/structure-
 import { configureComponents } from "../config/setup.js";
 import { LocalizeConfig, ResolvedLocalizeConfig } from "../config/index.js";
 import type { LengthMode } from "../utils/quality/length-checker.js";
+import type { ReviewCommandConfig } from "../commands/review.js";
 
 /** Global options declared on the root program in src/cli.ts. */
 interface GlobalOptions {
 	source?: string;
 	targets?: string[];
 	localesDir?: string;
-	deepContext: boolean;
-	debug: boolean;
-	verbose: boolean;
+	/** `--no-deep-context` sets `deepContext: false`. */
+	deepContext?: boolean;
+	debug?: boolean;
+	verbose?: boolean;
 }
+
+/**
+ * Settings for `locai review`: the global `--source` / `--localesDir` flags (whose
+ * defaults are the config values) decide where approved translations are written.
+ */
+export const resolveReviewConfig = (defaultConfig: LocalizeConfig): ReviewCommandConfig => {
+	const globalOpts = program.opts<GlobalOptions>();
+	const source = globalOpts.source ?? defaultConfig.source;
+	const localesDir = globalOpts.localesDir ?? defaultConfig.localesDir;
+	return {
+		source: source ? InputValidator.validateLanguageCode(source, "source language") : "en",
+		localesDir: localesDir
+			? InputValidator.validateDirectoryPath(localesDir, "locales directory")
+			: "./locales",
+	};
+};
 
 /**
  * Options commander parses for the commands handled by runCommand.
@@ -51,12 +69,6 @@ export interface CommandOptions {
 	minTextLength?: number;
 	allowNewCategories?: boolean;
 	maxRetries?: number;
-	// Read by runCommand, but no command declares them (`--debug`/`--verbose` are global options).
-	debug?: boolean;
-	verbose?: boolean;
-	timeout?: number;
-	initialDelay?: number;
-	maxDelay?: number;
 }
 
 export const autoDetectConfig = async <T extends LocalizeConfig>(defaultConfig: T): Promise<T> => {
@@ -195,6 +207,18 @@ export const runCommand = async (
 			sanitizedCommandOptions.contextConfidence = confidence;
 		}
 
+		if (sanitizedCommandOptions.minConfidence !== undefined) {
+			const minConfidence = parseFloat(String(sanitizedCommandOptions.minConfidence));
+			if (isNaN(minConfidence) || minConfidence < 0 || minConfidence > 1) {
+				console.warn(
+					`Warning: ignoring --min-confidence ${sanitizedCommandOptions.minConfidence}: it must be a number between 0 and 1`
+				);
+				sanitizedCommandOptions.minConfidence = undefined;
+			} else {
+				sanitizedCommandOptions.minConfidence = minConfidence;
+			}
+		}
+
 		let lengthMode: LengthMode | undefined;
 		if (typeof sanitizedCommandOptions.length === "string") {
 			const validLengthModes: LengthMode[] = [
@@ -261,9 +285,14 @@ export const runCommand = async (
 			concurrencyLimit: concurrencyLimit,
 			// commander turns `--no-cache` into `cache: false`
 			cacheEnabled: mergedOpts.cache === false ? false : defaultConfig.cacheEnabled,
-			debug: mergedOpts.debug,
-			verbose: mergedOpts.verbose || defaultConfig.logging?.verbose || false,
-			forceUpdate: mergedOpts.force || false,
+			// `--no-deep-context` sets `deepContext: false`; commander defaults it to true
+			deepContext:
+				sanitizedGlobalOpts.deepContext === false ? false : defaultConfig.deepContext,
+			debug: sanitizedGlobalOpts.debug || defaultConfig.debug || false,
+			verbose: sanitizedGlobalOpts.verbose || defaultConfig.logging?.verbose || false,
+			forceUpdate: mergedOpts.force || defaultConfig.forceUpdate || false,
+			minConfidence: mergedOpts.minConfidence ?? defaultConfig.minConfidence,
+			saveReviewQueue: mergedOpts.saveReviewQueue || defaultConfig.saveReviewQueue,
 			showDetailedStats: mergedOpts.stats || false,
 			autoOptimize: mergedOpts.autoOptimize || defaultConfig.advanced?.autoOptimize || false,
 			fixLength: commandName === "fix",
@@ -277,14 +306,13 @@ export const runCommand = async (
 			retryOptions: {
 				...defaultConfig.retryOptions,
 				maxRetries: mergedOpts.maxRetries || defaultConfig.retryOptions?.maxRetries || 2,
-				initialDelay:
-					mergedOpts.initialDelay || defaultConfig.retryOptions?.initialDelay || 1000,
-				maxDelay: mergedOpts.maxDelay || defaultConfig.retryOptions?.maxDelay || 10000,
+				initialDelay: defaultConfig.retryOptions?.initialDelay || 1000,
+				maxDelay: defaultConfig.retryOptions?.maxDelay || 10000,
 				jitter: defaultConfig.retryOptions?.jitter !== false,
 			},
 			context: {
 				...defaultConfig.context,
-				enabled: true,
+				enabled: defaultConfig.context.enabled !== false,
 				debug: mergedOpts.contextDebug || defaultConfig.context.debug || false,
 				useAI:
 					mergedOpts.useAi ||
@@ -311,12 +339,12 @@ export const runCommand = async (
 
 			advanced: {
 				...defaultConfig.advanced,
-				timeoutMs: mergedOpts.timeout || defaultConfig.advanced?.timeoutMs || 60000,
+				timeoutMs: defaultConfig.advanced?.timeoutMs || 60000,
 				maxKeyLength: defaultConfig.advanced?.maxKeyLength || 10000,
 				maxBatchSize: defaultConfig.advanced?.maxBatchSize || 50,
 				autoOptimize:
 					mergedOpts.autoOptimize || defaultConfig.advanced?.autoOptimize || false,
-				debug: mergedOpts.debug || defaultConfig.advanced?.debug || false,
+				debug: sanitizedGlobalOpts.debug || defaultConfig.advanced?.debug || false,
 			},
 
 			rateLimiter: {
@@ -328,7 +356,7 @@ export const runCommand = async (
 
 			logging: {
 				...defaultConfig.logging,
-				verbose: mergedOpts.verbose || defaultConfig.logging?.verbose || false,
+				verbose: sanitizedGlobalOpts.verbose || defaultConfig.logging?.verbose || false,
 			},
 		} satisfies LocalizeConfig;
 

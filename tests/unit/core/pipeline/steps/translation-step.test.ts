@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import TranslationStep from "../../../../../src/core/pipeline/steps/TranslationStep.js";
 import ProviderFactory from "../../../../../src/core/provider-factory.js";
-import { TranslationContext } from "../../../../../src/core/pipeline/context.js";
+import {
+	createTranslationContext,
+	PipelineOptions,
+	TranslationContext,
+} from "../../../../../src/core/pipeline/context.js";
 
 // Mock ProviderFactory
 vi.mock("../../../../../src/core/provider-factory.js", () => ({
@@ -10,20 +14,22 @@ vi.mock("../../../../../src/core/provider-factory.js", () => ({
 	},
 }));
 
+const pipelineOptions: PipelineOptions = {
+	source: "en",
+	context: {
+		categories: {},
+		detection: { threshold: 2, minConfidence: 0.6 },
+		fallback: { category: "general", prompt: "Provide a natural translation" },
+	},
+};
+
 describe("TranslationStep", () => {
 	let context: TranslationContext;
 
 	beforeEach(() => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
 		vi.spyOn(console, "warn").mockImplementation(() => {});
-		context = {
-			key: "testKey",
-			sourceText: "Hello",
-			sourceLang: "en",
-			targetLang: "es",
-			meta: {},
-			result: { success: false, translated: "", error: undefined },
-		} as unknown as TranslationContext;
+		context = createTranslationContext("testKey", "Hello", "en", "es", pipelineOptions);
 		vi.clearAllMocks();
 	});
 
@@ -31,7 +37,7 @@ describe("TranslationStep", () => {
 		const mockProvider = {
 			translate: vi.fn().mockResolvedValue("Hola"),
 		};
-		(ProviderFactory.getProvider as any).mockReturnValue(mockProvider);
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider);
 
 		const step = new TranslationStep({ apiProvider: "mock" });
 		await step.execute(context, async () => {});
@@ -45,7 +51,7 @@ describe("TranslationStep", () => {
 		const mockProvider = {
 			translate: vi.fn().mockResolvedValue("Hola Protected"),
 		};
-		(ProviderFactory.getProvider as any).mockReturnValue(mockProvider);
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider);
 
 		const step = new TranslationStep({ apiProvider: "mock" });
 		await step.execute(context, async () => {});
@@ -62,7 +68,7 @@ describe("TranslationStep", () => {
 		const mockProvider = {
 			translate: vi.fn().mockRejectedValue(new Error("API Error")),
 		};
-		(ProviderFactory.getProvider as any).mockReturnValue(mockProvider);
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider);
 
 		const step = new TranslationStep({ apiProvider: "mock" });
 		await step.execute(context, async () => {});
@@ -79,7 +85,7 @@ describe("TranslationStep", () => {
 				.fn()
 				.mockReturnValue({ translation: "Hola", confidence: 0.9 }),
 		};
-		(ProviderFactory.getProvider as any).mockReturnValue(mockProvider);
+		vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider);
 
 		const step = new TranslationStep(
 			{ apiProvider: "mock" },

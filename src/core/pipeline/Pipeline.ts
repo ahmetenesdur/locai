@@ -6,8 +6,7 @@ import { TranslationContext } from "./context.js";
  * Allows composing a sequence of steps that can process a context object.
  */
 class Pipeline {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	steps: any[] = []; // allow loose typing initially for step inputs, but ideally PipelineStep
+	steps: PipelineStep[] = [];
 
 	constructor() {
 		this.steps = [];
@@ -18,8 +17,7 @@ class Pipeline {
 	 * @param step - A step instance with an execute(context, next) method.
 	 * @returns - Returns self for chaining.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	use(step: PipelineStep | any): Pipeline {
+	use(step: PipelineStep): Pipeline {
 		if (!step || typeof step.execute !== "function") {
 			throw new Error("Pipeline step must implement an execute(context, next) method.");
 		}

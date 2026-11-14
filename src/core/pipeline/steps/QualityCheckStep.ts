@@ -4,10 +4,10 @@ import { TranslationContext } from "../context.js";
 import QualityChecker from "../../../utils/quality/index.js"; // Assuming default export or correct named export
 
 class QualityCheckStep extends PipelineStep {
-	private qualityChecker: QualityChecker | any;
+	private qualityChecker: QualityChecker | null;
 	private debug: boolean;
 
-	constructor(qualityChecker: QualityChecker | any, debug: boolean = false) {
+	constructor(qualityChecker: QualityChecker | null, debug: boolean = false) {
 		super();
 		this.qualityChecker = qualityChecker;
 		this.debug = debug;
@@ -28,8 +28,7 @@ class QualityCheckStep extends PipelineStep {
 				context.translatedText
 			);
 			translated = qualityResult.fixedText;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			(context as any).qualityResult = qualityResult;
+			context.qualityResult = qualityResult;
 		}
 
 		// 2. JSON Validity Check
@@ -54,8 +53,7 @@ class QualityCheckStep extends PipelineStep {
 			translated: context.translatedText,
 			context: context.meta,
 			success: true,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			qualityChecks: (context as any).qualityResult,
+			qualityChecks: context.qualityResult,
 		};
 
 		await next();

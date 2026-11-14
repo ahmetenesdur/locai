@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import Pipeline from "../../../../src/core/pipeline/Pipeline.js";
 import PipelineStep from "../../../../src/core/pipeline/PipelineStep.js";
-import { TranslationContext } from "../../../../src/core/pipeline/context.js";
+import {
+	createTranslationContext,
+	PipelineOptions,
+	TranslationContext,
+} from "../../../../src/core/pipeline/context.js";
 
 class MockStep extends PipelineStep {
 	constructor(private fn: (ctx: TranslationContext, next: () => Promise<void>) => Promise<void>) {
@@ -12,11 +16,20 @@ class MockStep extends PipelineStep {
 	}
 }
 
+const options: PipelineOptions = {
+	source: "en",
+	context: {
+		categories: {},
+		detection: { threshold: 2, minConfidence: 0.6 },
+		fallback: { category: "general", prompt: "Provide a natural translation" },
+	},
+};
+
 describe("Pipeline", () => {
 	it("should execute steps in order", async () => {
 		const pipeline = new Pipeline();
 		const callOrder: string[] = [];
-		const context = {} as TranslationContext;
+		const context = createTranslationContext("key", "text", "en", "es", options);
 
 		pipeline.use(
 			new MockStep(async (ctx, next) => {
@@ -40,7 +53,7 @@ describe("Pipeline", () => {
 
 	it("should handle context modification", async () => {
 		const pipeline = new Pipeline();
-		const context = { sourceText: "original" } as TranslationContext;
+		const context = createTranslationContext("key", "original", "en", "es", options);
 
 		pipeline.use(
 			new MockStep(async (ctx, next) => {
@@ -55,11 +68,13 @@ describe("Pipeline", () => {
 
 	it("should throw if step is invalid", () => {
 		const pipeline = new Pipeline();
-		expect(() => pipeline.use({} as any)).toThrow();
+		// @ts-expect-error -- not a PipelineStep: exercises the runtime check
+		expect(() => pipeline.use({})).toThrow();
 	});
 
 	it("should throw if context is missing", async () => {
 		const pipeline = new Pipeline();
-		await expect(pipeline.execute(null as any)).rejects.toThrow();
+		// @ts-expect-error -- no context: exercises the runtime check
+		await expect(pipeline.execute(null)).rejects.toThrow();
 	});
 });

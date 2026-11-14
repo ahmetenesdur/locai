@@ -2,6 +2,7 @@
  * Prompt template utilities for translation and analysis
  */
 
+import type { FlatTranslationValue } from "./object-transformer.js";
 import type { LengthControlOptions } from "./quality/length-checker.js";
 
 export interface PromptOptions {
@@ -12,7 +13,8 @@ export interface PromptOptions {
 		category?: string;
 		confidence?: number;
 		prompt?: string;
-		existingTranslation?: string;
+		/** Current value in the target file; only a string triggers a revision request */
+		existingTranslation?: FlatTranslationValue;
 		similarTranslation?: {
 			source: string;
 			target: string;

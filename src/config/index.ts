@@ -1,7 +1,40 @@
-import { loadConfig as c12LoadConfig, ConfigLayer } from "c12";
-import { OrchestratorOptions } from "../core/orchestrator.js";
+import { loadConfig as c12LoadConfig } from "c12";
+import type { OrchestratorOptions, ProviderRetryOptions } from "../core/orchestrator.js";
+import type { ContextConfig } from "../core/context-processor.js";
+import type { ProviderConfig } from "../providers/base-provider.js";
+import type { SyncOptions } from "../types/index.js";
+import type { LoggerConfig } from "../utils/logger.js";
 
-export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "context"> {
+/** The `context` section as written in a config file; {@link loadConfig} fills in the rest. */
+export interface ContextConfigInput extends Partial<Omit<ContextConfig, "detection" | "fallback">> {
+	detection?: Partial<ContextConfig["detection"]>;
+	fallback?: Partial<ContextConfig["fallback"]>;
+}
+
+/** The `fileOperations` configuration section. */
+export interface FileOperationsConfig {
+	/**
+	 * File format to use (json, yaml, po, properties, etc.)
+	 * @default "json"
+	 */
+	format?: "json" | "yaml" | "po" | "properties" | "arb" | "auto";
+
+	/**
+	 * File structure (flat, nested, namespaced)
+	 * @default "flat"
+	 */
+	fileStructure?: "flat" | "nested" | "namespaced" | "auto";
+
+	backupFiles?: boolean;
+	backupDir?: string;
+	atomic?: boolean;
+	createMissingDirs?: boolean;
+}
+
+export interface LocalizeConfig extends Omit<
+	Partial<OrchestratorOptions>,
+	"context" | "sourceCodeAnalyzer"
+> {
 	/**
 	 * Source language code (e.g. 'en')
 	 */
@@ -51,16 +84,7 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	/**
 	 * Synchronization options
 	 */
-	syncOptions?: {
-		enabled?: boolean;
-		removeDeletedKeys?: boolean;
-		retranslateModified?: boolean;
-		stateTracking?: {
-			enabled?: boolean;
-			stateFileName?: string;
-			stateDir?: string;
-		};
-	};
+	syncOptions?: SyncOptions;
 
 	/**
 	 * Concurrency limit for parallel translations
@@ -79,24 +103,7 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	 */
 	minConfidence?: number;
 
-	fileOperations?: {
-		/**
-		 * File format to use (json, yaml, po, properties, etc.)
-		 * @default "json"
-		 */
-		format?: "json" | "yaml" | "po" | "properties" | "arb" | "auto";
-
-		/**
-		 * File structure (flat, nested, namespaced)
-		 * @default "flat"
-		 */
-		fileStructure?: "flat" | "nested" | "namespaced" | "auto";
-
-		backupFiles?: boolean;
-		backupDir?: string;
-		atomic?: boolean;
-		createMissingDirs?: boolean;
-	};
+	fileOperations?: FileOperationsConfig;
 	useAi?: boolean;
 	contextProvider?: string;
 	contextThreshold?: number;
@@ -117,46 +124,30 @@ export interface LocalizeConfig extends Omit<Partial<OrchestratorOptions>, "cont
 	verbose?: boolean;
 	version?: string;
 
-	// Overrides for better typing or legacy support
-	rateLimiter?: {
-		enabled?: boolean;
-		queueStrategy?: string;
-		queueTimeout?: number;
-		adaptiveThrottling?: boolean;
-		providerLimits?: any;
-	};
+	logging?: LoggerConfig;
 
-	context?: {
-		enabled?: boolean;
-		useAI?: boolean;
-		aiProvider?: string;
-		minTextLength?: number;
-		allowNewCategories?: boolean;
-		debug?: boolean;
-		analysisOptions?: {
-			model?: string;
-			temperature?: number;
-			maxTokens?: number;
-			cacheAnalysis?: boolean;
-		};
-		detection?: {
-			threshold?: number;
-			minConfidence?: number;
-		};
-		categories?: any;
-		fallback?: any;
-	};
-
-	qualityChecks?: {
-		enabled?: boolean;
-		rules?: any;
-		autoFix?: boolean;
-	};
+	context?: ContextConfigInput;
 
 	// Command specific
 	command?: string;
 	fixLength?: boolean;
 	showDetailedStats?: boolean;
+}
+
+/**
+ * The configuration returned by {@link loadConfig}: the user's settings merged over the
+ * defaults, so the defaulted settings are always present.
+ */
+export interface ResolvedLocalizeConfig extends LocalizeConfig {
+	source: string;
+	targets: string[];
+	localesDir: string;
+	concurrencyLimit: number;
+	cacheEnabled: boolean;
+	retryOptions: ProviderRetryOptions;
+	context: ContextConfig;
+	apiConfig: Record<string, ProviderConfig>;
+	fileOperations: FileOperationsConfig;
 }
 
 /**
@@ -203,17 +194,18 @@ export async function loadConfig(cwd: string = process.cwd()) {
 				format: "json",
 				fileStructure: "flat",
 			},
-		},
+		} satisfies ResolvedLocalizeConfig,
 	});
 
 	return {
-		config: config || {},
+		// c12 merges the user's config over `defaults`, so the defaulted settings are always set.
+		config: (config || {}) as ResolvedLocalizeConfig,
 		configFile,
 		layers,
 	};
 }
 
-export const validateEnvironment = (config?: any) => {
+export const validateEnvironment = (config?: LocalizeConfig) => {
 	const providerMap: Record<string, string> = {
 		openai: "OPENAI_API_KEY",
 		anthropic: "ANTHROPIC_API_KEY",

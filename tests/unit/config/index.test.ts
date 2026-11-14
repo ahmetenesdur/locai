@@ -35,8 +35,7 @@ describe("Config Module", () => {
 				layers: [],
 			};
 
-			// @ts-ignore
-			c12.loadConfig.mockResolvedValue(mockC12Response);
+			vi.mocked(c12.loadConfig).mockResolvedValue(mockC12Response);
 
 			const result = await loadConfig("/test/cwd");
 
@@ -65,8 +64,8 @@ describe("Config Module", () => {
 				layers: [],
 			};
 
-			// @ts-ignore
-			c12.loadConfig.mockResolvedValue(mockC12Response);
+			// @ts-expect-error -- c12 types `config` as non-null; this exercises loadConfig's fallback
+			vi.mocked(c12.loadConfig).mockResolvedValue(mockC12Response);
 
 			const result = await loadConfig();
 

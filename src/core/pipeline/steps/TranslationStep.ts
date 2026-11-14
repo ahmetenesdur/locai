@@ -1,7 +1,20 @@
 import PipelineStep from "../PipelineStep.js";
 import ProviderFactory, { AIProvider } from "../../provider-factory.js";
 import { TranslationContext } from "../context.js";
-import { ProviderConfig } from "../../../providers/base-provider.js";
+import type { TranslateOptions } from "../../../providers/base-provider.js";
+import type { ConfidenceResult } from "../../../utils/confidence-scorer.js";
+
+/** A low-confidence translation saved for manual review (`localize review`). */
+export interface ReviewQueueItem {
+	key: string;
+	source: string;
+	translation?: string;
+	confidence: ConfidenceResult;
+	language: string;
+	sourceLang: string;
+	category: string;
+	timestamp: string;
+}
 
 export interface ConfidenceSettings {
 	enabled: boolean;
@@ -9,21 +22,50 @@ export interface ConfidenceSettings {
 	rejectThreshold: number;
 	reviewThreshold: number;
 	saveReviewQueue: boolean;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	reviewQueue: any[];
+	reviewQueue: ReviewQueueItem[];
 	autoApprovedCount: number;
 	rejectedCount: number;
-	[key: string]: any;
 }
 
+/** Options TranslationStep reads; the whole object is also forwarded to the provider. */
+export interface TranslationStepOptions extends TranslateOptions {
+	apiProvider?: string;
+	useFallback?: boolean;
+	fallbackOrder?: string[];
+}
+
+/**
+ * A provider that can score its own translations: it returns the raw response when asked
+ * and extracts the translation plus a confidence score from it.
+ */
+interface ConfidenceScoringProvider extends AIProvider {
+	name?: string;
+	translate(
+		text: string,
+		sourceLang: string,
+		targetLang: string,
+		options?: TranslateOptions & { returnRawResponse?: boolean }
+	): Promise<string>;
+	extractTranslationWithConfidence(
+		response: string,
+		providerName: string,
+		sourceText: string,
+		sourceLang: string,
+		targetLang: string,
+		category?: string
+	): { translation: string; confidence: ConfidenceResult };
+}
+
+const supportsConfidenceScoring = (provider: AIProvider): provider is ConfidenceScoringProvider =>
+	"extractTranslationWithConfidence" in provider &&
+	typeof provider.extractTranslationWithConfidence === "function";
+
 class TranslationStep extends PipelineStep {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private options: any;
+	private options: TranslationStepOptions;
 	private confidenceSettings: Partial<ConfidenceSettings>;
 
 	constructor(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		options: any = {},
+		options: TranslationStepOptions = {},
 		confidenceSettings: Partial<ConfidenceSettings> = {}
 	) {
 		super();
@@ -45,11 +87,7 @@ class TranslationStep extends PipelineStep {
 			};
 
 			// Handling Confidence Scoring if enabled
-			if (
-				this.confidenceSettings.enabled &&
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				typeof (provider as any).extractTranslationWithConfidence === "function"
-			) {
+			if (this.confidenceSettings.enabled && supportsConfidenceScoring(provider)) {
 				const rawResponse = await provider.translate(
 					context.protectedText || context.sourceText,
 					context.sourceLang,
@@ -57,11 +95,9 @@ class TranslationStep extends PipelineStep {
 					{ ...translationOpts, returnRawResponse: true }
 				);
 
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const result = (provider as any).extractTranslationWithConfidence(
+				const result = provider.extractTranslationWithConfidence(
 					rawResponse,
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					(provider as any).name || "unknown",
+					provider.name || "unknown",
 					context.protectedText || context.sourceText,
 					context.sourceLang,
 					context.targetLang,
@@ -83,9 +119,9 @@ class TranslationStep extends PipelineStep {
 
 			// Continue to next steps (restore glossary, quality check, etc.)
 			await next();
-		} catch (error: any) {
+		} catch (error) {
 			console.error(`Translation error - key "${context.key}":`, error);
-			context.result.error = error.message;
+			context.result.error = error instanceof Error ? error.message : String(error);
 			context.result.success = false;
 			context.result.translated = context.sourceText; // Fallback to source
 			// Stop pipeline or proceed?
@@ -102,7 +138,6 @@ class TranslationStep extends PipelineStep {
 			this.options
 		);
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		if (!provider || typeof provider.translate !== "function") {
 			throw new Error(
 				`Translation provider not available or invalid: ${this.options.apiProvider}`

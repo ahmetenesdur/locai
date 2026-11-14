@@ -27,14 +27,14 @@ export interface AIProvider {
 class ProviderFactory {
 	/**
 	 * Get provider instance with intelligent fallback support.
-	 * @param {string} providerName - Name of the primary provider.
+	 * @param {string} [providerName] - Name of the primary provider; omitted → default fallback chain.
 	 * @param {boolean} [useFallback=true] - Whether to use fallback chain on failure.
 	 * @param {Object} [config=null] - Optional configuration overrides.
 	 * @returns {AIProvider} - Provider instance or wrapped FallbackProvider.
 	 * @throws {Error} If provider is not found or configured.
 	 */
 	static getProvider(
-		providerName: string,
+		providerName: string | undefined,
 		useFallback: boolean = true,
 		config: { fallbackOrder?: string[] } | null = null
 	): AIProvider {

@@ -8,7 +8,7 @@ Locai translates the JSON locale files of your project (`en.json` or `en/transla
 
 ## 🚀 Quick Start
 
-Translate your project in seconds without installing anything:
+Run it with `npx`, without installing anything:
 
 ```bash
 # Translates your ./locales from English to Turkish, Spanish, and German
@@ -18,8 +18,6 @@ npx locai translate --source en --targets tr,es,de
 > **Need a permanent setup?** See the [Configuration Guide](./docs/configuration.md) to create a `localize.config.ts` file.
 
 ## 📖 Documentation
-
-Everything you need to know to master Locai.
 
 ### [Getting Started](./docs/getting-started.md)
 
@@ -39,7 +37,7 @@ Supported providers (OpenAI, Anthropic, Gemini, DeepSeek, Dashscope, XAI), their
 
 ### [Core Concepts](./docs/concepts.md)
 
-Deep dive into Locai's intelligent features. We didn't just wrap an API; we built a localization engine.
+How Locai's features work:
 
 - **Context Categories**: You define categories (keywords plus a prompt) in `context.categories`. When a string contains enough of a category's keywords, that category's prompt is added to the translation request. There are no built-in categories. AI classification of longer strings is optional (`context.useAI`, off by default).
 - **Deep Context Analysis**: Scans your source code (AST) to extract component names, comments, and props for context-aware translations.
@@ -60,7 +58,7 @@ Contributing to Locai? Learn how to build, test, and run the project locally.
 - **JSON Locale Files**: Works with any project that stores translations as JSON (`<lang>.json` or `<lang>/translation.json`).
 - **Fewer API Calls**: Only new, changed or missing keys are sent to the AI. Strings already translated in the current run, or found in vector memory when it is enabled, are reused instead of triggering another translation call.
 - **Flat or Nested Layout**: Supports flat (`en.json`) and nested (`en/translation.json`) layouts. Target files are written in the same layout as the source file. The nested layout requires the file name `translation.json`.
-- **Developer Friendly**: TypeScript config, type safety, and great error messages.
+- **TypeScript Config**: `localize.config.ts` with types via `defineConfig` from `locai/config`.
 
 ## 🤝 Community & Contributing
 

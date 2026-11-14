@@ -40,7 +40,7 @@ const main = async () => {
 
 	program
 		.name("locai")
-		.description("AI-powered localization tool for Next.js projects")
+		.description("AI-powered localization tool for JSON locale files")
 		.version(version);
 
 	program

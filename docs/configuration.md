@@ -1,12 +1,14 @@
 # Configuration Guide
 
-Locai follows a "Zero-Config" philosophy but offers deep customization when you need it. It uses [`c12`](https://github.com/unjs/c12) to load configuration, supporting `.js`, `.ts`, and `.json` extensions.
+Locai runs without a config file (pass `--source` and `--targets`), or reads its settings from a config file in the directory you run it from. Command-line options override the config file.
 
 ## Supported Files
 
-- `localize.config.ts` (Recommended)
-- `localize.config.js`
-- `.localizerc`
+Configuration is loaded with [`c12`](https://github.com/unjs/c12), which looks for `localize.config` with one of these extensions:
+
+- `localize.config.ts` (recommended; loaded with `jiti`, which is bundled, so no extra setup is needed)
+- `localize.config.js`, `.mjs`, `.cjs`, `.mts`, `.cts`
+- `localize.config.json`, `.jsonc`, `.json5`, `.yaml`, `.yml`, `.toml`
 
 ## Locale Files
 
@@ -55,7 +57,7 @@ Suitable for simple projects or `npx` usage.
 // localize.config.js
 export default {
 	source: "en",
-	targets: ["tr", "es", "de"], // Changed from ["tr", "es", "de", "fr"]
+	targets: ["tr", "es", "de"],
 
 	// Scans source code for rich context (enabled by default)
 	deepContext: true,
@@ -81,16 +83,15 @@ export default defineConfig({
 });
 ```
 
-## Complete Configuration Reference
+## Configuration Reference
 
-Below is the full list of available options, including advanced performance, quality, and context settings.
+Below is an example with most options, including performance, quality, and context settings. The values are examples, not defaults; where a default matters it is noted in a comment.
 
-> **Tip:** For a living example, check out the [`localize.config.ts`](../localize.config.ts) file in the project root. It contains every available option with detailed comments.
+> **Tip:** The [`localize.config.ts`](../localize.config.ts) file in the project root is the repository's own config. It uses the same options with comments.
 
 ```typescript
 export default defineConfig({
 	// ===== BASIC SETTINGS =====
-	version: "2.6.2",
 	localesDir: "./locales", // Directory where locale JSON files are stored
 	source: "en", // Source language (BCP 47 tag, e.g. "en", "pt-BR", "zh-Hant")
 	targets: ["tr", "de", "es"], // Target language tags; also used as output file names (e.g. pt-BR.json)
@@ -350,7 +351,7 @@ export default defineConfig({
 });
 ```
 
-> **Note:** This is a partial example showing common configuration options. For the complete configuration with all available options and their default values, see the [`localize.config.ts`](../localize.config.ts) file in the project root.
+> **Note:** This is a partial example. The values are not defaults. See [`localize.config.ts`](../localize.config.ts) in the project root for the repository's own config.
 
 ## Troubleshooting
 
@@ -381,5 +382,6 @@ If translations aren't updating:
 
 If `localize.config.ts` isn't loading:
 
-- Ensure `ts-node` or `jiti` is installed/working (Locai handles this internally usually).
-- Switch to `localize.config.js` if ESM issues persist.
+- TypeScript configs are loaded with `jiti`, which is bundled with Locai; you do not need `ts-node` or `tsx`.
+- Run `locai validate-config` to see whether the values pass validation.
+- If the file still fails to load, try a plain `localize.config.js` or `localize.config.json`.

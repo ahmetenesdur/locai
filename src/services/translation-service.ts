@@ -234,7 +234,10 @@ class TranslationService {
 		// Initialize shared SourceCodeAnalyzer
 		console.log("Initializing Locai Engine...");
 		const sharedAnalyzer = new SourceCodeAnalyzer();
-		sharedAnalyzer.initialize();
+		// Scan the source code only for deep context; disabled, the analyzer stays empty
+		if (options.deepContext !== false) {
+			sharedAnalyzer.initialize();
+		}
 
 		// Create shared orchestrators array to collect review queues
 		const orchestrators: Orchestrator[] = [];

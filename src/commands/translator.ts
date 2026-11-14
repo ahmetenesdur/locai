@@ -1,5 +1,7 @@
-import translationService from "../services/translation-service.js";
+import translationService, { FixSummary } from "../services/translation-service.js";
 import { GlobalStats, TranslationOptions } from "../types/index.js";
+
+export type { FixSummary };
 
 /**
  * Main translator function to process source file and create translations.
@@ -25,12 +27,12 @@ async function findLocaleFiles(localesDir: string, sourceLang: string): Promise<
  * Validate and fix existing translations that have length issues.
  * @param {string} file - File path to validate.
  * @param {TranslationOptions} options - Validation options.
- * @returns {Promise<void>}
+ * @returns {Promise<FixSummary>} - How many length issues were found and fixed.
  */
 async function validateAndFixExistingTranslations(
 	file: string,
 	options: TranslationOptions
-): Promise<void> {
+): Promise<FixSummary> {
 	return await translationService.validateAndFixExistingTranslations(file, options);
 }
 

@@ -112,6 +112,16 @@ locai advanced [options]
 | `--max-retries <num>` | Maximum number of API retries (`retryOptions.maxRetries`) | config value or 2 |
 | `--context-debug` | No effect (not implemented) | |
 
+## Exit Codes
+
+`translate`, `advanced` and `fix` exit with:
+
+- `0` when every translation (or every length fix) succeeded, including when there was nothing to translate.
+- `1` when no provider can be used (no API key for any provider, or, with `useFallback: false`, none for `apiProvider`). Locai checks this before it reads or writes anything (`fix`: before its first re-translation) and prints which environment variables to set.
+- `1` when any translation failed, a language could not be processed, or `fix` could not fix a length issue. Translations rejected by confidence scoring count as failed. Failed keys are not written and are translated again on the next run.
+
+A failed key prints one line with its error message; run with `--debug` to also see the stack trace.
+
 ## Examples
 
 **Production Build Run:**

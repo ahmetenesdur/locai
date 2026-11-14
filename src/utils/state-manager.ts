@@ -134,6 +134,30 @@ class StateManager {
 	}
 
 	/**
+	 * The state to save after a run: the current source hashes, except that keys whose
+	 * translation did not finish keep their previous hash (or stay absent if they are new),
+	 * so the next run still sees them as changed and translates them again.
+	 * @param {Record<string, string>} previousState - State loaded at the start of the run.
+	 * @param {Record<string, string>} currentState - Hashes of the current source.
+	 * @param {Iterable<string>} unfinishedKeys - Keys that failed or were not processed.
+	 */
+	stateAfterRun(
+		previousState: Record<string, string>,
+		currentState: Record<string, string>,
+		unfinishedKeys: Iterable<string>
+	): Record<string, string> {
+		const state = { ...currentState };
+		for (const key of unfinishedKeys) {
+			if (key in previousState) {
+				state[key] = previousState[key];
+			} else {
+				delete state[key];
+			}
+		}
+		return state;
+	}
+
+	/**
 	 * Compare two states and identify changes
 	 */
 	compareStates(

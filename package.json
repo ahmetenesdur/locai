@@ -1,6 +1,6 @@
 {
 	"name": "locai",
-	"version": "2.6.2",
+	"version": "2.7.0",
 	"type": "module",
 	"main": "dist/core/orchestrator.js",
 	"types": "dist/core/orchestrator.d.ts",
@@ -32,7 +32,8 @@
 		"translation",
 		"l10n",
 		"internationalization",
-		"automation",
+		"json",
+		"i18next",
 		"cli",
 		"llm",
 		"ai",
@@ -43,6 +44,8 @@
 		"gemini",
 		"deepseek",
 		"xai",
+		"dashscope",
+		"qwen",
 		"vector-database",
 		"semantic-search",
 		"developer-tools",
@@ -54,7 +57,7 @@
 		"url": "https://github.com/ahmetenesdur"
 	},
 	"license": "MIT",
-	"description": "Global, AI-Powered Translation CLI for every project.",
+	"description": "CLI that translates JSON locale files with AI providers (OpenAI, Anthropic, Gemini, DeepSeek, xAI, DashScope).",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/ahmetenesdur/locai.git"

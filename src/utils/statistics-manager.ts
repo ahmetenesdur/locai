@@ -11,6 +11,8 @@ export interface GlobalStats {
 	totalTime: number;
 	success: number;
 	failed: number;
+	/** Keys that failed in at least one language (may repeat across languages). */
+	failedKeys: string[];
 	skipped: number;
 	languages: Record<string, LanguageStats>;
 	startTime: string;
@@ -23,7 +25,19 @@ export interface LanguageStats {
 	skipped: number;
 	failed: number;
 	timeMs: number;
+	/** Set when the language could not be processed at all. */
+	error?: string;
 }
+
+/** Whether a run had failures: keys that were not translated, or languages that errored. */
+export const runFailures = (
+	stats: Pick<GlobalStats, "failed" | "languages">
+): { failedTranslations: number; failedLanguages: string[] } => ({
+	failedTranslations: stats.failed,
+	failedLanguages: Object.entries(stats.languages)
+		.filter(([, language]) => language.error)
+		.map(([code]) => code),
+});
 
 export class StatisticsManager {
 	private stats: GlobalStats;
@@ -43,6 +57,7 @@ export class StatisticsManager {
 			totalTime: 0,
 			success: 0,
 			failed: 0,
+			failedKeys: [],
 			skipped: 0,
 			languages: {},
 			startTime: new Date().toISOString(),

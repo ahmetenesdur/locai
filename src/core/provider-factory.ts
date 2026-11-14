@@ -20,6 +20,24 @@ export interface AIProvider {
 	chat?(messages: ChatMessage[], options?: ProviderConfig): Promise<string>;
 }
 
+/** API key environment variable per provider, in the default fallback-chain order. */
+const PROVIDER_API_KEYS: Record<string, string> = {
+	dashscope: "DASHSCOPE_API_KEY",
+	xai: "XAI_API_KEY",
+	openai: "OPENAI_API_KEY",
+	anthropic: "ANTHROPIC_API_KEY",
+	deepseek: "DEEPSEEK_API_KEY",
+	gemini: "GEMINI_API_KEY",
+};
+
+/** No configured provider can translate (no API key); thrown before any per-key work. */
+export class NoProviderError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "NoProviderError";
+	}
+}
+
 /**
  * Factory for creating and managing AI providers.
  * Handles provider instantiation, configuration, and fallback chains.
@@ -154,35 +172,45 @@ class ProviderFactory {
 
 	/**
 	 * Get list of available (configured) providers.
-	 * @returns {string[]} - Array of provider names with valid API keys.
+	 * @returns {string[]} - Array of provider names with valid API keys, in default chain order.
 	 */
 	static getAvailableProviders(): string[] {
-		const providers: Record<string, string | undefined> = {
-			dashscope: process.env.DASHSCOPE_API_KEY,
-			xai: process.env.XAI_API_KEY,
-			openai: process.env.OPENAI_API_KEY,
-			anthropic: process.env.ANTHROPIC_API_KEY,
-			deepseek: process.env.DEEPSEEK_API_KEY,
-			gemini: process.env.GEMINI_API_KEY,
-		};
-
-		return Object.entries(providers)
-			.filter(([, key]) => !!key)
-			.map(([name]) => name);
+		return Object.keys(PROVIDER_API_KEYS).filter((name) => this.isProviderConfigured(name));
 	}
 
 	/**
-	 * Validate that at least one provider is configured.
-	 * @returns {string[]} - Array of available providers.
-	 * @throws {Error} If no providers are configured.
+	 * Fail fast when no provider can translate: with fallback, no provider has an API key;
+	 * without it, the configured provider has none.
+	 * @param {string} [providerName] - The configured `apiProvider`.
+	 * @param {boolean} [useFallback=true] - Whether other providers may be used.
+	 * @throws {NoProviderError} If no usable provider is configured.
 	 */
-	static validateProviders(): string[] {
-		const available = this.getAvailableProviders();
-		if (available.length === 0) {
-			throw new Error("No API providers configured. Please set at least one API key.");
+	static assertProviderAvailable(providerName?: string, useFallback: boolean = true): void {
+		const name = (providerName || "").toLowerCase();
+
+		if (!useFallback) {
+			const envKey = PROVIDER_API_KEYS[name];
+			if (!envKey) {
+				throw new NoProviderError(
+					`Unknown provider "${providerName}" and useFallback is false. ` +
+						`Supported providers: ${Object.keys(PROVIDER_API_KEYS).join(", ")}.`
+				);
+			}
+			if (!this.isProviderConfigured(name)) {
+				throw new NoProviderError(
+					`No API key for provider "${name}" (useFallback is false, so no other ` +
+						`provider is tried). Set ${envKey} in the environment, .env or .env.local.`
+				);
+			}
+			return;
 		}
 
-		return available;
+		if (this.getAvailableProviders().length === 0) {
+			throw new NoProviderError(
+				"No AI provider has an API key, so nothing can be translated. Set at least one of " +
+					`${Object.values(PROVIDER_API_KEYS).join(", ")} in the environment, .env or .env.local.`
+			);
+		}
 	}
 
 	/**
@@ -191,16 +219,7 @@ class ProviderFactory {
 	 * @returns {boolean} - True if provider has an API key configured.
 	 */
 	static isProviderConfigured(providerName: string): boolean {
-		const envVarMap: Record<string, string> = {
-			dashscope: "DASHSCOPE_API_KEY",
-			xai: "XAI_API_KEY",
-			openai: "OPENAI_API_KEY",
-			anthropic: "ANTHROPIC_API_KEY",
-			deepseek: "DEEPSEEK_API_KEY",
-			gemini: "GEMINI_API_KEY",
-		};
-
-		const envKey = envVarMap[providerName.toLowerCase()];
+		const envKey = PROVIDER_API_KEYS[providerName.toLowerCase()];
 		return !!(envKey && process.env[envKey]);
 	}
 }

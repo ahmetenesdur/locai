@@ -8,6 +8,8 @@ import {
 } from "../commands/translator.js";
 import InputValidator from "../utils/input-validator.js";
 import ErrorHelper from "../utils/error-helper.js";
+import { NoProviderError } from "../core/provider-factory.js";
+import { runFailures } from "../utils/statistics-manager.js";
 import { FrameworkDetector } from "../core/detection/framework-detector.js";
 import { StructureDetector, LocaleStructure } from "../core/detection/structure-detector.js";
 import { configureComponents } from "../config/setup.js";
@@ -441,12 +443,20 @@ export const runCommand = async (
 		}
 
 		switch (commandName) {
-			case "fix":
+			case "fix": {
 				console.log("\nRunning in FIX mode");
-				await Promise.all(
+				const summaries = await Promise.all(
 					files.map((file) => validateAndFixExistingTranslations(file, finalConfig))
 				);
-				break;
+				const unfixed = summaries.reduce((sum, s) => sum + (s.issues - s.fixed), 0);
+				if (unfixed > 0) {
+					console.error(`\n${unfixed} length issue(s) could not be fixed`);
+					process.exit(1);
+					return;
+				}
+				process.exit(0);
+				return;
+			}
 
 			case "analyze":
 				console.log("\nRunning in ANALYZE mode");
@@ -475,7 +485,9 @@ export const runCommand = async (
 				);
 
 				console.log(`API Configuration:`);
-				console.log(`   - Active Provider: ${finalConfig.apiProvider}`);
+				console.log(
+					`   - Active Provider: ${finalConfig.apiProvider || "first provider with an API key"}`
+				);
 				console.log(`   - Available Providers: ${availableProviders.join(", ") || "None"}`);
 
 				if (finalConfig.context.useAI) {
@@ -504,14 +516,18 @@ export const runCommand = async (
 					);
 				}
 
+				let failedTranslations = 0;
+				const failedLanguages: string[] = [];
 				for (const file of files) {
-					await translateFile(file, finalConfig);
+					const failures = runFailures(await translateFile(file, finalConfig));
+					failedTranslations += failures.failedTranslations;
+					failedLanguages.push(...failures.failedLanguages);
 				}
 
-				// Exit after successful translation in CLI mode
-				// This allows translateFile to be used as library without forcing exit
-				process.exit(0);
-				break;
+				// Exit here in CLI mode (translateFile can also be used as a library). A run in
+				// which anything failed exits non-zero, so CI does not pass a run that did not translate.
+				process.exit(failedTranslations > 0 || failedLanguages.length > 0 ? 1 : 0);
+				return;
 			}
 		}
 
@@ -521,6 +537,11 @@ export const runCommand = async (
 			validationError instanceof Error ? validationError.message : String(validationError);
 		if (message.includes("Configuration validation")) {
 			// Already handled above with better formatting
+			return;
+		}
+		if (validationError instanceof NoProviderError) {
+			console.error(`\nError: ${message}`);
+			process.exit(1);
 			return;
 		}
 		console.error(`\nInput validation error: ${message}`);

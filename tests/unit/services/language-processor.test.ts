@@ -37,6 +37,7 @@ describe("LanguageProcessor", () => {
 		total: 0,
 		success: 0,
 		failed: 0,
+		failedKeys: [],
 		skipped: 0,
 		languages: {
 			tr: { processed: 0, failed: 0, skipped: 0, added: 0, timeMs: 0 },

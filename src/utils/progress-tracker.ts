@@ -280,7 +280,8 @@ class ProgressTracker {
 			}
 		}
 
-		const spinner = final ? "[OK]" : this._spinnerFrames[this._spinnerIndex];
+		const finalLabel = this.failed > 0 ? "[ERR]" : "[OK]";
+		const spinner = final ? finalLabel : this._spinnerFrames[this._spinnerIndex];
 		const text = `${spinner} ${langInfo}${bar} ${percent.toFixed(1)}% | ${this.completed}/${this.total} items | OK ${this.success} | ERR ${this.failed}${etaText}`;
 
 		process.stderr.write("\r\x1b[K" + text);

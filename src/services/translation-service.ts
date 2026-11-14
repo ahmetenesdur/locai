@@ -2,6 +2,7 @@ import path from "path";
 import { FileManager } from "../utils/file-manager.js";
 import ObjectTransformer, { FlatTranslations } from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
+import ProviderFactory, { NoProviderError } from "../core/provider-factory.js";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
 import { updateReviewQueue } from "../utils/review-queue.js";
 import QualityChecker from "../utils/quality/index.js";
@@ -10,7 +11,7 @@ import InputValidator from "../utils/input-validator.js";
 import { targetLocaleFile } from "../utils/locale-paths.js";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 import uiManager from "../utils/ui-manager.js";
-import statisticsManager from "../utils/statistics-manager.js";
+import statisticsManager, { runFailures } from "../utils/statistics-manager.js";
 import { LanguageProcessor } from "./language-processor.js";
 import { SourceCodeAnalyzer } from "./source-analyzer.js";
 import {
@@ -19,6 +20,14 @@ import {
 	LanguageProcessResult,
 	MissingKey,
 } from "../types/index.js";
+
+/** Result of `locai fix` for one source file. */
+export interface FixSummary {
+	/** Translations with a length issue. */
+	issues: number;
+	/** Of those, how many were re-translated successfully. */
+	fixed: number;
+}
 
 /**
  * Service for handling file translation operations.
@@ -34,6 +43,9 @@ class TranslationService {
 	 * @throws {Error} If validation fails or translation process errors.
 	 */
 	async translateFile(file: string, options: TranslationOptions): Promise<GlobalStats> {
+		// Stop before reading or changing anything when no provider could translate a key.
+		ProviderFactory.assertProviderAvailable(options.apiProvider, options.useFallback !== false);
+
 		await uiManager.log(`\nProcessing File: "${path.basename(file)}"`);
 
 		try {
@@ -46,18 +58,26 @@ class TranslationService {
 
 			await uiManager.log(`Source file contains ${totalKeys} translation keys`);
 
-			const { stateManager, projectRoot, currentState, comparison } =
+			const { stateManager, projectRoot, previousState, currentState, comparison } =
 				await this.initializeTranslationState(resolvedFile, flattenedSource, options);
 
-			gracefulShutdown.registerCallback(async () => {
+			// Interrupted (Ctrl-C): changed keys may not be translated yet, so keep them changed.
+			const saveStateOnShutdown = async () => {
 				try {
-					await stateManager.saveState(projectRoot, currentState);
+					await stateManager.saveState(
+						projectRoot,
+						stateManager.stateAfterRun(previousState, currentState, [
+							...comparison.newKeys,
+							...comparison.modifiedKeys,
+						])
+					);
 					console.log("State saved during shutdown");
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					console.error("Failed to save state during shutdown:", message);
 				}
-			});
+			};
+			gracefulShutdown.registerCallback(saveStateOnShutdown);
 
 			statisticsManager.reset();
 			const globalStats: GlobalStats = statisticsManager.getStats();
@@ -74,7 +94,9 @@ class TranslationService {
 				await this.finalizeTranslation(
 					stateManager,
 					projectRoot,
+					previousState,
 					currentState,
+					comparison,
 					globalStats,
 					startTime,
 					options
@@ -93,6 +115,7 @@ class TranslationService {
 
 				throw error;
 			} finally {
+				gracefulShutdown.unregisterCallback(saveStateOnShutdown);
 				if (process.env.DEBUG) {
 					await uiManager.log("\nCache statistics:");
 				}
@@ -209,7 +232,7 @@ class TranslationService {
 			await uiManager.log(`First run - will process all keys`);
 		}
 
-		return { stateManager, projectRoot, currentState, comparison };
+		return { stateManager, projectRoot, previousState, currentState, comparison };
 	}
 
 	/**
@@ -318,7 +341,9 @@ class TranslationService {
 	 * Finalize translation process and save state.
 	 * @param {StateManager} stateManager - State manager instance.
 	 * @param {string} projectRoot - Project root directory.
+	 * @param {Record<string, string>} previousState - State loaded at the start of the run.
 	 * @param {Record<string, string>} currentState - Current state (key → content hash).
+	 * @param {StateComparison} comparison - New, modified and deleted keys of this run.
 	 * @param {GlobalStats} globalStats - Global statistics object.
 	 * @param {number} startTime - Process start timestamp.
 	 * @param {TranslationOptions} options - Translation options.
@@ -326,7 +351,9 @@ class TranslationService {
 	async finalizeTranslation(
 		stateManager: StateManager,
 		projectRoot: string,
+		previousState: Record<string, string>,
 		currentState: Record<string, string>,
+		comparison: StateComparison,
 		globalStats: GlobalStats,
 		startTime: number,
 		options: TranslationOptions
@@ -339,8 +366,20 @@ class TranslationService {
 
 		await this.reportConfidence(globalStats.orchestrators);
 
+		// Keys that failed in any language (or every changed key, if a whole language failed)
+		// keep their previous hash, so the next run still treats them as changed.
+		const unfinishedKeys = new Set(globalStats.failedKeys);
+		if (runFailures(globalStats).failedLanguages.length > 0) {
+			for (const key of [...comparison.newKeys, ...comparison.modifiedKeys]) {
+				unfinishedKeys.add(key);
+			}
+		}
+
 		try {
-			await stateManager.saveState(projectRoot, currentState);
+			await stateManager.saveState(
+				projectRoot,
+				stateManager.stateAfterRun(previousState, currentState, unfinishedKeys)
+			);
 			if (options.debug) {
 				await uiManager.log(`State saved for future sync operations`);
 			}
@@ -476,9 +515,13 @@ class TranslationService {
 	 * Validate and fix existing translations that have length issues.
 	 * @param {string} file - Path to source file.
 	 * @param {TranslationOptions} options - Translation options.
+	 * @returns {Promise<FixSummary>} - How many length issues were found and fixed.
 	 * @throws {Error} If validation process fails.
 	 */
-	async validateAndFixExistingTranslations(file: string, options: TranslationOptions) {
+	async validateAndFixExistingTranslations(
+		file: string,
+		options: TranslationOptions
+	): Promise<FixSummary> {
 		await uiManager.log(`\nChecking existing translations in: "${path.basename(file)}"`);
 
 		const sourceContent = await FileManager.readJSON(file);
@@ -560,6 +603,12 @@ class TranslationService {
 						`Found ${invalidItems.length} length issues in ${targetLang}`
 					);
 
+					// Re-translating needs a provider; stop before the first request if none has a key.
+					ProviderFactory.assertProviderAvailable(
+						options.apiProvider,
+						options.useFallback !== false
+					);
+
 					// Batch process fixes to improve performance
 					const results = await orchestrator.processTranslations(invalidItems);
 
@@ -592,9 +641,13 @@ class TranslationService {
 			}
 
 			await this.reportConfidence([orchestrator]);
+			return { issues: totalIssues, fixed: totalFixed };
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await uiManager.log(`\nValidation error: ${message}`);
+			// The CLI prints a missing-provider error once; don't log it here as well.
+			if (!(error instanceof NoProviderError)) {
+				const message = error instanceof Error ? error.message : String(error);
+				await uiManager.log(`\nValidation error: ${message}`);
+			}
 			throw error;
 		}
 	}

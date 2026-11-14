@@ -1,5 +1,5 @@
 import type { LanguageProcessResult } from "../types/index.js";
-import { GlobalStats } from "./statistics-manager.js";
+import { GlobalStats, runFailures } from "./statistics-manager.js";
 
 interface ConsoleLock {
 	queue: (() => void)[];
@@ -112,7 +112,19 @@ export class UIManager {
 		// Clear completion message - only once
 		await this.log("\n" + "=".repeat(60));
 		const duration = stats.totalDuration || 0;
-		await this.log(`All operations completed successfully in ${duration.toFixed(1)}s`);
+		const { failedTranslations, failedLanguages } = runFailures(stats);
+		if (failedTranslations > 0 || failedLanguages.length > 0) {
+			const parts = [];
+			if (failedTranslations > 0) {
+				parts.push(`${failedTranslations} translation(s) failed`);
+			}
+			if (failedLanguages.length > 0) {
+				parts.push(`could not process: ${failedLanguages.join(", ")}`);
+			}
+			await this.log(`Finished with errors in ${duration.toFixed(1)}s: ${parts.join("; ")}`);
+		} else {
+			await this.log(`All operations completed successfully in ${duration.toFixed(1)}s`);
+		}
 		await this.log("=".repeat(60) + "\n");
 	}
 

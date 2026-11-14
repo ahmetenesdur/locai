@@ -3,6 +3,7 @@ import { program } from "commander";
 import { resolveReviewConfig, runCommand, type CommandOptions } from "../../../src/cli/helpers.js";
 import type { ReviewCommandConfig } from "../../../src/commands/review.js";
 import InputValidator from "../../../src/utils/input-validator.js";
+import { StatisticsManager } from "../../../src/utils/statistics-manager.js";
 import type { ResolvedLocalizeConfig } from "../../../src/config/index.js";
 import {
 	findLocaleFiles,
@@ -92,6 +93,8 @@ describe("runCommand", () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		vi.mocked(findLocaleFiles).mockResolvedValue(["locales/en.json"]);
+		vi.mocked(translateFile).mockResolvedValue(new StatisticsManager().getStats());
+		vi.mocked(validateAndFixExistingTranslations).mockResolvedValue({ issues: 0, fixed: 0 });
 		exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 		vi.spyOn(console, "log").mockImplementation(() => {});
 		vi.spyOn(console, "error").mockImplementation(() => {});
@@ -112,6 +115,58 @@ describe("runCommand", () => {
 			"locales/en.json",
 			expect.objectContaining({ fixLength: true })
 		);
+	});
+
+	describe("exit code", () => {
+		it("exits 1 when a translation failed", async () => {
+			const stats = new StatisticsManager().getStats();
+			stats.failed = 1;
+			vi.mocked(translateFile).mockResolvedValue(stats);
+
+			await runCommand(config, {}, "translate");
+
+			expect(exit).toHaveBeenCalledWith(1);
+			expect(exit).not.toHaveBeenCalledWith(0);
+		});
+
+		it("exits 1 when a language could not be processed", async () => {
+			const stats = new StatisticsManager().getStats();
+			stats.languages.tr = {
+				processed: 0,
+				added: 0,
+				skipped: 0,
+				failed: 0,
+				timeMs: 0,
+				error: "disk full",
+			};
+			vi.mocked(translateFile).mockResolvedValue(stats);
+
+			await runCommand(config, {}, "advanced");
+
+			expect(exit).toHaveBeenCalledWith(1);
+		});
+
+		it("exits 0 when every translation succeeded", async () => {
+			await runCommand(config, {}, "translate");
+
+			expect(exit).toHaveBeenCalledWith(0);
+		});
+
+		it("exits 1 when `fix` could not fix every length issue, and 0 when it did", async () => {
+			vi.mocked(validateAndFixExistingTranslations).mockResolvedValue({
+				issues: 2,
+				fixed: 1,
+			});
+			await runCommand(config, { length: true }, "fix");
+			expect(exit).toHaveBeenLastCalledWith(1);
+
+			vi.mocked(validateAndFixExistingTranslations).mockResolvedValue({
+				issues: 2,
+				fixed: 2,
+			});
+			await runCommand(config, { length: true }, "fix");
+			expect(exit).toHaveBeenLastCalledWith(0);
+		});
 	});
 
 	it("disables the cache for `translate --no-cache`", async () => {

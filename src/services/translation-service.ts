@@ -21,6 +21,14 @@ import {
 	MissingKey,
 } from "../types/index.js";
 
+/** Result of `locai fix` for one source file. */
+export interface FixSummary {
+	/** Translations with a length issue. */
+	issues: number;
+	/** Of those, how many were re-translated successfully. */
+	fixed: number;
+}
+
 /**
  * Service for handling file translation operations.
  * Orchestrates the translation process including state management,
@@ -480,9 +488,13 @@ class TranslationService {
 	 * Validate and fix existing translations that have length issues.
 	 * @param {string} file - Path to source file.
 	 * @param {TranslationOptions} options - Translation options.
+	 * @returns {Promise<FixSummary>} - How many length issues were found and fixed.
 	 * @throws {Error} If validation process fails.
 	 */
-	async validateAndFixExistingTranslations(file: string, options: TranslationOptions) {
+	async validateAndFixExistingTranslations(
+		file: string,
+		options: TranslationOptions
+	): Promise<FixSummary> {
 		await uiManager.log(`\nChecking existing translations in: "${path.basename(file)}"`);
 
 		const sourceContent = await FileManager.readJSON(file);
@@ -602,6 +614,7 @@ class TranslationService {
 			}
 
 			await this.reportConfidence([orchestrator]);
+			return { issues: totalIssues, fixed: totalFixed };
 		} catch (error) {
 			// The CLI prints a missing-provider error once; don't log it here as well.
 			if (!(error instanceof NoProviderError)) {

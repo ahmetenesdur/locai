@@ -190,12 +190,8 @@ export class LanguageProcessor {
 					console.error(
 						`Error processing translations for ${safeTargetLang}: ${message}`
 					);
+					// Counted below: every missing key without a valid result has failed.
 					results = [];
-
-					if (globalStats.languages[safeTargetLang]) {
-						globalStats.languages[safeTargetLang].failed += missingKeys.length;
-						globalStats.failed += missingKeys.length;
-					}
 				}
 			} else {
 				if (hasPlaceholderOnlyChanges) {
@@ -240,18 +236,22 @@ export class LanguageProcessor {
 				});
 			}
 
+			// Every missing key without a valid result failed, whether or not anything is written.
+			const translatedKeys = new Set(validResults.map((result) => result.key));
+			const failedKeys = missingKeys
+				.map((item) => item.key)
+				.filter((key) => !translatedKeys.has(key));
+			globalStats.total += validResults.length + failedKeys.length;
+			globalStats.success += validResults.length;
+			globalStats.failed += failedKeys.length;
+			globalStats.languages[safeTargetLang].added += validResults.length;
+			globalStats.languages[safeTargetLang].failed += failedKeys.length;
+
 			const hasChangesToSave = validResults.length > 0 || hasPlaceholderOnlyChanges;
 
 			if (hasChangesToSave) {
 				const unflattened = ObjectTransformer.unflatten(flattenedTarget);
 				await FileManager.writeJSON(targetPath, unflattened);
-
-				globalStats.total += validResults.length;
-				globalStats.success += validResults.length;
-				globalStats.failed += results.length - validResults.length;
-				globalStats.languages[safeTargetLang].added += validResults.length;
-				globalStats.languages[safeTargetLang].failed +=
-					results.length - validResults.length;
 
 				validResults.forEach((result) => {
 					if (result.context) {

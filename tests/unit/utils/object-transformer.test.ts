@@ -87,5 +87,29 @@ describe("ObjectTransformer", () => {
 			const result = ObjectTransformer.mergeObjects(target, source, false);
 			expect(result.arr).toEqual([1, 2, 3, 4]);
 		});
+
+		it("should replace a primitive in the target with an object from the source", () => {
+			const target = { a: "flat", b: null };
+			const source = { a: { x: "nested" }, b: { y: "nested" } };
+			const result = ObjectTransformer.mergeObjects(target, source);
+			expect(result).toEqual({ a: { x: "nested" }, b: { y: "nested" } });
+		});
+
+		it("should replace an array in the target with an object from the source", () => {
+			const target = { a: ["one", "two"] };
+			const source = { a: { x: "nested" } };
+			const result = ObjectTransformer.mergeObjects(target, source);
+			expect(result.a).toEqual({ x: "nested" });
+			expect(Array.isArray(result.a)).toBe(false);
+		});
+
+		it("should not share nested source objects with the result", () => {
+			const source = { a: { x: { deep: "value" }, list: ["v"] } };
+			const result = ObjectTransformer.mergeObjects({ a: "flat" }, source);
+			expect(result.a).toEqual(source.a);
+			expect(result.a).not.toBe(source.a);
+			expect((result.a as typeof source.a).x).not.toBe(source.a.x);
+			expect((result.a as typeof source.a).list).not.toBe(source.a.list);
+		});
 	});
 });

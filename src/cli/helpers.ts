@@ -52,7 +52,6 @@ export interface CommandOptions {
 	allowNewCategories?: boolean;
 	maxRetries?: number;
 	// Read by runCommand, but no command declares them (`--debug`/`--verbose` are global options).
-	noCache?: boolean;
 	debug?: boolean;
 	verbose?: boolean;
 	timeout?: number;
@@ -260,8 +259,8 @@ export const runCommand = async (
 			localesDir: mergedOpts.localesDir,
 			apiProvider: mergedOpts.provider || defaultConfig.apiProvider,
 			concurrencyLimit: concurrencyLimit,
-			cacheEnabled:
-				mergedOpts.noCache === undefined ? defaultConfig.cacheEnabled : !mergedOpts.noCache,
+			// commander turns `--no-cache` into `cache: false`
+			cacheEnabled: mergedOpts.cache === false ? false : defaultConfig.cacheEnabled,
 			debug: mergedOpts.debug,
 			verbose: mergedOpts.verbose || defaultConfig.logging?.verbose || false,
 			forceUpdate: mergedOpts.force || false,

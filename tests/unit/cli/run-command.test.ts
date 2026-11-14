@@ -3,6 +3,7 @@ import { runCommand } from "../../../src/cli/helpers.js";
 import type { ResolvedLocalizeConfig } from "../../../src/config/index.js";
 import {
 	findLocaleFiles,
+	translateFile,
 	validateAndFixExistingTranslations,
 } from "../../../src/commands/translator.js";
 
@@ -52,6 +53,25 @@ describe("runCommand", () => {
 		expect(validateAndFixExistingTranslations).toHaveBeenCalledWith(
 			"locales/en.json",
 			expect.objectContaining({ fixLength: true })
+		);
+	});
+
+	it("disables the cache for `translate --no-cache`", async () => {
+		// commander turns `--no-cache` into `cache: false`
+		await runCommand(config, { cache: false }, "translate");
+
+		expect(translateFile).toHaveBeenCalledWith(
+			"locales/en.json",
+			expect.objectContaining({ cacheEnabled: false })
+		);
+	});
+
+	it("keeps the configured cache setting when --no-cache is not passed", async () => {
+		await runCommand(config, { cache: true }, "translate");
+
+		expect(translateFile).toHaveBeenCalledWith(
+			"locales/en.json",
+			expect.objectContaining({ cacheEnabled: true })
 		);
 	});
 });

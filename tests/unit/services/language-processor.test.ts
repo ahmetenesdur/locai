@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import path from "path";
 import { LanguageProcessor } from "../../../src/services/language-processor.js";
 import { FileManager } from "../../../src/utils/file-manager.js";
 import ObjectTransformer from "../../../src/utils/object-transformer.js";
@@ -7,7 +6,8 @@ import Orchestrator from "../../../src/core/orchestrator.js";
 import InputValidator from "../../../src/utils/input-validator.js";
 import uiManager from "../../../src/utils/ui-manager.js";
 import statisticsManager from "../../../src/utils/statistics-manager.js";
-import { TranslationOptions } from "../../../src/types/index.js";
+import { GlobalStats, TranslationOptions } from "../../../src/types/index.js";
+import { ContextConfig } from "../../../src/core/context-processor.js";
 
 // Mock dependencies
 vi.mock("../../../src/utils/file-manager.js");
@@ -18,15 +18,22 @@ vi.mock("../../../src/utils/ui-manager.js");
 vi.mock("../../../src/utils/statistics-manager.js");
 
 describe("LanguageProcessor", () => {
+	const contextConfig: ContextConfig = {
+		enabled: false,
+		categories: {},
+		detection: { threshold: 2, minConfidence: 0.6 },
+		fallback: { category: "general", prompt: "Provide a natural translation" },
+	};
+
 	const mockOptions: TranslationOptions = {
 		source: "en",
 		targets: ["tr"],
 		localesDir: "./locales",
 		debug: false,
-		context: { enabled: false },
+		context: contextConfig,
 	};
 
-	const mockGlobalStats = {
+	const mockGlobalStats: GlobalStats = {
 		total: 0,
 		success: 0,
 		failed: 0,
@@ -41,12 +48,13 @@ describe("LanguageProcessor", () => {
 		startTime: new Date().toISOString(),
 	};
 
-	const mockOrchestrator = new Orchestrator(mockOptions as any);
+	const mockOrchestrator = new Orchestrator({ ...mockOptions, context: contextConfig });
 
 	beforeEach(() => {
 		vi.resetAllMocks();
 		// Setup default mock implementations
 		vi.mocked(InputValidator.validateLanguageCode).mockReturnValue("tr");
+		vi.mocked(InputValidator.validateText).mockImplementation((text) => String(text));
 		vi.mocked(InputValidator.createSafeFilePath).mockReturnValue("/mock/locales/tr.json");
 		vi.mocked(FileManager.readJSON).mockResolvedValue({});
 		vi.mocked(ObjectTransformer.flatten).mockReturnValue({});
@@ -79,7 +87,7 @@ describe("LanguageProcessor", () => {
 				mockOrchestrator,
 				mockOptions,
 				mockGlobalStats,
-				{}
+				{ newKeys: [], modifiedKeys: [] }
 			)
 		).rejects.toThrow("Invalid target language provided");
 	});

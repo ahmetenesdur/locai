@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as translator from "../../../src/commands/translator.js";
 import translationService from "../../../src/services/translation-service.js";
+import { TranslationOptions } from "../../../src/types/index.js";
 
 vi.mock("../../../src/services/translation-service.js", () => ({
 	default: {
@@ -11,13 +12,21 @@ vi.mock("../../../src/services/translation-service.js", () => ({
 }));
 
 describe("Translator Command", () => {
+	const options: TranslationOptions = {
+		source: "en",
+		context: {
+			categories: {},
+			detection: { threshold: 2, minConfidence: 0.6 },
+			fallback: { category: "general", prompt: "Provide a natural translation" },
+		},
+	};
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
 	it("should delegate translateFile to service", async () => {
 		const file = "test.json";
-		const options: any = { source: "en" };
 
 		await translator.translateFile(file, options);
 
@@ -35,7 +44,6 @@ describe("Translator Command", () => {
 
 	it("should delegate validateAndFixExistingTranslations to service", async () => {
 		const file = "test.json";
-		const options: any = { source: "en" };
 
 		await translator.validateAndFixExistingTranslations(file, options);
 

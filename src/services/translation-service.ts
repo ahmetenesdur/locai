@@ -1,15 +1,13 @@
 import path from "path";
 import { FileManager } from "../utils/file-manager.js";
-import ObjectTransformer from "../utils/object-transformer.js";
+import ObjectTransformer, { FlatTranslations } from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
-import { OrchestratorOptions } from "../core/orchestrator.js";
 import QualityChecker from "../utils/quality/index.js";
-import StateManager from "../utils/state-manager.js";
+import StateManager, { StateComparison } from "../utils/state-manager.js";
 import InputValidator from "../utils/input-validator.js";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 import uiManager from "../utils/ui-manager.js";
 import statisticsManager from "../utils/statistics-manager.js";
-import { TranslationResult } from "../core/pipeline/context.js";
 import { LanguageProcessor } from "./language-processor.js";
 import { SourceCodeAnalyzer } from "./source-analyzer.js";
 import {
@@ -52,13 +50,14 @@ class TranslationService {
 				try {
 					await stateManager.saveState(projectRoot, currentState);
 					console.log("State saved during shutdown");
-				} catch (error: any) {
-					console.error("Failed to save state during shutdown:", error.message);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error("Failed to save state during shutdown:", message);
 				}
 			});
 
 			statisticsManager.reset();
-			const globalStats = statisticsManager.getStats() as GlobalStats;
+			const globalStats: GlobalStats = statisticsManager.getStats();
 
 			try {
 				await this.processAllLanguages(
@@ -79,13 +78,14 @@ class TranslationService {
 				);
 
 				return globalStats;
-			} catch (error: any) {
-				await uiManager.log(`\nTranslation error: ${error.message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await uiManager.log(`\nTranslation error: ${message}`);
 
 				globalStats.error = {
-					message: error.message,
+					message,
 					time: new Date().toISOString(),
-					stack: process.env.DEBUG ? error.stack : undefined,
+					stack: process.env.DEBUG && error instanceof Error ? error.stack : undefined,
 				};
 
 				throw error;
@@ -94,8 +94,12 @@ class TranslationService {
 					await uiManager.log("\nCache statistics:");
 				}
 			}
-		} catch (validationError: any) {
-			await uiManager.log(`\nInput validation error: ${validationError.message}`);
+		} catch (validationError) {
+			const message =
+				validationError instanceof Error
+					? validationError.message
+					: String(validationError);
+			await uiManager.log(`\nInput validation error: ${message}`);
 			throw validationError;
 		}
 	}
@@ -148,13 +152,13 @@ class TranslationService {
 	/**
 	 * Initialize translation state and sync analysis.
 	 * @param {string} resolvedFile - Path to resolved source file.
-	 * @param {Record<string, any>} flattenedSource - Flattened source content.
+	 * @param {FlatTranslations} flattenedSource - Flattened source content.
 	 * @param {TranslationOptions} options - Translation options.
 	 * @returns {Promise<Object>} - Initialized state components.
 	 */
 	async initializeTranslationState(
 		resolvedFile: string,
-		flattenedSource: Record<string, any>,
+		flattenedSource: FlatTranslations,
 		options: TranslationOptions
 	) {
 		const stateManager = new StateManager(options.syncOptions);
@@ -208,17 +212,17 @@ class TranslationService {
 	/**
 	 * Process all target languages with concurrency.
 	 * @param {string} resolvedFile - Path to source file.
-	 * @param {Record<string, any>} flattenedSource - Flattened source content.
+	 * @param {FlatTranslations} flattenedSource - Flattened source content.
 	 * @param {TranslationOptions} options - Translation options.
 	 * @param {GlobalStats} globalStats - Global statistics object to update.
-	 * @param {any} comparison - State comparison result.
+	 * @param {StateComparison} comparison - State comparison result.
 	 */
 	async processAllLanguages(
 		resolvedFile: string,
-		flattenedSource: Record<string, any>,
+		flattenedSource: FlatTranslations,
 		options: TranslationOptions,
 		globalStats: GlobalStats,
-		comparison: any
+		comparison: StateComparison
 	) {
 		const languageConcurrency = options.concurrencyLimit || 3;
 		const targetLanguages = [...(options.targets || [])];
@@ -252,7 +256,7 @@ class TranslationService {
 						concurrencyLimit: 1,
 						progressOptions,
 						sourceCodeAnalyzer: sharedAnalyzer,
-					} as OrchestratorOptions);
+					});
 					orchestrators.push(orchestrator);
 					return this.processLanguage(
 						targetLang,
@@ -277,21 +281,21 @@ class TranslationService {
 	 * Process a single language translation.
 	 * @param {string} targetLang - Target language code.
 	 * @param {string} sourceFile - Path to source file.
-	 * @param {Record<string, any>} flattenedSource - Flattened source content.
+	 * @param {FlatTranslations} flattenedSource - Flattened source content.
 	 * @param {Orchestrator} orchestrator - Orchestrator instance.
 	 * @param {TranslationOptions} options - Translation options.
 	 * @param {GlobalStats} globalStats - Global statistics object.
-	 * @param {any} comparison - State comparison result.
+	 * @param {StateComparison} comparison - State comparison result.
 	 * @returns {Promise<LanguageProcessResult>} - Status and messages for this language.
 	 */
 	async processLanguage(
 		targetLang: string,
 		sourceFile: string,
-		flattenedSource: Record<string, any>,
+		flattenedSource: FlatTranslations,
 		orchestrator: Orchestrator,
 		options: TranslationOptions,
 		globalStats: GlobalStats,
-		comparison: any
+		comparison: StateComparison
 	): Promise<LanguageProcessResult> {
 		return await LanguageProcessor.processLanguage(
 			targetLang,
@@ -308,7 +312,7 @@ class TranslationService {
 	 * Finalize translation process and save state.
 	 * @param {StateManager} stateManager - State manager instance.
 	 * @param {string} projectRoot - Project root directory.
-	 * @param {any} currentState - Current state object.
+	 * @param {Record<string, string>} currentState - Current state (key → content hash).
 	 * @param {GlobalStats} globalStats - Global statistics object.
 	 * @param {number} startTime - Process start timestamp.
 	 * @param {TranslationOptions} options - Translation options.
@@ -316,7 +320,7 @@ class TranslationService {
 	async finalizeTranslation(
 		stateManager: StateManager,
 		projectRoot: string,
-		currentState: any,
+		currentState: Record<string, string>,
 		globalStats: GlobalStats,
 		startTime: number,
 		options: TranslationOptions
@@ -331,7 +335,7 @@ class TranslationService {
 		if (options.saveReviewQueue || options.minConfidence !== undefined) {
 			if (globalStats.orchestrators && globalStats.orchestrators.length > 0) {
 				// Collect all review queues from all orchestrators
-				const allReviewItems: any[] = [];
+				const allReviewItems: Orchestrator["confidenceSettings"]["reviewQueue"] = [];
 				globalStats.orchestrators.forEach((orchestrator) => {
 					if (
 						orchestrator.confidenceSettings &&
@@ -356,8 +360,9 @@ class TranslationService {
 			if (options.debug) {
 				await uiManager.log(`State saved for future sync operations`);
 			}
-		} catch (error: any) {
-			await uiManager.log(`Warning: Could not save state: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await uiManager.log(`Warning: Could not save state: ${message}`);
 		}
 	}
 
@@ -427,8 +432,9 @@ class TranslationService {
 				}
 
 				filesProcessed++;
-			} catch (error: any) {
-				await uiManager.log(`   \u274c Error processing ${targetLang}: ${error.message}`);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await uiManager.log(`   \u274c Error processing ${targetLang}: ${message}`);
 			}
 		}
 
@@ -448,7 +454,7 @@ class TranslationService {
 
 		const sourceContent = await FileManager.readJSON(file);
 		const flattenedSource = ObjectTransformer.flatten(sourceContent);
-		const orchestrator = new Orchestrator(options as OrchestratorOptions);
+		const orchestrator = new Orchestrator(options);
 
 		const sourceDir = path.dirname(file);
 		const isNestedStructure = path.basename(file) === "translation.json";
@@ -466,14 +472,15 @@ class TranslationService {
 
 					const targetContent = await FileManager.readJSON(targetPath);
 					return { targetLang, targetPath, content: targetContent, success: true };
-				} catch (err: any) {
-					await uiManager.log(`Could not read ${targetLang}: ${err.message}`);
+				} catch (err) {
+					const message = err instanceof Error ? err.message : String(err);
+					await uiManager.log(`Could not read ${targetLang}: ${message}`);
 					return {
 						targetLang,
 						targetPath: "",
 						content: {},
 						success: false,
-						error: err.message,
+						error: message,
 					};
 				}
 			})
@@ -489,7 +496,6 @@ class TranslationService {
 				styleGuide: options.styleGuide,
 				context: options.context,
 				lengthControl: options.lengthControl,
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				...(options.qualityChecks?.rules || {}),
 				enabled: true,
 			});
@@ -564,8 +570,9 @@ class TranslationService {
 			} else {
 				await uiManager.log(`\nNo length issues found in any language`);
 			}
-		} catch (error: any) {
-			await uiManager.log(`\nValidation error: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await uiManager.log(`\nValidation error: ${message}`);
 			throw error;
 		}
 	}
@@ -576,8 +583,9 @@ class TranslationService {
 	async findLocaleFiles(localesDir: string, sourceLang: string): Promise<string[]> {
 		try {
 			return await FileManager.findLocaleFiles(localesDir, sourceLang);
-		} catch (error: any) {
-			await uiManager.log(`Error finding locale files: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await uiManager.log(`Error finding locale files: ${message}`);
 			return [];
 		}
 	}

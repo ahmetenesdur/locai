@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { VectorStore } from "../../src/services/vector-store";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { VectorStore } from "../../src/services/vector-store.js";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -24,11 +24,8 @@ describe("VectorStore", () => {
 
 	it("should initialize correctly", async () => {
 		await vectorStore.initialize();
-		const indexExists = fs.existsSync(path.join(tmpDir, "index.json"));
-		// Vectra might not create index.json immediately until items added in some versions,
-		// but createIndex() should.
-		// Let's assume it works if no error thrown.
-		expect(true).toBe(true);
+		// createIndex() writes the index file up front
+		expect(fs.existsSync(path.join(tmpDir, "index.json"))).toBe(true);
 	});
 
 	it("should add and search items", async () => {

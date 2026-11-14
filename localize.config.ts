@@ -6,16 +6,13 @@
 import { defineConfig } from "./src/config/index.js";
 
 export default defineConfig({
-	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json) structures.
+	localesDir: "./locales", // Directory where locale JSON files are stored. Supports flat (en.json) or nested (en/translation.json; the file must be named translation.json) structures.
 	source: "en",
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
 
 	// Deep Context (Source Code Analysis)
 	// Scans source code for context (component name, comments, props)
 	deepContext: true,
-
-	// Optional: Filter by specific file extensions
-	// fileExtensions: [".json", ".arb"],
 
 	// API Provider Configuration
 	apiProvider: "openai",
@@ -286,17 +283,8 @@ export default defineConfig({
 
 	// File Operations
 	fileOperations: {
-		/**
-		 * File format to use (json, yaml, po, properties, etc.)
-		 * Set to "auto" to detect from file extension
-		 */
-		// format: "auto", // "json" | "yaml" | "po" | "properties" | "arb" | "auto"
-
-		/**
-		 * File structure (flat, nested, namespaced)
-		 * Set to "auto" to detect from content
-		 */
-		// fileStructure: "auto", // "flat" | "nested" | "namespaced" | "auto"
+		// Locale files are always read and written as JSON. `format` and `fileStructure`
+		// are accepted for compatibility but have no effect; the layout follows the source file.
 
 		backupFiles: false,
 		backupDir: "./.backups",

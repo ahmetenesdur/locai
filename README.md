@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/ahmetenesdur/locai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ahmetenesdur/locai/actions/workflows/ci.yml)
 
-**The Universal AI Localization Engine.**
+**AI translation for JSON locale files.**
 
-Locai brings human-quality AI localization to **any project** (Next.js, Flutter, Android, iOS, Python) and **any file format** with a single command. It fits right into your workflow, whether you're a solo dev or an enterprise team.
+Locai translates the JSON locale files of your project (`en.json` or `en/translation.json`) with an AI provider of your choice, from a single command. It works with any project that keeps its translations in JSON, for example Next.js, React or Vue apps using i18next.
 
 ## 🚀 Quick Start
 
@@ -27,11 +27,11 @@ Introduction, installation options, and setting up your API keys.
 
 ### [Configuration Guide](./docs/configuration.md)
 
-Detailed guide on `localize.config.ts`, supported file formats (`json`, `yaml`, `po`, `arb`), and advanced settings.
+Detailed guide on `localize.config.ts`, the supported locale file layouts, and advanced settings.
 
 ### [CLI Reference](./docs/cli-reference.md)
 
-Master the command line. Learn about `translate`, `fix`, `review`, and `analyze`.
+Learn about `translate`, `fix`, `review`, and `validate-config`.
 
 ### [Providers](./docs/providers.md)
 
@@ -58,10 +58,10 @@ Contributing to Locai? Learn how to build, test, and run the project locally.
 
 ## ✨ Why Locai?
 
-- **Framework Agnostic**: Works with Next.js, Flutter, Django, and more.
+- **JSON Locale Files**: Works with any project that stores translations as JSON (`<lang>.json` or `<lang>/translation.json`).
 - **Context Aware**: Knows the difference between "Home" (House) and "Home" (Page).
 - **Cost Efficient**: Only new or changed keys are sent to the AI, and strings already translated in the current run or found in translation memory are reused instead of triggering another API call.
-- **Flexible Structure**: Supports both flat (`en.json`) and nested (`en/translation.json`) directory structures automatically.
+- **Flat or Nested Layout**: Supports flat (`en.json`) and nested (`en/translation.json`) layouts. Target files are written in the same layout as the source file. The nested layout requires the file name `translation.json`.
 - **Developer Friendly**: TypeScript config, type safety, and great error messages.
 
 ## 🤝 Community & Contributing

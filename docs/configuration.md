@@ -8,9 +8,17 @@ Locai follows a "Zero-Config" philosophy but offers deep customization when you 
 - `localize.config.js`
 - `.localizerc`
 
-## Supported Directory Structures
+## Locale Files
 
-Locai automatically detects your project's locale structure. No configuration needed.
+`translate` and `fix` read and write JSON only. The source file is looked up in `localesDir` (default `./locales`) in this order:
+
+1. `<localesDir>/<source>/translation.json`
+2. `<localesDir>/<source>.json`
+3. Any file in `localesDir` whose name starts with `<source>.`, or a `<localesDir>/<source>/` directory that contains `translation.json`
+
+Target files are written in the same layout as the source file: `<localesDir>/<target>/translation.json` for the nested layout, `<target>.json` next to the source file for the flat layout. Locai does not search other directories; set `localesDir` (or pass `--localesDir`) if your files are elsewhere, for example `public/locales` or `messages`.
+
+The codebase also contains adapters for YAML, PO, `.properties`, Android XML and iOS `.strings` files, but `translate` and `fix` do not use them.
 
 ### 1. Flat Structure (Standard)
 
@@ -25,7 +33,7 @@ locales/
 
 ### 2. Nested Structure
 
-Common in larger projects (like `react-i18next` setups).
+Common in `react-i18next` setups. The file in each language directory must be named `translation.json`.
 
 ```
 locales/
@@ -54,7 +62,7 @@ export default {
 
 	// API Provider
 	apiProvider: "openai",
-	localesDir: "./locales", // Tool auto-detects this usually
+	localesDir: "./locales", // Default: "./locales"
 };
 ```
 

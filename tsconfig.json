@@ -3,14 +3,13 @@
 		"target": "ES2022",
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"rootDir": "src",
-		"outDir": "dist",
 		"strict": true,
 		"esModuleInterop": true,
 		"allowJs": true,
 
 		"checkJs": false,
-		"declaration": true
+		"noEmit": true
 	},
-	"include": ["src/**/*"]
+	"include": ["src/**/*", "tests/**/*", "*.ts"],
+	"exclude": ["tests/fixtures/**"]
 }

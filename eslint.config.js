@@ -1,9 +1,9 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
+import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 
-/** @type {import('eslint').Linter.Config[]} */
-export default [
+export default tseslint.config(
 	{
 		ignores: [
 			"**/node_modules/**",
@@ -12,9 +12,14 @@ export default [
 			".localize-cache/**",
 			"docs/**",
 			"test-glossary/**",
+			// Sample source files that the source analyzer tests parse; not project code.
+			"tests/fixtures/**",
 		],
 	},
 	{
+		linterOptions: {
+			reportUnusedDisableDirectives: "error",
+		},
 		languageOptions: {
 			globals: {
 				...globals.node,
@@ -24,11 +29,11 @@ export default [
 		},
 	},
 	pluginJs.configs.recommended,
-	eslintConfigPrettier,
+	tseslint.configs.recommended,
 	{
 		rules: {
-			"no-unused-vars": [
-				"warn",
+			"@typescript-eslint/no-unused-vars": [
+				"error",
 				{
 					argsIgnorePattern: "^_",
 					varsIgnorePattern: "^_",
@@ -36,8 +41,8 @@ export default [
 				},
 			],
 			"no-console": "off",
-			"prefer-const": "warn",
-			"no-undef": "error",
+			"prefer-const": "error",
 		},
 	},
-];
+	eslintConfigPrettier
+);

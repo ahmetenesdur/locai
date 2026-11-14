@@ -71,6 +71,19 @@ describe("ReviewCommand applying approved translations", () => {
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('"a" already holds a string'));
 	});
 
+	it("keeps an existing nested object where the approved key is a leaf", async () => {
+		const result = await approveAll(
+			[item("a", "nuevo"), item("c.d", "Cerrar"), item("e", "Editar")],
+			{ a: { b: "existente" }, c: { d: "Viejo" }, e: "Viejo" }
+		);
+
+		expect(result).toEqual({ a: { b: "existente" }, c: { d: "Cerrar" }, e: "Editar" });
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining('Skipped "a" for es: "a" already holds nested keys')
+		);
+	});
+
 	it("leaves the locale file untouched when no approved key can be applied", async () => {
 		const original = '{"a":"existente"}';
 		fs.mkdirSync(path.join(tmpDir, ".localize-cache"), { recursive: true });

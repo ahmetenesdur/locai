@@ -249,7 +249,8 @@ class ReviewCommand {
 
 	/**
 	 * Set nested value in object using dot notation. Missing parents are created; a parent
-	 * that already holds a non-object value (e.g. a string translation) is never overwritten.
+	 * that already holds a non-object value (e.g. a string translation) is never overwritten,
+	 * and neither is a leaf that already holds nested keys.
 	 * @param {LocaleTree} obj - Object to modify.
 	 * @param {string} path - Dot notation path.
 	 * @param {string} value - Value to set.
@@ -271,7 +272,13 @@ class ReviewCommand {
 			current = current[keys[i]] as LocaleTree;
 		}
 
-		current[keys[keys.length - 1]] = value;
+		const leaf = keys[keys.length - 1];
+		const existing: unknown = current[leaf];
+		if (existing !== null && typeof existing === "object" && !Array.isArray(existing)) {
+			return `"${path}" already holds nested keys, not a translation`;
+		}
+
+		current[leaf] = value;
 		return null;
 	}
 

@@ -16,7 +16,10 @@ export interface ProtectedTerm {
 	term: string;
 }
 
-/** Advanced format: `{ "API": { translation: "API", caseSensitive: true } }` */
+/**
+ * Advanced format: `{ "API": { translation: "API", caseSensitive: true, languages: ["de"] } }`.
+ * A non-empty `languages` list restricts the entry to those target languages.
+ */
 export type GlossaryEntryConfig = Partial<Omit<GlossaryEntry, "term">>;
 
 /** Language-specific format: `{ "API": { tr: "API", de: "API" } }` */
@@ -141,10 +144,14 @@ class GlossaryManager {
 	}
 
 	/**
-	 * Get applicable glossary entries for language pair
+	 * Get applicable glossary entries for language pair.
+	 * An advanced entry with a non-empty `languages` list applies only when `targetLang` is in
+	 * that list. Codes are compared as whole tags, ignoring case: `"pt-br"` matches `"pt-BR"`,
+	 * but `"zh"` does not match `"zh-CN"`.
 	 */
 	getApplicableEntries(sourceLang: string, targetLang: string): GlossaryEntry[] {
 		const entries: GlossaryEntry[] = [];
+		const target = targetLang.toLowerCase();
 
 		for (const [term, config] of Object.entries(this.glossary)) {
 			// Simple format: { "API": "API" }
@@ -155,13 +162,21 @@ class GlossaryManager {
 					caseSensitive: this.caseSensitive,
 				});
 			}
-			// Advanced format: { "API": { translation: "API", caseSensitive: true } }
+			// Advanced format: { "API": { translation: "API", caseSensitive: true, languages: ["de"] } }
 			else if (typeof config === "object" && isEntryConfig(config)) {
+				const { languages } = config;
+				if (
+					Array.isArray(languages) &&
+					languages.length > 0 &&
+					!languages.some((lang) => String(lang).toLowerCase() === target)
+				) {
+					continue;
+				}
 				entries.push({
 					term,
 					translation: config.translation,
 					caseSensitive: config.caseSensitive ?? this.caseSensitive,
-					languages: config.languages,
+					languages,
 				});
 			}
 			// Language-specific format

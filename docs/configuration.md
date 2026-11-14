@@ -321,8 +321,18 @@ export default defineConfig({
 		caseSensitive: false,
 		preserveFormatting: true,
 		glossary: {
+			// Simple: the same replacement for every target language
 			API: "API",
 			SDK: "SDK",
+			// Advanced: `languages` limits the entry to these target languages
+			// (whole codes, case-insensitive: "zh" does not match "zh-CN").
+			// Omit it or leave it empty to apply the entry to every target language.
+			NFT: {
+				translation: "NFT",
+				caseSensitive: true,
+				languages: ["de", "pt-BR"],
+			},
+			// Per-language: only applied for the target languages listed as keys
 			Dashboard: {
 				en: "Dashboard",
 				tr: "Kontrol Paneli",

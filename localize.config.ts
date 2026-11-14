@@ -359,6 +359,9 @@ export default defineConfig({
 			DeFi: {
 				translation: "DeFi",
 				caseSensitive: true, // Must match exact case
+				// Optional: only apply for these target languages (whole codes, case-insensitive;
+				// "zh" does not match "zh-CN"). Omitted or empty = every target language.
+				// languages: ["de", "pt-BR"],
 			},
 			NFT: {
 				translation: "NFT",

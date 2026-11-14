@@ -59,7 +59,7 @@ export default {
 	source: "en",
 	targets: ["tr", "es", "de"],
 
-	// Scans source code for rich context (enabled by default)
+	// Sends where each key is used in your source code with the prompt (enabled by default)
 	deepContext: true,
 
 	// API Provider
@@ -97,7 +97,7 @@ export default defineConfig({
 	targets: ["tr", "de", "es"], // Target language tags; also used as output file names (e.g. pt-BR.json)
 
 	// Deep Context (Source Code Analysis)
-	deepContext: true, // Scans source code for context (component name, comments, props)
+	deepContext: true, // Adds each key's usage in src/, app/, components/ (file, component, comments, JSX props, code) to the prompt
 
 	// API Provider Configuration
 	apiProvider: "openai",

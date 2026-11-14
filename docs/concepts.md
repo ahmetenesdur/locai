@@ -37,15 +37,19 @@ Only OpenAI embeddings are supported (`embeddingProvider: "openai"`), so `OPENAI
 
 ## Deep Context (Source Code Analysis)
 
-Unlike traditional tools that only see the key and value, LocAI scans your source code (TypeScript/TSX) to understand **where** and **how** a string is used.
+LocAI can look up where each key is used in your source code and send that usage with the translation request, so the model can tell a button label from a tooltip or an error message.
 
-It extracts:
+It reads the `.ts` and `.tsx` files under `src/`, `app/` and `components/` (relative to the directory you run LocAI from) and looks for calls like `t("cart.checkout")` or `i18n.t("cart.checkout")` whose first argument is a string literal equal to the key (nested keys in dot notation).
 
-- **Component Name**: Knowing it's in a `DeleteModal` vs `SuccessToast` changes the tone.
-- **Comments**: Reads comments like `// context: shown to admin users`.
-- **Props**: Analyzes JSX props (e.g., `variant="danger"`) to infer urgency or style.
+For each key it finds, the translation prompt gets a source code context section with:
 
-This rich context is sent to the AI, resulting in significantly more accurate translations.
+- **File and line** of the call.
+- **Component**: the enclosing function or class whose name starts with an uppercase letter (being in a `DeleteModal` rather than a `SuccessToast` changes the tone), otherwise the nearest named function.
+- **Comments** (up to 3, nearest first, 200 characters each): comments right above the call, its JSX attribute, its statement or the JSX elements around it, such as `// context: shown to admin users` or `{/* context: destructive action */}`, and the comment above its component. Tooling directives such as `eslint-disable-next-line` are left out.
+- **Props** (up to 10, values cut to 100 characters): the attributes of the JSX element the text belongs to, e.g. `variant="danger"` for `<Button variant="danger">{t("delete")}</Button>`.
+- **Code**: up to 200 characters of the code around the call, comments removed.
+
+When a key is used in several places, the first usage that has a comment is sent, otherwise the first usage. Keys that are not found get no extra context. This information goes to your AI provider together with the text. Set `deepContext: false` (or pass `--no-deep-context`) to skip the scan.
 
 ## 2. Smart Synchronization
 

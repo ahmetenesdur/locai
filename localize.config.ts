@@ -11,7 +11,8 @@ export default defineConfig({
 	targets: ["tr", "de", "es", "fr", "hi", "ja", "pl", "ru", "th", "uk", "vi", "yo", "zh"],
 
 	// Deep Context (Source Code Analysis)
-	// Scans source code for context (component name, comments, props)
+	// Adds where each key is used in src/, app/ and components/ (.ts/.tsx) to the prompt:
+	// file and line, component, comments, JSX props and a code snippet
 	deepContext: true,
 
 	// API Provider Configuration

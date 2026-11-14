@@ -64,7 +64,7 @@ Provides full type safety and autocomplete.
 
 ```typescript
 // localize.config.ts
-import { defineConfig } from "locai";
+import { defineConfig } from "locai/config";
 
 export default defineConfig({
 	source: "en",

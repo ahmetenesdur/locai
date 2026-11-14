@@ -145,14 +145,15 @@ export default defineConfig({
 	// Expired entries are translated again. `allowStaleCache` and `staleWhileRevalidate`
 	// are still accepted for compatibility but have no effect.
 
-	// Vector Memory (Infinite Memory)
-	// Semantic caching using embeddings to find similar translations
+	// Vector Memory (optional, off unless enabled: true)
+	// Reuses stored translations of similar strings. Needs OPENAI_API_KEY and costs one
+	// embedding request per new string. Only "openai" embeddings are supported.
 	vectorMemory: {
 		enabled: true,
 		similarityThreshold: 0.85, // Minimum similarity to use as context
 		exactMatchThreshold: 0.98, // Minimum similarity to use directly as translation
 		vectorDbPath: "./.localize-cache/vector-memory",
-		embeddingProvider: "openai", // Provider for generating embeddings
+		embeddingProvider: "openai", // Only "openai" is supported
 		embeddingModel: "text-embedding-3-small",
 	},
 
@@ -188,10 +189,10 @@ export default defineConfig({
 	// Translation Quality and Context
 	context: {
 		enabled: true,
-		useAI: true,
+		useAI: true, // Default: false. AI classifies strings >= minTextLength when the keyword match is weak (extra API calls)
 		aiProvider: "openai",
-		minTextLength: 200,
-		allowNewCategories: true,
+		minTextLength: 200, // Default: 50
+		allowNewCategories: true, // Let AI analysis suggest categories that are not defined below
 		debug: false,
 		analysisOptions: {
 			model: "gpt-4o",
@@ -199,9 +200,10 @@ export default defineConfig({
 			maxTokens: 1000,
 		},
 		detection: {
-			threshold: 2,
-			minConfidence: 0.6,
+			threshold: 2, // Keyword matches needed for a category
+			minConfidence: 0.6, // Share of the total score the best category needs
 		},
+		// No built-in categories: only the ones you define here are used
 		categories: {
 			technical: {
 				keywords: ["API", "backend", "database", "server", "endpoint"],

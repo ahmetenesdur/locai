@@ -8,6 +8,7 @@ import {
 } from "../commands/translator.js";
 import InputValidator from "../utils/input-validator.js";
 import ErrorHelper from "../utils/error-helper.js";
+import { NoProviderError } from "../core/provider-factory.js";
 import { FrameworkDetector } from "../core/detection/framework-detector.js";
 import { StructureDetector, LocaleStructure } from "../core/detection/structure-detector.js";
 import { configureComponents } from "../config/setup.js";
@@ -475,7 +476,9 @@ export const runCommand = async (
 				);
 
 				console.log(`API Configuration:`);
-				console.log(`   - Active Provider: ${finalConfig.apiProvider}`);
+				console.log(
+					`   - Active Provider: ${finalConfig.apiProvider || "first provider with an API key"}`
+				);
 				console.log(`   - Available Providers: ${availableProviders.join(", ") || "None"}`);
 
 				if (finalConfig.context.useAI) {
@@ -521,6 +524,11 @@ export const runCommand = async (
 			validationError instanceof Error ? validationError.message : String(validationError);
 		if (message.includes("Configuration validation")) {
 			// Already handled above with better formatting
+			return;
+		}
+		if (validationError instanceof NoProviderError) {
+			console.error(`\nError: ${message}`);
+			process.exit(1);
 			return;
 		}
 		console.error(`\nInput validation error: ${message}`);

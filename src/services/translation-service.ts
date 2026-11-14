@@ -2,6 +2,7 @@ import path from "path";
 import { FileManager } from "../utils/file-manager.js";
 import ObjectTransformer, { FlatTranslations } from "../utils/object-transformer.js";
 import Orchestrator from "../core/orchestrator.js";
+import ProviderFactory, { NoProviderError } from "../core/provider-factory.js";
 import ConfidenceScorer from "../utils/confidence-scorer.js";
 import { updateReviewQueue } from "../utils/review-queue.js";
 import QualityChecker from "../utils/quality/index.js";
@@ -34,6 +35,9 @@ class TranslationService {
 	 * @throws {Error} If validation fails or translation process errors.
 	 */
 	async translateFile(file: string, options: TranslationOptions): Promise<GlobalStats> {
+		// Stop before reading or changing anything when no provider could translate a key.
+		ProviderFactory.assertProviderAvailable(options.apiProvider, options.useFallback !== false);
+
 		await uiManager.log(`\nProcessing File: "${path.basename(file)}"`);
 
 		try {
@@ -560,6 +564,12 @@ class TranslationService {
 						`Found ${invalidItems.length} length issues in ${targetLang}`
 					);
 
+					// Re-translating needs a provider; stop before the first request if none has a key.
+					ProviderFactory.assertProviderAvailable(
+						options.apiProvider,
+						options.useFallback !== false
+					);
+
 					// Batch process fixes to improve performance
 					const results = await orchestrator.processTranslations(invalidItems);
 
@@ -593,8 +603,11 @@ class TranslationService {
 
 			await this.reportConfidence([orchestrator]);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await uiManager.log(`\nValidation error: ${message}`);
+			// The CLI prints a missing-provider error once; don't log it here as well.
+			if (!(error instanceof NoProviderError)) {
+				const message = error instanceof Error ? error.message : String(error);
+				await uiManager.log(`\nValidation error: ${message}`);
+			}
 			throw error;
 		}
 	}

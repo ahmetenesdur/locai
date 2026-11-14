@@ -88,13 +88,17 @@ describe("TranslationService", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// service is already instantiated
-
+		// translateFile stops early when no provider has an API key
+		vi.stubEnv("OPENAI_API_KEY", "test-key");
 		// Setup FileManager mocks
 		vi.mocked(FileManager.readJSON).mockResolvedValue({});
 		vi.mocked(FileManager.writeJSON).mockResolvedValue(true);
 		vi.mocked(FileManager.exists).mockResolvedValue(true);
 		// process.cwd mock might be needed if validation checks path, but usually it works if we pass absolute paths or relative that resolve inside
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
 	});
 
 	it("should be defined", () => {

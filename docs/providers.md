@@ -1,19 +1,19 @@
 # AI Providers
 
-Locai supports multiple industry-leading AI providers, allowing you to balance cost, speed, and translation quality.
+Locai can use six AI providers. Set the API key of at least one of them; pick the main one with `apiProvider` (or `--provider`).
 
-## Supported Models
+## Supported Providers
 
-| Provider      | Default Model               | RPM Limit | Concurrency | Context Limit |
-| ------------- | --------------------------- | --------- | ----------- | ------------- |
-| **OpenAI**    | `gpt-4o`                    | 1000      | 15          | 16K           |
-| **Dashscope** | `qwen-plus`                 | 200       | 8           | 8K            |
-| **DeepSeek**  | `deepseek-chat`             | 200       | 8           | 8K            |
-| **Gemini**    | `gemini-3-flash`            | 500       | 12          | 16K           |
-| **Anthropic** | `claude-haiku-4-5-20251001` | 50        | 5           | 200K          |
-| **XAI**       | `grok-4`                    | 300       | 10          | 8K            |
+| Provider      | Default Model               | API key variable    | Default RPM | Default Concurrency |
+| ------------- | --------------------------- | ------------------- | ----------- | ------------------- |
+| **OpenAI**    | `gpt-4o`                    | `OPENAI_API_KEY`    | 300         | 5                   |
+| **Dashscope** | `qwen-plus`                 | `DASHSCOPE_API_KEY` | 80          | 6                   |
+| **DeepSeek**  | `deepseek-chat`             | `DEEPSEEK_API_KEY`  | 30          | 2                   |
+| **Gemini**    | `gemini-3-flash`            | `GEMINI_API_KEY`    | 300         | 5                   |
+| **Anthropic** | `claude-haiku-4-5-20251001` | `ANTHROPIC_API_KEY` | 50          | 5                   |
+| **XAI**       | `grok-4`                    | `XAI_API_KEY`       | 80          | 8                   |
 
-> **Note:** These are the default limits when using the configuration shown in [`localize.config.ts`](../localize.config.ts). Limits are configurable via `rateLimiter` in your configuration.
+> **Note:** The RPM and concurrency columns are the built-in rate limiter defaults. Override them with `rateLimiter.providerLimits`; the repository's [`localize.config.ts`](../localize.config.ts) uses higher example values (for example OpenAI 1000 RPM / 15). Change the model with `apiConfig.<provider>.model`.
 
 ## Setup Guides
 
@@ -47,18 +47,23 @@ Locai supports multiple industry-leading AI providers, allowing you to balance c
 1. Get key from [x.ai](https://x.ai/)
 2. Add to `.env`: `XAI_API_KEY=xai-...`
 
-## Fallback Strategy
+## Fallback
 
-Locai implements a robust **Fallback Chain**. If your primary provider fails or hits a rate limit, the tool automatically switches to the next available provider.
+With `useFallback: true` (the default), Locai builds a chain from the providers whose API key is set:
 
-**Default Chain:**
-`OpenAI` → `Anthropic` → `Dashscope` → `DeepSeek` → `Gemini` → `XAI`
+1. `apiProvider` (or `--provider`) first, if its key is set.
+2. Then the providers listed in `fallbackOrder`, then any other providers with a key. Without `fallbackOrder` the built-in order is Dashscope → XAI → OpenAI → Anthropic → DeepSeek → Gemini.
 
-**Configuring Fallback:**
+If a request fails, the next provider in the chain is tried, cycling through the chain up to three times. A provider that fails five times in a row is skipped for two minutes. During a run, Locai also re-orders the chain by each provider's success rate and response time.
+
+With `useFallback: false`, only `apiProvider` is used, and its API key must be set.
+
+**Example:**
 
 ```typescript
 // localize.config.ts
 export default {
+	apiProvider: "openai",
 	useFallback: true,
 	fallbackOrder: ["openai", "anthropic", "dashscope", "deepseek", "gemini", "xai"],
 };

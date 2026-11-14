@@ -363,7 +363,7 @@ export default defineConfig({
 If you see `Rate limit exceeded` errors:
 
 1.  **Reduce Concurrency**: Set `concurrencyLimit: 1` in your config.
-2.  **Enable Fallback**: Set `useFallback: true` to switch to another provider automatically.
+2.  **Use Fallback**: Keep `useFallback` on (the default) and set API keys for more than one provider, so failed requests go to another provider.
 3.  **Check Plan**: Ensure your API provider account has sufficient credits.
 
 ### Broken Placeholders or HTML in Translations

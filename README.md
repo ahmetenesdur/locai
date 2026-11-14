@@ -35,7 +35,7 @@ Learn about `translate`, `fix`, `review`, and `validate-config`.
 
 ### [Providers](./docs/providers.md)
 
-Choose the right brain for your localization. Compare OpenAI, Gemini, DeepSeek, and more.
+Supported providers (OpenAI, Anthropic, Gemini, DeepSeek, Dashscope, XAI), their default models, API keys, rate limits and fallback.
 
 ### [Core Concepts](./docs/concepts.md)
 
@@ -47,7 +47,7 @@ Deep dive into Locai's intelligent features. We didn't just wrap an API; we buil
 - **Smart Sync**: Locai stores a hash of each source string. A key is translated when it is missing from a target file or its source text changed since the last run. If you have 1000 translated keys and change 5, only those 5 are sent to the AI. Keys removed from the source file are removed from the target files.
 - **Glossary & Brand Safety**: Define protected terms (like "Locai", "API", "SaaS"). Locai swaps them for placeholder tokens before the text reaches the AI, then restores your configured translation, so the model never sees the original term.
 - **Auto-Fix**: After each translation, rule-based checks repair what they can: unbalanced quotes, missing or damaged placeholders (`{name}`, `${name}`, `%s`, `%d`), HTML tags and ending punctuation, plus markdown, code blocks and special characters if you turn those rules on. The checks do not reject a translation.
-- **Multi-Provider Fallback**: OpenAI down? Rate limit hit? Locai automatically switches to Gemini, DeepSeek, or other configured providers without breaking the build.
+- **Provider Fallback**: With `useFallback` (on by default), a failed request is retried with the other providers that have an API key set.
 - **Confidence Scoring**: Every translation gets a score (0-1). Low confidence translations are flagged for your review.
 - **Interactive Review**: A built-in Terminal UI (TUI) to manually approve or edit translations that need attention.
 

@@ -213,6 +213,7 @@ class ReviewCommand {
 			byLanguage[item.language].push(item);
 		});
 
+		let skipped = 0;
 		Object.entries(byLanguage).forEach(([lang, items]) => {
 			const localeFile = path.join(this.config.localesDir, `${lang}.json`);
 
@@ -221,35 +222,57 @@ class ReviewCommand {
 				localeData = JSON.parse(fs.readFileSync(localeFile, "utf8")) as LocaleTree;
 			}
 
+			let applied = 0;
 			items.forEach((item) => {
-				this.setNestedValue(localeData, item.key, item.translation);
+				const conflict = this.setNestedValue(localeData, item.key, item.translation);
+				if (conflict) {
+					skipped++;
+					console.warn(
+						`   Skipped "${item.key}" for ${lang}: ${conflict}; the existing value was kept`
+					);
+				} else {
+					applied++;
+				}
 			});
 
+			if (applied === 0) return;
 			fs.writeFileSync(localeFile, JSON.stringify(localeData, null, 2) + "\n");
-			console.log(`   Updated ${lang}.json (${items.length} translations)`);
+			console.log(`   Updated ${lang}.json (${applied} translations)`);
 		});
 
-		console.log("\nAll approved translations applied!");
+		console.log(
+			skipped === 0
+				? "\nAll approved translations applied!"
+				: `\nApplied ${toApply.length - skipped} approved translations; skipped ${skipped} (see warnings above).`
+		);
 	}
 
 	/**
-	 * Set nested value in object using dot notation.
+	 * Set nested value in object using dot notation. Missing parents are created; a parent
+	 * that already holds a non-object value (e.g. a string translation) is never overwritten.
 	 * @param {LocaleTree} obj - Object to modify.
 	 * @param {string} path - Dot notation path.
 	 * @param {string} value - Value to set.
+	 * @returns {string | null} - Why the value could not be set, or null when it was set.
 	 */
-	setNestedValue(obj: LocaleTree, path: string, value: string): void {
+	setNestedValue(obj: LocaleTree, path: string, value: string): string | null {
 		const keys = path.split(".");
 		let current = obj;
 
 		for (let i = 0; i < keys.length - 1; i++) {
-			if (!current[keys[i]]) {
+			const next: unknown = current[keys[i]];
+			if (next === undefined) {
 				current[keys[i]] = {};
+			} else if (next === null || typeof next !== "object" || Array.isArray(next)) {
+				const kind =
+					next === null ? "null" : Array.isArray(next) ? "an array" : `a ${typeof next}`;
+				return `"${keys.slice(0, i + 1).join(".")}" already holds ${kind}, not nested keys`;
 			}
 			current = current[keys[i]] as LocaleTree;
 		}
 
 		current[keys[keys.length - 1]] = value;
+		return null;
 	}
 
 	/**

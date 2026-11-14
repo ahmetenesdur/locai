@@ -11,6 +11,8 @@ export interface GlobalStats {
 	totalTime: number;
 	success: number;
 	failed: number;
+	/** Keys that failed in at least one language (may repeat across languages). */
+	failedKeys: string[];
 	skipped: number;
 	languages: Record<string, LanguageStats>;
 	startTime: string;
@@ -55,6 +57,7 @@ export class StatisticsManager {
 			totalTime: 0,
 			success: 0,
 			failed: 0,
+			failedKeys: [],
 			skipped: 0,
 			languages: {},
 			startTime: new Date().toISOString(),

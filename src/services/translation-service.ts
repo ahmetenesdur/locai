@@ -11,7 +11,7 @@ import InputValidator from "../utils/input-validator.js";
 import { targetLocaleFile } from "../utils/locale-paths.js";
 import gracefulShutdown from "../utils/graceful-shutdown.js";
 import uiManager from "../utils/ui-manager.js";
-import statisticsManager from "../utils/statistics-manager.js";
+import statisticsManager, { runFailures } from "../utils/statistics-manager.js";
 import { LanguageProcessor } from "./language-processor.js";
 import { SourceCodeAnalyzer } from "./source-analyzer.js";
 import {
@@ -58,18 +58,26 @@ class TranslationService {
 
 			await uiManager.log(`Source file contains ${totalKeys} translation keys`);
 
-			const { stateManager, projectRoot, currentState, comparison } =
+			const { stateManager, projectRoot, previousState, currentState, comparison } =
 				await this.initializeTranslationState(resolvedFile, flattenedSource, options);
 
-			gracefulShutdown.registerCallback(async () => {
+			// Interrupted (Ctrl-C): changed keys may not be translated yet, so keep them changed.
+			const saveStateOnShutdown = async () => {
 				try {
-					await stateManager.saveState(projectRoot, currentState);
+					await stateManager.saveState(
+						projectRoot,
+						stateManager.stateAfterRun(previousState, currentState, [
+							...comparison.newKeys,
+							...comparison.modifiedKeys,
+						])
+					);
 					console.log("State saved during shutdown");
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					console.error("Failed to save state during shutdown:", message);
 				}
-			});
+			};
+			gracefulShutdown.registerCallback(saveStateOnShutdown);
 
 			statisticsManager.reset();
 			const globalStats: GlobalStats = statisticsManager.getStats();
@@ -86,7 +94,9 @@ class TranslationService {
 				await this.finalizeTranslation(
 					stateManager,
 					projectRoot,
+					previousState,
 					currentState,
+					comparison,
 					globalStats,
 					startTime,
 					options
@@ -105,6 +115,7 @@ class TranslationService {
 
 				throw error;
 			} finally {
+				gracefulShutdown.unregisterCallback(saveStateOnShutdown);
 				if (process.env.DEBUG) {
 					await uiManager.log("\nCache statistics:");
 				}
@@ -221,7 +232,7 @@ class TranslationService {
 			await uiManager.log(`First run - will process all keys`);
 		}
 
-		return { stateManager, projectRoot, currentState, comparison };
+		return { stateManager, projectRoot, previousState, currentState, comparison };
 	}
 
 	/**
@@ -330,7 +341,9 @@ class TranslationService {
 	 * Finalize translation process and save state.
 	 * @param {StateManager} stateManager - State manager instance.
 	 * @param {string} projectRoot - Project root directory.
+	 * @param {Record<string, string>} previousState - State loaded at the start of the run.
 	 * @param {Record<string, string>} currentState - Current state (key → content hash).
+	 * @param {StateComparison} comparison - New, modified and deleted keys of this run.
 	 * @param {GlobalStats} globalStats - Global statistics object.
 	 * @param {number} startTime - Process start timestamp.
 	 * @param {TranslationOptions} options - Translation options.
@@ -338,7 +351,9 @@ class TranslationService {
 	async finalizeTranslation(
 		stateManager: StateManager,
 		projectRoot: string,
+		previousState: Record<string, string>,
 		currentState: Record<string, string>,
+		comparison: StateComparison,
 		globalStats: GlobalStats,
 		startTime: number,
 		options: TranslationOptions
@@ -351,8 +366,20 @@ class TranslationService {
 
 		await this.reportConfidence(globalStats.orchestrators);
 
+		// Keys that failed in any language (or every changed key, if a whole language failed)
+		// keep their previous hash, so the next run still treats them as changed.
+		const unfinishedKeys = new Set(globalStats.failedKeys);
+		if (runFailures(globalStats).failedLanguages.length > 0) {
+			for (const key of [...comparison.newKeys, ...comparison.modifiedKeys]) {
+				unfinishedKeys.add(key);
+			}
+		}
+
 		try {
-			await stateManager.saveState(projectRoot, currentState);
+			await stateManager.saveState(
+				projectRoot,
+				stateManager.stateAfterRun(previousState, currentState, unfinishedKeys)
+			);
 			if (options.debug) {
 				await uiManager.log(`State saved for future sync operations`);
 			}

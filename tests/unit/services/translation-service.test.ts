@@ -4,6 +4,7 @@ import { FileManager } from "../../../src/utils/file-manager.js";
 import Orchestrator from "../../../src/core/orchestrator.js";
 import { SourceCodeAnalyzer } from "../../../src/services/source-analyzer.js";
 import statisticsManager from "../../../src/utils/statistics-manager.js";
+import type * as StatisticsModule from "../../../src/utils/statistics-manager.js";
 import { TranslationOptions } from "../../../src/types/index.js";
 
 // Mock dependencies
@@ -29,17 +30,20 @@ vi.mock("../../../src/utils/ui-manager.js", () => ({
 }));
 // Shared stats object for mocks
 
-vi.mock("../../../src/utils/statistics-manager.js", () => {
+vi.mock("../../../src/utils/statistics-manager.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof StatisticsModule>();
 	const mockStats = {
 		total: 0,
 		success: 0,
 		failed: 0,
+		failedKeys: [] as string[],
 		skipped: 0,
 		languages: {} as Record<string, Record<string, number>>,
 		details: {},
 		byCategory: {},
 	};
 	return {
+		runFailures: actual.runFailures,
 		default: {
 			reset: vi.fn().mockImplementation(() => {
 				mockStats.languages = {};
@@ -66,11 +70,13 @@ vi.mock("../../../src/utils/state-manager.js", () => ({
 		compareStates = vi.fn().mockReturnValue({ newKeys: [], modifiedKeys: [], deletedKeys: [] });
 		getComparisonStats = vi.fn().mockReturnValue({ hasChanges: false });
 		saveState = vi.fn().mockResolvedValue(undefined);
+		stateAfterRun = vi.fn().mockReturnValue({});
 	},
 }));
 vi.mock("../../../src/utils/graceful-shutdown.js", () => ({
 	default: {
 		registerCallback: vi.fn(),
+		unregisterCallback: vi.fn(),
 	},
 }));
 

@@ -123,6 +123,7 @@ export class LanguageProcessor {
 					await uiManager.log(`\u26a0\ufe0f Skipping invalid key/text: ${message}`);
 					globalStats.languages[safeTargetLang].failed++;
 					globalStats.failed++;
+					globalStats.failedKeys.push(key);
 					continue;
 				}
 
@@ -244,6 +245,7 @@ export class LanguageProcessor {
 			globalStats.total += validResults.length + failedKeys.length;
 			globalStats.success += validResults.length;
 			globalStats.failed += failedKeys.length;
+			globalStats.failedKeys.push(...failedKeys);
 			globalStats.languages[safeTargetLang].added += validResults.length;
 			globalStats.languages[safeTargetLang].failed += failedKeys.length;
 

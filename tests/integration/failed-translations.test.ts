@@ -168,4 +168,43 @@ describe("a run in which translations fail", () => {
 		expect(stats.languages.tr).toMatchObject({ added: 1, failed: 1 });
 		expect(readJson(path.join(localesDir, "tr.json"))).toEqual({ hello: "Merhaba" });
 	});
+
+	it("translates a changed key again on the next run when its translation failed", async () => {
+		const source = path.join(localesDir, "en.json");
+		writeSource({ hello: "Hello", bye: "Goodbye" });
+		replies = { Hello: "Merhaba", Goodbye: "Hoşça kal" };
+		await translateFile(source, options());
+		expect(readJson(path.join(localesDir, "tr.json"))).toEqual({
+			hello: "Merhaba",
+			bye: "Hoşça kal",
+		});
+
+		// The source text of `hello` changes, and its translation fails this time
+		writeSource({ hello: "Hello there", bye: "Goodbye" });
+		replies = {};
+		const failed = await translateFile(source, options());
+		expect(failed.failed).toBe(1);
+		expect(readJson(path.join(localesDir, "tr.json")).hello).toBe("Merhaba");
+
+		// The next run must still treat `hello` as changed and translate it
+		replies = { "Hello there": "Merhaba oradaki" };
+		const retried = await translateFile(source, options());
+		expect(retried).toMatchObject({ success: 1, failed: 0 });
+		expect(readJson(path.join(localesDir, "tr.json"))).toEqual({
+			hello: "Merhaba oradaki",
+			bye: "Hoşça kal",
+		});
+	});
+
+	it("translates a new key on the next run when its translation failed", async () => {
+		const source = path.join(localesDir, "en.json");
+		writeSource({ hello: "Hello" });
+		replies = {};
+		await translateFile(source, options());
+
+		replies = { Hello: "Merhaba" };
+		const retried = await translateFile(source, options());
+		expect(retried).toMatchObject({ success: 1, failed: 0 });
+		expect(readJson(path.join(localesDir, "tr.json"))).toEqual({ hello: "Merhaba" });
+	});
 });

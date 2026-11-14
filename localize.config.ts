@@ -62,8 +62,6 @@ export default defineConfig({
 	cacheTTL: 24 * 60 * 60 * 1000,
 	cacheSize: 2000,
 	updateAgeOnGet: true, // Update cache age when accessed (LRU behavior)
-	allowStaleCache: true, // Allow returning stale cache while refreshing
-	staleWhileRevalidate: true, // Serve stale content while revalidating in background
 
 	// Vector Memory (Infinite Memory)
 	// Semantic caching using embeddings to find similar translations

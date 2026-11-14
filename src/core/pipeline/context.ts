@@ -66,11 +66,8 @@ export interface TranslationResult {
 	needsReview?: boolean;
 }
 
-/** Options visible to the pipeline steps: the orchestrator options plus per-run flags. */
-export interface PipelineOptions extends OrchestratorOptions {
-	/** Bypass the cache reads, forcing a fresh translation (background cache refresh). */
-	skipCache?: boolean;
-}
+/** Options visible to the pipeline steps: the orchestrator options. */
+export type PipelineOptions = OrchestratorOptions;
 
 /** Source-code usage of a key, as added by ContextEnrichmentStep. */
 export interface VisualContext {

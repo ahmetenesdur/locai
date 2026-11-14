@@ -89,7 +89,9 @@ export interface OrchestratorOptions {
 	cacheSize?: number;
 	cacheTTL?: number;
 	updateAgeOnGet?: boolean;
+	/** @deprecated Has no effect: expired cache entries are always translated again. */
 	allowStaleCache?: boolean;
+	/** @deprecated Has no effect: the cache never refreshes entries in the background. */
 	staleWhileRevalidate?: boolean;
 	minConfidence?: number;
 	saveReviewQueue?: boolean;
@@ -141,13 +143,6 @@ interface TranslationItem {
 	existingTranslation?: FlatTranslationValue;
 }
 
-/** What a background refresh needs to re-translate a cached entry (the cache's fetch context). */
-interface CacheRefreshContext {
-	text: string;
-	targetLang: string;
-	contextData?: TranslationMeta;
-}
-
 /** Cache counters plus the cache's current size, capacity and hit rate. */
 export interface CacheStatus extends CacheStats {
 	size: number;
@@ -181,7 +176,7 @@ class Orchestrator {
 	public qualityChecker: QualityChecker | null;
 	public advanced: AdvancedSettings;
 	public glossaryManager: GlossaryManager;
-	public translationCache: LRUCache<string, TranslationResult, CacheRefreshContext> | null;
+	public translationCache: LRUCache<string, TranslationResult> | null;
 	public cacheStats: CacheStats;
 
 	// Vector Memory
@@ -237,30 +232,16 @@ class Orchestrator {
 		}
 
 		// Cache Initialization
-		this.translationCache = new LRUCache<string, TranslationResult, CacheRefreshContext>({
+		this.translationCache = new LRUCache<string, TranslationResult>({
 			max: options.cacheSize || 1000,
 			ttl: options.cacheTTL || 1000 * 60 * 60 * 24,
 			updateAgeOnGet: options.updateAgeOnGet !== false,
-			allowStale: options.allowStaleCache !== false,
-			// Simplified fetchMethod for stale-while-revalidate pattern
-			fetchMethod: async (key, staleValue, { context }) => {
-				if (staleValue && options.staleWhileRevalidate !== false) {
-					// Background refresh using a mini-pipeline or direct logic
-					this._refreshCacheEntry(key, context).catch((err) => {
-						console.warn(`Cache refresh failed for key ${key}: ${err.message}`);
-					});
-					return staleValue;
-				}
-				return undefined;
-			},
 		});
 
 		this.cacheStats = {
 			hits: 0,
 			misses: 0,
-			staleHits: 0,
 			stored: 0,
-			refreshes: 0,
 		};
 
 		// Confidence scoring settings
@@ -564,9 +545,7 @@ class Orchestrator {
 		this.cacheStats = {
 			hits: 0,
 			misses: 0,
-			staleHits: 0,
 			stored: 0,
-			refreshes: 0,
 		};
 	}
 
@@ -578,40 +557,6 @@ class Orchestrator {
 			capacity: this.translationCache.max,
 			hitRate: this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses) || 0,
 		};
-	}
-
-	// Used by background revalidation.
-	async _refreshCacheEntry(key: string, context: CacheRefreshContext): Promise<void> {
-		if (!context || !context.text || !context.targetLang) {
-			return;
-		}
-
-		try {
-			// Use the full pipeline for refresh, but skip cache read to force re-translation
-			// pass specific options merged with global options
-			const refreshOptions = {
-				...this.options,
-				skipCache: true,
-				staleWhileRevalidate: false, // Prevent infinite recursion matching this condition
-			};
-
-			const ctx = createTranslationContext(
-				key,
-				context.text,
-				this.options.source,
-				context.targetLang,
-				refreshOptions,
-				context.contextData
-			);
-
-			await this.pipeline.execute(ctx);
-
-			// Stats are handled within steps (TranslationStep adds confidence, CacheWriteStep updates cache & stats)
-			this.cacheStats.refreshes++;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			console.warn(`Failed to refresh cache entry: ${message}`);
-		}
 	}
 
 	getStatus(): OrchestratorStatus {

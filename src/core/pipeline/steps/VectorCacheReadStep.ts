@@ -39,12 +39,7 @@ export class VectorCacheReadStep extends PipelineStep {
 
 	async execute(context: TranslationContext, next: () => Promise<void>): Promise<void> {
 		// Skip if disabled, or already has result (Exact Cache hit)
-		if (
-			!this.options.enabled ||
-			context.result?.success ||
-			context.result?.fromCache ||
-			context.options?.skipCache
-		) {
+		if (!this.options.enabled || context.result?.success || context.result?.fromCache) {
 			await next();
 			return;
 		}

@@ -2,6 +2,7 @@
  * Prompt template utilities for translation and analysis
  */
 
+import type { CodeContext } from "../types/context.js";
 import type { FlatTranslationValue } from "./object-transformer.js";
 import type { LengthControlOptions } from "./quality/length-checker.js";
 
@@ -20,6 +21,8 @@ export interface PromptOptions {
 			target: string;
 			similarity: number;
 		};
+		/** Where the key is used in the project's source code (deep context) */
+		code?: CodeContext;
 	};
 	styleGuide?: {
 		formality?: string;
@@ -138,6 +141,62 @@ const getLengthInstructions = (options: PromptOptions): string => {
 	return "TRANSLATION LENGTH: Keep translation concise and natural.";
 };
 
+/** What the prompt carries of a key's source-code usage (deep context). */
+const CODE_CONTEXT_LIMITS = {
+	/** Characters of the file path, of each comment and of the code snippet */
+	textLength: 200,
+	/** Characters of the component name and of each prop value */
+	nameLength: 100,
+	comments: 3,
+	props: 10,
+};
+
+/** `text` on one line, cut to `max` characters. */
+const clip = (text: string, max: number): string => {
+	const line = text.replace(/\s+/g, " ").trim();
+	return line.length > max ? `${line.substring(0, max)}...` : line;
+};
+
+/**
+ * Where the key is used in the project's source code: file, component, comments, JSX props and
+ * a code snippet, cut to CODE_CONTEXT_LIMITS. Empty when the key was not found in the code.
+ */
+const getCodeContextInstructions = (code: CodeContext | undefined): string => {
+	if (!code) return "";
+
+	const { textLength, nameLength } = CODE_CONTEXT_LIMITS;
+	const lines = [`- File: ${clip(code.filePath, textLength)}:${code.line}`];
+	if (code.component) {
+		lines.push(`- Component: ${clip(code.component, nameLength)}`);
+	}
+	const comments = (code.comments ?? [])
+		.map((comment) => clip(comment, textLength))
+		.filter((comment) => comment.length > 0)
+		.slice(0, CODE_CONTEXT_LIMITS.comments);
+	if (comments.length > 0) {
+		lines.push(`- Comments: ${comments.map((comment) => `"${comment}"`).join("; ")}`);
+	}
+	const props = Object.entries(code.props ?? {})
+		.slice(0, CODE_CONTEXT_LIMITS.props)
+		.map(([name, value]) =>
+			// Expression values keep their braces: onClick={onDelete}
+			value.startsWith("{")
+				? `${name}=${clip(value, nameLength)}`
+				: `${name}="${clip(value, nameLength)}"`
+		);
+	if (props.length > 0) {
+		lines.push(`- JSX props: ${props.join(" ")}`);
+	}
+	if (code.usageSnippet) {
+		lines.push(`- Code: ${clip(code.usageSnippet, textLength)}`);
+	}
+
+	return `
+SOURCE CODE CONTEXT (where this text is used in the app; use it only to understand the text, do not translate it or include it in your answer):
+${lines.join("\n")}
+`;
+};
+
 /**
  * Base translation prompt template
  */
@@ -208,6 +267,7 @@ Please maintain consistency with this style and vocabulary where appropriate.`;
 
 	const formality = options.styleGuide?.formality || "neutral";
 	const toneOfVoice = options.styleGuide?.toneOfVoice || "professional";
+	const codeContextInstructions = getCodeContextInstructions(options.detectedContext?.code);
 
 	return `
 Translation Task: ${sourceLang} → ${targetLang}
@@ -215,7 +275,7 @@ ${additionalInstructions}
 
 Category: ${safeContext.category}
 Context Instructions: ${safeContext.prompt}
-
+${codeContextInstructions}
 LENGTH CONTROL:
 ${lengthInstructions}
 

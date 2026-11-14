@@ -13,6 +13,7 @@ import { StructureDetector, LocaleStructure } from "../core/detection/structure-
 import { configureComponents } from "../config/setup.js";
 import { LocalizeConfig, ResolvedLocalizeConfig } from "../config/index.js";
 import type { LengthMode } from "../utils/quality/length-checker.js";
+import type { ReviewCommandConfig } from "../commands/review.js";
 
 /** Global options declared on the root program in src/cli.ts. */
 interface GlobalOptions {
@@ -24,6 +25,22 @@ interface GlobalOptions {
 	debug?: boolean;
 	verbose?: boolean;
 }
+
+/**
+ * Settings for `locai review`: the global `--source` / `--localesDir` flags (whose
+ * defaults are the config values) decide where approved translations are written.
+ */
+export const resolveReviewConfig = (defaultConfig: LocalizeConfig): ReviewCommandConfig => {
+	const globalOpts = program.opts<GlobalOptions>();
+	const source = globalOpts.source ?? defaultConfig.source;
+	const localesDir = globalOpts.localesDir ?? defaultConfig.localesDir;
+	return {
+		source: source ? InputValidator.validateLanguageCode(source, "source language") : "en",
+		localesDir: localesDir
+			? InputValidator.validateDirectoryPath(localesDir, "locales directory")
+			: "./locales",
+	};
+};
 
 /**
  * Options commander parses for the commands handled by runCommand.

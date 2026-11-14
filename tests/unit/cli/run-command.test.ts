@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { program } from "commander";
-import { runCommand, type CommandOptions } from "../../../src/cli/helpers.js";
+import { resolveReviewConfig, runCommand, type CommandOptions } from "../../../src/cli/helpers.js";
+import type { ReviewCommandConfig } from "../../../src/commands/review.js";
+import InputValidator from "../../../src/utils/input-validator.js";
 import type { ResolvedLocalizeConfig } from "../../../src/config/index.js";
 import {
 	findLocaleFiles,
@@ -67,6 +69,12 @@ program
 	.command("fix")
 	.option("--length", "Fix length issues", true)
 	.action((options: CommandOptions) => runCommand(cliConfig, options, "fix"));
+
+/** The settings the `review` action resolved; set when `review` runs. */
+let reviewConfig: ReviewCommandConfig | undefined;
+program.command("review").action(() => {
+	reviewConfig = resolveReviewConfig(cliConfig);
+});
 
 program.action(() => runCommand(cliConfig, {}, "translate"));
 
@@ -247,5 +255,19 @@ describe("runCommand", () => {
 				})
 			);
 		});
+	});
+
+	it("passes the global --source and --localesDir flags to `review`", async () => {
+		reviewConfig = undefined;
+		vi.mocked(InputValidator.validateLanguageCode).mockImplementation((code) => String(code));
+		vi.mocked(InputValidator.validateDirectoryPath).mockImplementation((dir) => String(dir));
+
+		await runCli(["--source", "de", "--localesDir", "./i18n", "review"], {
+			...config,
+			source: "fr",
+			localesDir: "./messages",
+		});
+
+		expect(reviewConfig).toEqual({ source: "de", localesDir: "./i18n" });
 	});
 });

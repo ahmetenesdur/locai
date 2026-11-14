@@ -4,9 +4,13 @@ import { program } from "commander";
 import ErrorHelper, { HelperError } from "./utils/error-helper.js";
 import { loadConfig, validateEnvironment } from "./config/index.js";
 import { loadEnvironmentVariables, configureComponents } from "./config/setup.js";
-import { autoDetectConfig, runCommand, CommandOptions } from "./cli/helpers.js";
+import {
+	autoDetectConfig,
+	runCommand,
+	resolveReviewConfig,
+	CommandOptions,
+} from "./cli/helpers.js";
 import InputValidator from "./utils/input-validator.js";
-import type { ReviewCommandConfig } from "./commands/review.js";
 
 interface ValidateConfigOptions {
 	showWarnings: boolean;
@@ -289,14 +293,7 @@ const main = async () => {
 		.action(async (options: ReviewOptions) => {
 			try {
 				const ReviewCommand = (await import("./commands/review.js")).default;
-				// ReviewCommandConfig requires localesDir and source to be strings (not undefined)
-				const reviewConfig: ReviewCommandConfig = {
-					...defaultConfig,
-					localesDir: defaultConfig.localesDir || "./locales",
-					source: defaultConfig.source || "en",
-				};
-
-				const review = new ReviewCommand(reviewConfig);
+				const review = new ReviewCommand(resolveReviewConfig(defaultConfig));
 
 				if (options.export) {
 					review.exportReviewQueue(options.export);

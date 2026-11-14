@@ -51,6 +51,16 @@ describe("RetryHelper", () => {
 
 			expect(operation).toHaveBeenCalledTimes(1); // Only initial attempt
 		});
+
+		it("should keep the message when the operation rejects with a non-Error value", async () => {
+			const operation = vi.fn().mockRejectedValue("quota exhausted");
+
+			await expect(
+				RetryHelper.withRetry(operation, { maxRetries: 1, initialDelay: 1 })
+			).rejects.toThrow("quota exhausted (after 2 attempts");
+
+			expect(operation).toHaveBeenCalledTimes(2);
+		});
 	});
 
 	describe("defaultRetryCondition", () => {

@@ -125,9 +125,12 @@ class RetryHelper {
 
 				return result;
 			} catch (caught) {
-				// Operations reject with Error objects (or axios-style errors); treat them
-				// as error-like so they can be classified and annotated below.
-				const error = caught as RetryableError;
+				// Errors are annotated with retry metadata below, which a primitive rejection
+				// (a thrown string, undefined) cannot hold; wrap those so the message survives.
+				const error: RetryableError =
+					typeof caught === "object" && caught !== null
+						? caught
+						: new Error(String(caught));
 				attempts++;
 				lastError = error;
 

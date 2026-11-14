@@ -140,6 +140,24 @@ describe("a run in which translations fail", () => {
 		expect(output).not.toContain("completed successfully");
 	});
 
+	it("prints the error message of a failed key and its stack only with --debug", async () => {
+		writeSource({ hello: "Hello" });
+		replies = {};
+
+		await translateFile(path.join(localesDir, "en.json"), options());
+		const output = logged.join("\n");
+		expect(output).toMatch(/Translation error - key "hello": .*All providers failed/);
+		expect(output).not.toMatch(/^\s+at /m);
+		expect(output).not.toContain("task failed");
+
+		// --debug sets DEBUG=true
+		logged = [];
+		fs.rmSync(path.join(projectDir, ".localize-cache"), { recursive: true, force: true });
+		vi.stubEnv("DEBUG", "true");
+		await translateFile(path.join(localesDir, "en.json"), options());
+		expect(logged.join("\n")).toMatch(/^\s+at /m);
+	});
+
 	it("counts a partial failure and writes only the successful keys", async () => {
 		writeSource({ hello: "Hello", bye: "Goodbye" });
 		replies = { Hello: "Merhaba" };

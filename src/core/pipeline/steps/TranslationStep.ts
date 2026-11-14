@@ -75,8 +75,13 @@ class TranslationStep extends PipelineStep {
 			// Continue to next steps (restore glossary, quality check, etc.)
 			await next();
 		} catch (error) {
-			console.error(`Translation error - key "${context.key}":`, error);
-			context.result.error = error instanceof Error ? error.message : String(error);
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`Translation error - key "${context.key}": ${message}`);
+			// The stack is for debugging LocAI itself; show it only with --debug
+			if (process.env.DEBUG === "true" && error instanceof Error && error.stack) {
+				console.error(error.stack);
+			}
+			context.result.error = message;
 			context.result.success = false;
 			context.result.translated = context.sourceText; // Fallback to source
 			// Stop pipeline or proceed?

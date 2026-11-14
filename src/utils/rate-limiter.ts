@@ -324,12 +324,15 @@ class RateLimiter {
 			} catch (error) {
 				this._trackErrorRate(provider, true);
 
-				console.error(`Provider ${provider} task failed:`, {
-					error: error instanceof Error ? error.message : String(error),
-					queueTime: queueTime,
-					processingTime: performance.now() - startTime,
-					queueSize: queue.length,
-				});
+				// The caller reports the failure; the per-attempt details are for --debug
+				if (process.env.DEBUG === "true") {
+					console.error(`Provider ${provider} task failed:`, {
+						error: error instanceof Error ? error.message : String(error),
+						queueTime: queueTime,
+						processingTime: performance.now() - startTime,
+						queueSize: queue.length,
+					});
+				}
 				reject(error);
 			} finally {
 				this.processing[provider]--;

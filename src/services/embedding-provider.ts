@@ -36,8 +36,9 @@ export class EmbeddingProvider implements IEmbeddingProvider {
 			// Fallback or other providers would go here
 			console.warn(`Provider ${this.provider} not supported for embeddings yet.`);
 			return [];
-		} catch (error: any) {
-			console.error(`Failed to generate embedding: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`Failed to generate embedding: ${message}`);
 			return [];
 		}
 	}
@@ -53,8 +54,9 @@ export class EmbeddingProvider implements IEmbeddingProvider {
 				return await openaiProvider.embedBatch(texts, { model: this.model });
 			}
 			return [];
-		} catch (error: any) {
-			console.error(`Failed to generate batch embeddings: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`Failed to generate batch embeddings: ${message}`);
 			return [];
 		}
 	}

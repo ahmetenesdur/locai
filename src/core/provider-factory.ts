@@ -6,7 +6,7 @@ import * as dashscopeProvider from "../providers/dashscope.js";
 import * as xaiProvider from "../providers/xai.js";
 import FallbackProvider, { ProviderWrapper, ProviderModule } from "./fallback-provider.js";
 import rateLimiter from "../utils/rate-limiter.js";
-import { ProviderConfig, TranslateOptions } from "../providers/base-provider.js";
+import { ChatMessage, ProviderConfig, TranslateOptions } from "../providers/base-provider.js";
 
 // Common interface for both Provider modules and FallbackProvider
 export interface AIProvider {
@@ -17,7 +17,7 @@ export interface AIProvider {
 		options?: TranslateOptions
 	): Promise<string>;
 	analyze?(prompt: string, options?: ProviderConfig): Promise<string>;
-	chat?(messages: any[], options?: ProviderConfig): Promise<string>;
+	chat?(messages: ChatMessage[], options?: ProviderConfig): Promise<string>;
 }
 
 /**
@@ -80,7 +80,6 @@ class ProviderFactory {
 					prompt: string,
 					options: ProviderConfig = {}
 				): Promise<string> => {
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					return rateLimiter.enqueue(normalizedProviderName, () =>
 						selected.analyze!(prompt, options)
 					);
@@ -89,10 +88,9 @@ class ProviderFactory {
 
 			if (selected.chat) {
 				wrappedProvider.chat = (
-					messages: any[],
+					messages: ChatMessage[],
 					options: ProviderConfig = {}
 				): Promise<string> => {
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					return rateLimiter.enqueue(normalizedProviderName, () =>
 						selected.chat!(messages, options)
 					);

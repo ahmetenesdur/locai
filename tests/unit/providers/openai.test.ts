@@ -1,12 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { OpenAIProvider } from "../../../src/providers/openai.js";
-import axios from "axios";
+import axios, { type AxiosInstance } from "axios";
 
 vi.mock("axios");
 
 describe("OpenAIProvider", () => {
 	let provider: OpenAIProvider;
-	let mockClient: any;
+	let mockClient: {
+		post: Mock;
+		interceptors: { request: { use: Mock }; response: { use: Mock } };
+	};
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -18,7 +21,8 @@ describe("OpenAIProvider", () => {
 				response: { use: vi.fn() },
 			},
 		};
-		(axios.create as any).mockReturnValue(mockClient);
+		// Partial client: the provider only calls `post`.
+		vi.mocked(axios.create).mockReturnValue(mockClient as unknown as AxiosInstance);
 
 		process.env.OPENAI_API_KEY = "test-key";
 		provider = new OpenAIProvider();

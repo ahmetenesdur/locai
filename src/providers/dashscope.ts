@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import BaseProvider, { ProviderConfig, TranslateOptions } from "./base-provider.js";
+import type { ChatCompletionResponse, DashScopeGenerationResponse } from "./api-types.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
@@ -70,17 +71,20 @@ class DashScopeProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model || "qwen-plus",
-						...promptData,
-						temperature: config.temperature || 0.3,
-						max_tokens: config.maxTokens || 2000,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model || "qwen-plus",
+							...promptData,
+							temperature: config.temperature || 0.3,
+							max_tokens: config.maxTokens || 2000,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const translation = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(translation);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -112,7 +116,7 @@ class DashScopeProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.generationClient.post(
+					const response = await this.generationClient.post<DashScopeGenerationResponse>(
 						this.getGenerationEndpoint(),
 						{
 							...promptData,
@@ -125,7 +129,7 @@ class DashScopeProvider extends BaseProvider {
 
 					const result = response.data.output.text.trim();
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}

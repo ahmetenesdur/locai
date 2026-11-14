@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
-import BaseProvider, { ProviderConfig, TranslateOptions } from "./base-provider.js";
+import BaseProvider, { ChatMessage, ProviderConfig, TranslateOptions } from "./base-provider.js";
+import type { ChatCompletionResponse, EmbeddingResponse } from "./api-types.js";
 import { getPrompt, getAnalysisPrompt } from "../utils/prompt-templates.js";
 import RetryHelper from "../utils/retry-helper.js";
 
@@ -53,17 +54,20 @@ class OpenAIProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model || "gpt-4o",
-						...promptData,
-						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model || "gpt-4o",
+							...promptData,
+							temperature: config.temperature,
+							max_completion_tokens: config.maxTokens || config.max_tokens,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const translation = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(translation);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error; // handleApiError throws, but TS might need this
 				}
@@ -92,17 +96,20 @@ class OpenAIProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model,
-						...promptData,
-						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model,
+							...promptData,
+							temperature: config.temperature,
+							max_completion_tokens: config.maxTokens || config.max_tokens,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -115,7 +122,7 @@ class OpenAIProvider extends BaseProvider {
 		);
 	}
 
-	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+	async chat(messages: ChatMessage[], options: ProviderConfig = {}): Promise<string> {
 		const config = this.getConfig({
 			model: options.model || "gpt-4o",
 			temperature: options.temperature || 0.3,
@@ -125,18 +132,21 @@ class OpenAIProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post(this.getEndpoint(), {
-						model: config.model,
-						messages: messages,
-						temperature: config.temperature,
-						max_completion_tokens: config.maxTokens || config.max_tokens,
-						response_format: options.json ? { type: "json_object" } : undefined,
-					});
+					const response = await this.client.post<ChatCompletionResponse>(
+						this.getEndpoint(),
+						{
+							model: config.model,
+							messages: messages,
+							temperature: config.temperature,
+							max_completion_tokens: config.maxTokens || config.max_tokens,
+							response_format: options.json ? { type: "json_object" } : undefined,
+						}
+					);
 
 					this.validateResponse(response, this.name);
 					const result = this.extractTranslation(response.data, this.name);
 					return this.sanitizeTranslation(result);
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -156,7 +166,7 @@ class OpenAIProvider extends BaseProvider {
 		return RetryHelper.withRetry(
 			async () => {
 				try {
-					const response = await this.client.post("/embeddings", {
+					const response = await this.client.post<EmbeddingResponse>("/embeddings", {
 						model: config.model,
 						input: text,
 					});
@@ -165,7 +175,7 @@ class OpenAIProvider extends BaseProvider {
 						return response.data.data[0].embedding;
 					}
 					return [];
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -189,18 +199,18 @@ class OpenAIProvider extends BaseProvider {
 					// OpenAI suggests replacing newlines for best results
 					const cleanTexts = texts.map((t) => t.replace(/\n/g, " "));
 
-					const response = await this.client.post("/embeddings", {
+					const response = await this.client.post<EmbeddingResponse>("/embeddings", {
 						model: config.model,
 						input: cleanTexts,
 					});
 
 					if (response.data && response.data.data) {
 						return response.data.data
-							.sort((a: any, b: any) => a.index - b.index)
-							.map((item: any) => item.embedding);
+							.sort((a, b) => a.index - b.index)
+							.map((item) => item.embedding);
 					}
 					return [];
-				} catch (error: any) {
+				} catch (error) {
 					this.handleApiError(error, this.name);
 					throw error;
 				}
@@ -238,7 +248,7 @@ async function analyze(prompt: string, options: ProviderConfig = {}): Promise<st
 	return getProvider().analyze(prompt, options);
 }
 
-async function chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
+async function chat(messages: ChatMessage[], options: ProviderConfig = {}): Promise<string> {
 	return getProvider().chat(messages, options);
 }
 

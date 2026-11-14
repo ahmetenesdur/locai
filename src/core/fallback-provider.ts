@@ -1,6 +1,6 @@
 import RetryHelper from "../utils/retry-helper.js";
 import rateLimiter from "../utils/rate-limiter.js";
-import { TranslateOptions, ProviderConfig } from "../providers/base-provider.js";
+import { TranslateOptions, ProviderConfig, ChatMessage } from "../providers/base-provider.js";
 
 export interface ProviderModule {
 	translate(
@@ -10,14 +10,19 @@ export interface ProviderModule {
 		options?: TranslateOptions
 	): Promise<string>;
 	analyze?(prompt: string, options?: ProviderConfig): Promise<string>;
-	chat?(messages: any[], options?: ProviderConfig): Promise<string>;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[key: string]: any;
+	chat?(messages: ChatMessage[], options?: ProviderConfig): Promise<string>;
 }
 
 export interface ProviderWrapper {
 	name: string;
 	implementation: ProviderModule;
+}
+
+/** One failed provider attempt, reported when the whole chain fails. */
+interface AttemptError {
+	provider: string;
+	error: string;
+	attempt: number;
 }
 
 interface ProviderStats {
@@ -88,8 +93,7 @@ class FallbackProvider {
 		targetLang: string,
 		options: TranslateOptions = {}
 	): Promise<string> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const errors: any[] = [];
+		const errors: AttemptError[] = [];
 		const startTime = Date.now();
 		const startIndex = this.currentIndex;
 		let currentAttempt = 0;
@@ -154,7 +158,6 @@ class FallbackProvider {
 
 				const responseTime = Date.now() - providerStartTime;
 
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				const stats = this.providerStats.get(providerName)!;
 				stats.success++;
 				stats.consecutiveFailures = 0;
@@ -168,15 +171,15 @@ class FallbackProvider {
 				this.lastErrorTime = null;
 
 				return result;
-			} catch (error: any) {
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
 				if (this.providerStats.has(providerName)) {
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					const stats = this.providerStats.get(providerName)!;
 					stats.failure++;
 					stats.consecutiveFailures++;
 					stats.lastError = {
 						time: new Date(),
-						message: error.message,
+						message,
 					};
 
 					if (stats.consecutiveFailures >= 5) {
@@ -189,15 +192,15 @@ class FallbackProvider {
 
 				errors.push({
 					provider: providerName,
-					error: error.message,
+					error: message,
 					attempt: currentAttempt + 1,
 				});
 
 				const safeProviderName = `Provider_${(currentProviderIndex % totalProviders) + 1}`;
 				const safeErrorMessage =
-					error.message.includes("API") || error.message.includes("key")
+					message.includes("API") || message.includes("key")
 						? "Authentication or API error"
-						: error.message.substring(0, 100);
+						: message.substring(0, 100);
 
 				console.warn(
 					`${safeProviderName} failed (attempt ${currentAttempt + 1}/${maxAttempts}): ${safeErrorMessage}`
@@ -216,8 +219,7 @@ class FallbackProvider {
 	}
 
 	async analyze(prompt: string, options: ProviderConfig = {}): Promise<string> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const errors: any[] = [];
+		const errors: AttemptError[] = [];
 		const startTime = Date.now();
 		const savedIndex = this.currentIndex;
 		let currentAttempt = 0;
@@ -292,7 +294,6 @@ class FallbackProvider {
 
 				const responseTime = Date.now() - providerStartTime;
 
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				const stats = this.providerStats.get(providerName)!;
 				stats.success++;
 				stats.consecutiveFailures = 0;
@@ -307,15 +308,15 @@ class FallbackProvider {
 
 				this.currentIndex = savedIndex;
 				return result;
-			} catch (error: any) {
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
 				if (this.providerStats.has(providerName)) {
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					const stats = this.providerStats.get(providerName)!;
 					stats.failure++;
 					stats.consecutiveFailures++;
 					stats.lastError = {
 						time: new Date(),
-						message: error.message,
+						message,
 					};
 
 					if (stats.consecutiveFailures >= 5) {
@@ -328,15 +329,15 @@ class FallbackProvider {
 
 				errors.push({
 					provider: providerName,
-					error: error.message,
+					error: message,
 					attempt: currentAttempt + 1,
 				});
 
 				const safeProviderName = `Provider_${(currentProviderIndex % totalProviders) + 1}`;
 				const safeErrorMessage =
-					error.message.includes("API") || error.message.includes("key")
+					message.includes("API") || message.includes("key")
 						? "Authentication or API error"
-						: error.message.substring(0, 100);
+						: message.substring(0, 100);
 
 				console.warn(
 					`${safeProviderName} failed (attempt ${currentAttempt + 1}/${maxAttempts}): ${safeErrorMessage}`
@@ -353,9 +354,8 @@ class FallbackProvider {
 		);
 	}
 
-	async chat(messages: any[], options: ProviderConfig = {}): Promise<string> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const errors: any[] = [];
+	async chat(messages: ChatMessage[], options: ProviderConfig = {}): Promise<string> {
+		const errors: AttemptError[] = [];
 		const startTime = Date.now();
 		const savedIndex = this.currentIndex;
 		let currentAttempt = 0;
@@ -430,7 +430,6 @@ class FallbackProvider {
 
 				const responseTime = Date.now() - providerStartTime;
 
-				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				const stats = this.providerStats.get(providerName)!;
 				stats.success++;
 				stats.consecutiveFailures = 0;
@@ -445,15 +444,15 @@ class FallbackProvider {
 
 				this.currentIndex = savedIndex;
 				return result;
-			} catch (error: any) {
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
 				if (this.providerStats.has(providerName)) {
-					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					const stats = this.providerStats.get(providerName)!;
 					stats.failure++;
 					stats.consecutiveFailures++;
 					stats.lastError = {
 						time: new Date(),
-						message: error.message,
+						message,
 					};
 
 					if (stats.consecutiveFailures >= 5) {
@@ -466,15 +465,15 @@ class FallbackProvider {
 
 				errors.push({
 					provider: providerName,
-					error: error.message,
+					error: message,
 					attempt: currentAttempt + 1,
 				});
 
 				const safeProviderName = `Provider_${(currentProviderIndex % totalProviders) + 1}`;
 				const safeErrorMessage =
-					error.message.includes("API") || error.message.includes("key")
+					message.includes("API") || message.includes("key")
 						? "Authentication or API error"
-						: error.message.substring(0, 100);
+						: message.substring(0, 100);
 
 				console.warn(
 					`${safeProviderName} failed (attempt ${currentAttempt + 1}/${maxAttempts}): ${safeErrorMessage}`

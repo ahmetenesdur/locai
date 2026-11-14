@@ -140,9 +140,9 @@ class GlossaryManager {
 
 		let restoredText = translatedText;
 
-		// Replace tokens with translations
+		// Replace tokens with translations; a replacer function keeps `$` patterns literal
 		for (const [token, data] of termMap.entries()) {
-			restoredText = restoredText.replace(new RegExp(token, "g"), data.translation);
+			restoredText = restoredText.replace(new RegExp(token, "g"), () => data.translation);
 		}
 
 		return restoredText;

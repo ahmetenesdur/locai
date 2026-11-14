@@ -145,4 +145,14 @@ describe("GlossaryManager term replacement", () => {
 		expect(context.protectedText).toBe("APIs use the __GLOSSARY_TOKEN_0__");
 		expect(context.translatedText).toBe("APIs use the Application Interface");
 	});
+
+	it("restores a translation containing `$` patterns literally", async () => {
+		const manager = new GlossaryManager({
+			preserveFormatting: false,
+			glossary: { Price: "$& costs $1 or $$" },
+		});
+		const context = await translate(manager, "The Price", "fr");
+
+		expect(context.translatedText).toBe("The $& costs $1 or $$");
+	});
 });

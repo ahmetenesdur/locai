@@ -60,7 +60,16 @@ class GlossaryManager {
 	private preserveFormatting: boolean;
 
 	constructor(config: GlossaryConfig = {}) {
-		this.glossary = config.glossary || {};
+		// Config files are plain JS/JSON, so a term can map to `null`; skip it instead of
+		// crashing on every translation.
+		this.glossary = {};
+		for (const [term, entry] of Object.entries(config.glossary || {})) {
+			if (entry === null) {
+				console.warn(`Warning: glossary entry "${term}" is null; skipping it.`);
+				continue;
+			}
+			this.glossary[term] = entry;
+		}
 		this.enabled = config.enabled !== false;
 		this.caseSensitive = config.caseSensitive !== false;
 		this.preserveFormatting = config.preserveFormatting !== false;

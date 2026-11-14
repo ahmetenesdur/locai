@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import os from "os";
+import path from "path";
 import GlossaryManager, { GlossaryConfig } from "../../../src/utils/glossary-manager.js";
 import Pipeline from "../../../src/core/pipeline/Pipeline.js";
 import PipelineStep from "../../../src/core/pipeline/PipelineStep.js";
@@ -98,5 +101,35 @@ describe("GlossaryManager languages restriction", () => {
 				"CLI",
 			]);
 		}
+	});
+});
+
+describe("GlossaryManager null entries", () => {
+	let tempDir: string | undefined;
+
+	afterEach(async () => {
+		vi.restoreAllMocks();
+		if (tempDir) {
+			await rm(tempDir, { recursive: true, force: true });
+			tempDir = undefined;
+		}
+	});
+
+	it("skips a null entry, warns once, and keeps applying the other terms", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		tempDir = await mkdtemp(path.join(os.tmpdir(), "locai-glossary-"));
+		const file = path.join(tempDir, "glossary.json");
+		await writeFile(file, JSON.stringify({ API: "API", Broken: null }), "utf8");
+
+		const manager = await GlossaryManager.loadFromFile(file);
+		const context = await translate(manager, "Call the API", "fr");
+
+		expect(context.translatedText).toBe("Call the API");
+		expect(context.termMap?.size).toBe(1);
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(String(warn.mock.calls[0][0])).toContain('"Broken"');
+
+		expect(manager.getStats().terms).toEqual(["API"]);
+		expect(manager.validate()).toEqual({ valid: true, errors: [], warnings: [] });
 	});
 });

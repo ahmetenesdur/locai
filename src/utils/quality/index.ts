@@ -53,7 +53,10 @@ class QualityChecker extends BaseChecker {
 		this.lengthChecker = new LengthChecker();
 		this.textSanitizer = new TextSanitizer();
 		this.quoteBalanceChecker = new QuoteBalanceChecker();
-		this.styleGuideChecker = new StyleGuideChecker(this.styleGuide);
+		this.styleGuideChecker = new StyleGuideChecker({
+			...this.styleGuide,
+			conventions: this.rules.styleGuide?.conventions,
+		});
 		this.markdownChecker = new MarkdownChecker();
 		this.codeBlockChecker = new CodeBlockChecker();
 		this.specialCharactersChecker = new SpecialCharactersChecker();

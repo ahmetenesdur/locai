@@ -37,6 +37,19 @@ describe("QualityChecker", () => {
 			expect(result.isValid).toBe(false);
 			expect(result.issues.some((i) => i.type === "punctuation")).toBe(true);
 		});
+
+		it("should honour styleGuide.conventions from the config", () => {
+			const text = "Red, green and blue.";
+			const flagged = qualityChecker.validate(text, text);
+			expect(flagged.issues.some((i) => i.type === "oxford-comma")).toBe(true);
+
+			const withoutOxfordComma = new QualityChecker({
+				...defaultOptions,
+				styleGuide: { conventions: { useOxfordComma: false } },
+			});
+			const result = withoutOxfordComma.validate(text, text);
+			expect(result.issues.some((i) => i.type === "oxford-comma")).toBe(false);
+		});
 	});
 
 	describe("validateAndFix", () => {

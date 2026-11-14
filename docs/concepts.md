@@ -1,23 +1,30 @@
 # Core Concepts
 
-Locai is more than just a wrapper around an API; it contains several intelligent systems to ensure human-quality localization.
+This page explains how Locai processes translations.
 
 ## Translation Pipeline
 
-Locai processes every key through a robust pipeline to ensure quality and consistency.
+Before the pipeline runs, each batch of strings is matched to a context category (see [Context Categories](#5-context-categories)). Each string then goes through these steps in order:
 
 ```mermaid
 graph TD
-    A[Input Key] --> B{Cache Hit?}
-    B -- Yes --> C[Return Cached]
-    B -- No --> D[Context Analysis]
-    D --> E[Glossary Check]
-    E --> F[AI Translation]
-    F --> G[Quality Validation]
-    G --> H{Pass Check?}
-    H -- Yes --> I[Save & Cache]
-    H -- No --> J[Auto-Fix / Flag]
+    A[Input validation] --> B{In-memory cache hit?}
+    B -- Yes --> Z[Result]
+    B -- No --> C{Vector memory match >= 0.98?<br/>only if enabled}
+    C -- Yes --> Z
+    C -- No --> D[Glossary: protect terms]
+    D --> E[Deep context from source code]
+    E --> F[AI translation, with provider fallback]
+    F --> G[Vector memory write, if enabled]
+    G --> H[Glossary: restore terms]
+    H --> I[Quality checks and auto-fix]
+    I --> J[Tone check, if styleGuide.enforceTone]
+    J --> K[Confidence scoring, if enabled]
+    K --> L[In-memory cache write]
+    L --> Z
 ```
+
+Results are written to the target files after all keys of a language are processed.
 
 ## 1. Vector Memory (optional)
 
@@ -64,7 +71,7 @@ Locai calculates a **Confidence Score (0.0 - 1.0)**. It also performs automated 
 
 ### Example: Quote Balance Fix
 
-Locai detects when an AI generates invalid JSON (missing quotes) and fixes it automatically.
+The quote balance check closes a quote the model left open. It works on the translated text only; it is not a JSON repair step.
 
 **Scenario:**
 

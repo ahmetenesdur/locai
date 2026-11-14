@@ -200,21 +200,21 @@ export default defineConfig({
 	},
 
 	// Quality Checks
-	// Automated validation and fixing to ensure translation quality
+	// Run on every new translation and repair what they can. They never reject a
+	// translation or stop it from being saved. `enabled: false` turns off all checks and auto-fixes.
 	qualityChecks: {
-		enabled: true, // Enable quality checks
+		enabled: true,
 		rules: {
-			placeholderConsistency: true, // Check placeholders
-			htmlTagsConsistency: true, // Check HTML tags
-			punctuationCheck: true, // Check punctuation
-			quoteBalanceCheck: true, // Check quote balance (prevents missing quotes that cause JSON parse errors)
-			lengthValidation: true, // Check text length
-			sanitizeOutput: true, // Clean output text
-			markdownPreservation: true, // Preserve markdown
-			specialCharacters: true, // Maintain special characters
-			codeBlockPreservation: true, // Preserve code blocks
+			placeholderConsistency: true, // Restore {name}, ${name}, %s, %d placeholders
+			htmlTagsConsistency: true, // Repair HTML tags
+			punctuationCheck: true, // Match the source's ending punctuation
+			quoteBalanceCheck: true, // Close unbalanced quotes
+			lengthValidation: true, // Detect length issues; used by `locai fix`, not fixed during translate
+			sanitizeOutput: true, // Remove model artifacts such as <think> tags
+			markdownPreservation: true, // Repair markdown (default off)
+			specialCharacters: true, // Keep special characters (default off)
+			codeBlockPreservation: true, // Keep code blocks (default off)
 		},
-		autoFix: true, // Auto-fix common issues
 	},
 
 	// Style Guide

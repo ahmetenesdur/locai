@@ -219,20 +219,21 @@ export default defineConfig({
 	},
 
 	// Quality Checks
+	// Run on every new translation and repair what they can. They never reject a
+	// translation or stop it from being saved.
 	qualityChecks: {
-		enabled: true, // Enable quality checks
+		enabled: true, // Default: true. `false` turns off all checks and auto-fixes
 		rules: {
-			placeholderConsistency: true, // Check placeholders
-			htmlTagsConsistency: true, // Check HTML tags
-			punctuationCheck: true, // Check punctuation
-			quoteBalanceCheck: true, // Check quote balance
-			lengthValidation: true, // Check text length
-			sanitizeOutput: true, // Clean output text
-			markdownPreservation: true, // Preserve markdown
-			specialCharacters: true, // Maintain special characters
-			codeBlockPreservation: true, // Preserve code blocks
+			placeholderConsistency: true, // Restore {name}, ${name}, %s, %d placeholders (default on)
+			htmlTagsConsistency: true, // Repair HTML tags (default on)
+			punctuationCheck: true, // Match the source's ending punctuation (default on)
+			quoteBalanceCheck: true, // Close unbalanced quotes (default on)
+			lengthValidation: true, // Detect length issues; used by `locai fix`, not fixed during translate (default on)
+			sanitizeOutput: true, // Remove model artifacts such as <think> tags (default on)
+			markdownPreservation: true, // Repair markdown (default off)
+			specialCharacters: true, // Keep special characters (default off)
+			codeBlockPreservation: true, // Keep code blocks (default off)
 		},
-		autoFix: true, // Auto-fix common issues
 	},
 
 	// Style Guide
@@ -365,13 +366,18 @@ If you see `Rate limit exceeded` errors:
 2.  **Enable Fallback**: Set `useFallback: true` to switch to another provider automatically.
 3.  **Check Plan**: Ensure your API provider account has sufficient credits.
 
-### "Validation Failed" Errors
+### Broken Placeholders or HTML in Translations
 
-Locai validates translations before saving.
+The quality checks repair what they can (see `qualityChecks` above), but they never reject a translation, so a translation they cannot repair is still saved.
 
-- **Placeholders**: Ensure `{{variable}}` exists in the translation.
-- **HTML**: Check for broken tags like `</b>` without `<b>`.
-- **Fix**: Run `locai fix` to attempt auto-repair.
+- **Placeholders**: `{name}`, `${name}`, `%s` and `%d` are recognized. Double-brace placeholders such as `{{name}}` are only partly recognized; check them after translating.
+- **HTML**: Tags from the source that are missing in the translation are inserted by `htmlTagsConsistency`, which can put them in the wrong place; check the result.
+- To redo a single bad translation, delete the key from the target file and run `locai translate` again, or use `--force` to re-translate every key.
+- `locai fix` only re-translates translations whose length is outside the `lengthControl` limits; it does not repair placeholders or HTML.
+
+### "Configuration Validation Failed"
+
+`locai validate-config` prints this when a config value is invalid, for example `rateLimiter.queueTimeout` outside 1000–120000 ms. `translate`, `fix` and `advanced` validate the same values before running and stop with an error. The message lists each invalid option.
 
 ### Translations Not Updating
 

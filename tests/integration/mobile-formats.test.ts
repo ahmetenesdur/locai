@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import path from "path";
 import fs from "fs/promises";
-import { FileManager } from "../../src/utils/file-manager";
+import { FileManager } from "../../src/utils/file-manager.js";
 
 describe("Mobile Format Integration", () => {
 	const tempDir = path.join(process.cwd(), "tests/temp/mobile");

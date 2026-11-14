@@ -2,14 +2,42 @@
  * Utility class for object manipulation.
  */
 
-// Define a recursive interface for the object structure we handle
-export interface TransformedObject {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[key: string]: any;
+/**
+ * A value in a locale file: a primitive leaf, an array, or a nested object.
+ */
+export type TranslationValue =
+	| string
+	| number
+	| boolean
+	| null
+	| TranslationValue[]
+	| TranslationObject;
+
+/**
+ * A (possibly nested) locale object, e.g. `{ "home": { "title": "Hello" } }`.
+ */
+export interface TranslationObject {
+	[key: string]: TranslationValue;
 }
 
+/**
+ * A leaf of a flattened locale object. Arrays are kept whole, they are not flattened.
+ */
+export type FlatTranslationValue = Exclude<TranslationValue, TranslationObject>;
+
+/**
+ * A locale object flattened to dot-notation keys, e.g. `{ "home.title": "Hello" }`.
+ */
+export type FlatTranslations = Record<string, FlatTranslationValue>;
+
+const isPlainObject = (value: TranslationValue): value is TranslationObject =>
+	value !== null &&
+	typeof value === "object" &&
+	!Array.isArray(value) &&
+	value.constructor === Object;
+
 interface StackItem {
-	obj: TransformedObject;
+	obj: TranslationObject;
 	prefix: string;
 	depth: number;
 }
@@ -22,18 +50,12 @@ class ObjectTransformer {
 	 * @param maxDepth - Maximum recursion depth.
 	 * @returns Flattened object.
 	 */
-	static flatten(
-		obj: TransformedObject,
-		prefix = "",
-		maxDepth = 20
-	): Record<string, string | number | boolean | null> {
+	static flatten(obj: TranslationObject, prefix = "", maxDepth = 20): FlatTranslations {
 		if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			return prefix ? { [prefix]: obj as any } : {};
+			return prefix ? { [prefix]: obj } : {};
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const result: Record<string, any> = {};
+		const result: FlatTranslations = {};
 		const stack: StackItem[] = [{ obj, prefix, depth: 0 }];
 
 		while (stack.length > 0) {
@@ -55,12 +77,7 @@ class ObjectTransformer {
 				const value = currentObj[key];
 				const newKey = currentPrefix ? `${currentPrefix}.${key}` : key;
 
-				if (
-					value !== null &&
-					typeof value === "object" &&
-					!Array.isArray(value) &&
-					value.constructor === Object
-				) {
+				if (isPlainObject(value)) {
 					stack.push({ obj: value, prefix: newKey, depth: depth + 1 });
 				} else {
 					result[newKey] = value;
@@ -76,13 +93,12 @@ class ObjectTransformer {
 	 * @param obj - The flattened object.
 	 * @returns Nested object.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static unflatten(obj: Record<string, any>): TransformedObject {
+	static unflatten(obj: Record<string, TranslationValue>): TranslationObject {
 		if (!obj || typeof obj !== "object") {
 			return {};
 		}
 
-		const result: TransformedObject = {};
+		const result: TranslationObject = {};
 		const keys = Object.keys(obj);
 		const keysLength = keys.length;
 
@@ -111,16 +127,14 @@ class ObjectTransformer {
 
 			for (let i = 0; i < lastIndex; i++) {
 				const part = keyParts[i];
+				let next = current[part];
 
-				if (
-					current[part] == null ||
-					typeof current[part] !== "object" ||
-					Array.isArray(current[part])
-				) {
-					current[part] = {};
+				if (next == null || typeof next !== "object" || Array.isArray(next)) {
+					next = {};
+					current[part] = next;
 				}
 
-				current = current[part];
+				current = next;
 			}
 
 			current[keyParts[lastIndex]] = value;
@@ -135,53 +149,42 @@ class ObjectTransformer {
 	 * @param seen - Internal set to track circular references.
 	 * @returns Deep copy of the object.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	static deepClone<T>(obj: T, seen = new WeakSet()): T {
+	static deepClone<T>(obj: T, seen = new WeakSet<object>()): T {
 		if (obj === null || typeof obj !== "object") {
 			return obj;
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		if (seen.has(obj as any)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			return {} as any;
+		if (seen.has(obj)) {
+			// Circular reference: break the cycle with an empty object
+			return {} as T;
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		seen.add(obj as any);
+		seen.add(obj);
 
 		if (Array.isArray(obj)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const result = obj.map((item) => this.deepClone(item, seen)) as any;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			seen.delete(obj as any);
-			return result;
+			const result = obj.map((item) => this.deepClone(item, seen));
+			seen.delete(obj);
+			return result as T;
 		}
 
 		if (obj instanceof Date) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			seen.delete(obj as any);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			return new Date(obj.getTime()) as any;
+			seen.delete(obj);
+			return new Date(obj.getTime()) as T;
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		if ((obj as any).constructor !== Object) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			seen.delete(obj as any);
+		if (obj.constructor !== Object) {
+			seen.delete(obj);
 			return obj;
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const result: any = {};
-		for (const key of Object.keys(obj)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			result[key] = this.deepClone((obj as any)[key], seen);
+		const source = obj as Record<string, unknown>;
+		const result: Record<string, unknown> = {};
+		for (const key of Object.keys(source)) {
+			result[key] = this.deepClone(source[key], seen);
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		seen.delete(obj as any);
-		return result;
+		seen.delete(obj);
+		return result as T;
 	}
 
 	/**
@@ -192,10 +195,10 @@ class ObjectTransformer {
 	 * @returns Merged object.
 	 */
 	static mergeObjects(
-		target: TransformedObject,
-		source: TransformedObject,
+		target: TranslationObject,
+		source: TranslationObject,
 		overwriteArrays = false
-	): TransformedObject {
+	): TranslationObject {
 		if (!target || !source || typeof target !== "object" || typeof source !== "object") {
 			return target;
 		}
@@ -221,7 +224,9 @@ class ObjectTransformer {
 				typeof sourceValue === "object" &&
 				sourceValue.constructor === Object
 			) {
-				result[key] = this.mergeObjects(targetValue || {}, sourceValue, overwriteArrays);
+				// A non-object targetValue is returned unchanged by the guard at the top.
+				const nestedTarget = (targetValue || {}) as TranslationObject;
+				result[key] = this.mergeObjects(nestedTarget, sourceValue, overwriteArrays);
 			} else {
 				result[key] = sourceValue;
 			}

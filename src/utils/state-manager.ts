@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { FileManager } from "./file-manager.js"; // Note: Changed named import to default import based on file-manager migration
+import { FileManager } from "./file-manager.js";
+import type { FlatTranslations, FlatTranslationValue } from "./object-transformer.js";
 import path from "path";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -12,7 +13,6 @@ export interface StateOptions {
 	enabled?: boolean;
 	stateFileName?: string;
 	stateDir?: string;
-	[key: string]: any;
 }
 
 export interface StateComparison {
@@ -52,7 +52,7 @@ class StateManager {
 	/**
 	 * Generate a SHA-256 hash for given text content
 	 */
-	_generateHash(text: string | object): string {
+	_generateHash(text: FlatTranslationValue): string {
 		if (typeof text !== "string") {
 			text = JSON.stringify(text);
 		}
@@ -75,12 +75,14 @@ class StateManager {
 			const stateFilePath = this._getStateFilePath(projectRoot);
 			const state = await FileManager.readJSON(stateFilePath);
 			return (state as Record<string, string>) || {};
-		} catch (error: any) {
+		} catch (error) {
 			// State file doesn't exist or is corrupted - return empty state
-			if (error.message.includes("File read error") || error.code === "ENOENT") {
+			const message = error instanceof Error ? error.message : String(error);
+			const code = error instanceof Error && "code" in error ? error.code : undefined;
+			if (message.includes("File read error") || code === "ENOENT") {
 				return {};
 			}
-			throw new Error(`Failed to load state: ${error.message}`);
+			throw new Error(`Failed to load state: ${message}`);
 		}
 	}
 
@@ -95,29 +97,32 @@ class StateManager {
 			const stateDir = path.dirname(stateFilePath);
 			await FileManager.ensureDir(stateDir);
 
+			const packageJson: { version: string } = JSON.parse(
+				readFileSync(path.join(__dirname, "../../package.json"), "utf8")
+			);
+
 			// Save state with metadata
 			const stateWithMetadata = {
 				...state,
 				_metadata: {
 					lastUpdated: new Date().toISOString(),
 					version: "1.0.0",
-					toolVersion: JSON.parse(
-						readFileSync(path.join(__dirname, "../../package.json"), "utf8")
-					).version,
+					toolVersion: packageJson.version,
 				},
 			};
 
 			await FileManager.writeJSON(stateFilePath, stateWithMetadata);
 			return true;
-		} catch (error: any) {
-			throw new Error(`Failed to save state: ${error.message}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Failed to save state: ${message}`);
 		}
 	}
 
 	/**
 	 * Generate state object from source content by creating hashes for each key
 	 */
-	generateStateFromSource(sourceContent: Record<string, string>): Record<string, string> {
+	generateStateFromSource(sourceContent: FlatTranslations): Record<string, string> {
 		const state: Record<string, string> = {};
 
 		for (const [key, value] of Object.entries(sourceContent)) {
@@ -195,12 +200,13 @@ class StateManager {
 			const stateFilePath = this._getStateFilePath(projectRoot);
 			await FileManager.deleteFile(stateFilePath);
 			return true;
-		} catch (error: any) {
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
 			// File doesn't exist - that's fine
-			if (error.message.includes("ENOENT")) {
+			if (message.includes("ENOENT")) {
 				return true;
 			}
-			throw new Error(`Failed to cleanup state: ${error.message}`);
+			throw new Error(`Failed to cleanup state: ${message}`);
 		}
 	}
 }

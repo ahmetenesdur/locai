@@ -1,13 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { getPrompt, getAnalysisPrompt } from "../../../src/utils/prompt-templates.js";
+import {
+	getPrompt,
+	getAnalysisPrompt,
+	type AnalysisPromptPayload,
+} from "../../../src/utils/prompt-templates.js";
+
+/** OpenAI-style payloads carry their chat messages at the top level */
+const messagesOf = (prompt: AnalysisPromptPayload) => {
+	if (!("messages" in prompt)) {
+		throw new Error("Expected a chat-style prompt payload");
+	}
+	return prompt.messages;
+};
 
 describe("Prompt Templates", () => {
 	describe("getPrompt", () => {
 		it("should return default openai template when provider is openai", () => {
 			const prompt = getPrompt("openai", "en", "es", "Hello");
 			expect(prompt).toHaveProperty("messages");
-			expect(prompt.messages).toHaveLength(2);
-			expect(prompt.messages[1].content).toBe("Hello");
+			expect(messagesOf(prompt)).toHaveLength(2);
+			expect(messagesOf(prompt)[1].content).toBe("Hello");
 		});
 
 		it("should handle missing options gracefully", () => {
@@ -24,7 +36,7 @@ describe("Prompt Templates", () => {
 			const prompt = getPrompt("openai", "en", "es", "Hello", {
 				styleGuide: { formality: "formal", toneOfVoice: "authoritative" },
 			});
-			const systemMessage = prompt.messages[0].content;
+			const systemMessage = messagesOf(prompt)[0].content;
 			expect(systemMessage).toContain("formal");
 			expect(systemMessage).toContain("authoritative");
 		});
@@ -33,7 +45,7 @@ describe("Prompt Templates", () => {
 			const prompt = getPrompt("openai", "en", "es", "Hello", {
 				detectedContext: { category: "legal", confidence: 0.9, prompt: "Legal context" },
 			});
-			const systemMessage = prompt.messages[0].content;
+			const systemMessage = messagesOf(prompt)[0].content;
 			expect(systemMessage).toContain("Category: legal");
 		});
 
@@ -42,7 +54,7 @@ describe("Prompt Templates", () => {
 				mode: "strict",
 				lengthControl: { rules: { strict: 1.0 } },
 			});
-			const systemMessage = prompt.messages[0].content;
+			const systemMessage = messagesOf(prompt)[0].content;
 			expect(systemMessage).toContain("CRITICAL: Translation must not exceed");
 		});
 	});
@@ -51,14 +63,14 @@ describe("Prompt Templates", () => {
 		it("should return analysis prompt for openai", () => {
 			const prompt = getAnalysisPrompt("openai", "Analyze me");
 			expect(prompt).toHaveProperty("messages");
-			expect(prompt.messages[1].content).toContain("Analyze me");
+			expect(messagesOf(prompt)[1].content).toContain("Analyze me");
 		});
 
 		it("should handle custom categories", () => {
 			const prompt = getAnalysisPrompt("openai", "Analyze me", {
 				categories: { specific: "desc" },
 			});
-			expect(prompt.messages[1].content).toContain("specific");
+			expect(messagesOf(prompt)[1].content).toContain("specific");
 		});
 	});
 });

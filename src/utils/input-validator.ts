@@ -4,12 +4,15 @@
  */
 
 import path from "path";
+import type { FileOptions } from "./file-manager.js";
+import type { QualityRules } from "./quality/base-checker.js";
+import type { LengthControlOptions } from "./quality/length-checker.js";
 
-// Define interfaces for configuration objects
+// Shapes of a configuration after validateConfig has accepted it
 export interface ApiProviderConfig {
 	temperature?: number;
 	maxTokens?: number;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export interface RateLimiterProviderLimit {
@@ -36,18 +39,13 @@ export interface ContextConfig {
 		threshold?: number;
 		minConfidence?: number;
 	};
-	categories?: Record<string, any>;
+	categories?: Record<string, unknown>;
 }
 
 export interface QualityChecksConfig {
-	rules?: Record<string, any>;
+	rules?: QualityRules;
 	enabled?: boolean;
 	autoFix?: boolean;
-}
-
-export interface LengthControlConfig {
-	mode?: "strict" | "flexible" | "exact" | "relaxed" | "smart";
-	rules?: Record<string, any>;
 }
 
 export interface AdvancedConfig {
@@ -70,13 +68,22 @@ export interface AppConfig {
 	retryOptions?: RetryOptions;
 	context?: ContextConfig;
 	qualityChecks?: QualityChecksConfig;
-	lengthControl?: LengthControlConfig;
+	lengthControl?: LengthControlOptions;
 	advanced?: AdvancedConfig;
-	fileOperations?: Record<string, any>;
+	fileOperations?: FileOptions;
 	debug?: boolean;
 	verbose?: boolean;
-	[key: string]: any;
+	[key: string]: unknown;
 }
+
+/** A config section that is an object but whose fields have not been validated yet */
+type UnvalidatedSection = Record<string, unknown>;
+
+const isObject = (value: unknown): value is UnvalidatedSection =>
+	typeof value === "object" && value !== null;
+
+const errorMessage = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
 
 class InputValidator {
 	/**
@@ -103,12 +110,12 @@ class InputValidator {
 	 * Validate a BCP 47 language tag and return it in canonical casing:
 	 * lowercase language, title-case script, uppercase region
 	 * (e.g. "ZH-hant-tw" -> "zh-Hant-TW", "PT-br" -> "pt-BR").
-	 * @param {string} langCode - Language tag to validate.
+	 * @param {unknown} langCode - Language tag to validate.
 	 * @param {string} [paramName="language"] - Parameter name for error messages.
 	 * @returns {string} - Canonical language tag.
 	 * @throws {Error} If validation fails.
 	 */
-	static validateLanguageCode(langCode: string, paramName: string = "language"): string {
+	static validateLanguageCode(langCode: unknown, paramName: string = "language"): string {
 		if (!langCode || typeof langCode !== "string") {
 			throw new Error(`${paramName} must be a non-empty string`);
 		}
@@ -144,12 +151,12 @@ class InputValidator {
 
 	/**
 	 * Validate array of language codes.
-	 * @param {string[]} langCodes - Array of language codes.
+	 * @param {unknown} langCodes - Array of language codes.
 	 * @param {string} [paramName="languages"] - Parameter name for errors.
 	 * @returns {string[]} - Sanitized array of language codes.
 	 * @throws {Error} If array is empty or contains invalid codes.
 	 */
-	static validateLanguageCodes(langCodes: string[], paramName: string = "languages"): string[] {
+	static validateLanguageCodes(langCodes: unknown, paramName: string = "languages"): string[] {
 		if (!Array.isArray(langCodes)) {
 			throw new Error(`${paramName} must be an array`);
 		}
@@ -169,12 +176,12 @@ class InputValidator {
 
 	/**
 	 * Validate and sanitize directory path.
-	 * @param {string} dirPath - Directory path.
+	 * @param {unknown} dirPath - Directory path.
 	 * @param {string} [paramName="directory"] - Parameter name for errors.
 	 * @returns {string} - Resolved and validated absolute path.
 	 * @throws {Error} If path is invalid or outside working directory.
 	 */
-	static validateDirectoryPath(dirPath: string, paramName: string = "directory"): string {
+	static validateDirectoryPath(dirPath: unknown, paramName: string = "directory"): string {
 		if (!dirPath || typeof dirPath !== "string") {
 			throw new Error(`${paramName} must be a non-empty string`);
 		}
@@ -194,12 +201,12 @@ class InputValidator {
 
 	/**
 	 * Validate translation text.
-	 * @param {string} text - Text to validate.
+	 * @param {unknown} text - Text to validate.
 	 * @param {string} [paramName="text"] - Parameter name for errors.
 	 * @returns {string} - Validated text.
 	 * @throws {Error} If text is invalid or too long.
 	 */
-	static validateText(text: string, paramName: string = "text"): string {
+	static validateText(text: unknown, paramName: string = "text"): string {
 		if (text === null || text === undefined) {
 			throw new Error(`${paramName} cannot be null or undefined`);
 		}
@@ -219,12 +226,12 @@ class InputValidator {
 
 	/**
 	 * Validate translation key.
-	 * @param {string} key - Key to validate.
+	 * @param {unknown} key - Key to validate.
 	 * @param {string} [paramName="key"] - Parameter name.
 	 * @returns {string} - Validated key.
 	 * @throws {Error} If key is invalid, too long, or contains traversal.
 	 */
-	static validateKey(key: string, paramName: string = "key"): string {
+	static validateKey(key: unknown, paramName: string = "key"): string {
 		if (!key || typeof key !== "string") {
 			throw new Error(`${paramName} must be a non-empty string`);
 		}
@@ -244,12 +251,12 @@ class InputValidator {
 
 	/**
 	 * Validate API provider name.
-	 * @param {string} provider - Provider name.
+	 * @param {unknown} provider - Provider name.
 	 * @param {string} [fieldName="API provider"] - Parameter name.
 	 * @returns {string} - Normalized provider name.
 	 * @throws {Error} If provider is unknown.
 	 */
-	static validateProvider(provider: string, fieldName: string = "API provider"): string {
+	static validateProvider(provider: unknown, fieldName: string = "API provider"): string {
 		if (!provider || typeof provider !== "string") {
 			throw new Error(`${fieldName} must be a non-empty string`);
 		}
@@ -279,7 +286,7 @@ class InputValidator {
 
 		let sanitized = path
 			.basename(filename)
-			.replace(/[<>:"/\\|?*\x00-\x1f]/g, "") // eslint-disable-line no-control-regex
+			.replace(/[<>:"/\\|?*\x00-\x1f]/g, "") // eslint-disable-line no-control-regex -- strip ASCII control characters
 			.replace(/^\.+/, "")
 			.trim();
 
@@ -319,12 +326,12 @@ class InputValidator {
 	 * Validate configuration object.
 	 * Rewrites `source` and `targets` in place to canonical BCP 47 casing so that
 	 * file lookups and per-language settings all see the same tag.
-	 * @param {any} config - Configuration object to validate.
+	 * @param {unknown} config - Configuration object to validate.
 	 * @returns {AppConfig} - Validated configuration.
 	 * @throws {Error} If configuration is invalid.
 	 */
-	static validateConfig(config: any): AppConfig {
-		if (!config || typeof config !== "object") {
+	static validateConfig(config: unknown): AppConfig {
+		if (!isObject(config)) {
 			throw new Error("Configuration must be an object");
 		}
 
@@ -340,8 +347,8 @@ class InputValidator {
 		} else {
 			try {
 				config.source = this.validateLanguageCode(config.source, "source language");
-			} catch (error: any) {
-				errors.push(`Invalid source language: ${error.message}`);
+			} catch (error) {
+				errors.push(`Invalid source language: ${errorMessage(error)}`);
 			}
 		}
 
@@ -350,8 +357,8 @@ class InputValidator {
 		} else {
 			try {
 				config.targets = this.validateLanguageCodes(config.targets, "target languages");
-			} catch (error: any) {
-				errors.push(`Invalid target languages: ${error.message}`);
+			} catch (error) {
+				errors.push(`Invalid target languages: ${errorMessage(error)}`);
 			}
 		}
 
@@ -363,8 +370,8 @@ class InputValidator {
 		if (config.apiProvider) {
 			try {
 				this.validateProvider(config.apiProvider, "API provider");
-			} catch (error: any) {
-				errors.push(`Invalid API provider: ${error.message}`);
+			} catch (error) {
+				errors.push(`Invalid API provider: ${errorMessage(error)}`);
 			}
 		} else {
 			warnings.push("No API provider specified, will use first available provider");
@@ -378,8 +385,8 @@ class InputValidator {
 				for (const provider of config.fallbackOrder) {
 					try {
 						this.validateProvider(provider, "fallback provider");
-					} catch (error: any) {
-						errors.push(`Invalid provider in fallbackOrder: ${error.message}`);
+					} catch (error) {
+						errors.push(`Invalid provider in fallbackOrder: ${errorMessage(error)}`);
 					}
 				}
 			}
@@ -387,7 +394,7 @@ class InputValidator {
 
 		// Concurrency validation
 		if (config.concurrencyLimit !== undefined) {
-			const limit = parseInt(config.concurrencyLimit);
+			const limit = parseInt(String(config.concurrencyLimit));
 			if (isNaN(limit) || limit < 1 || limit > 50) {
 				errors.push("'concurrencyLimit' must be a number between 1 and 50");
 			}
@@ -395,14 +402,14 @@ class InputValidator {
 
 		// Cache configuration validation
 		if (config.cacheSize !== undefined) {
-			const size = parseInt(config.cacheSize);
+			const size = parseInt(String(config.cacheSize));
 			if (isNaN(size) || size < 100 || size > 10000) {
 				errors.push("'cacheSize' must be a number between 100 and 10000");
 			}
 		}
 
 		if (config.cacheTTL !== undefined) {
-			const ttl = parseInt(config.cacheTTL);
+			const ttl = parseInt(String(config.cacheTTL));
 			if (isNaN(ttl) || ttl < 0) {
 				errors.push("'cacheTTL' must be a non-negative number (milliseconds)");
 			}
@@ -413,7 +420,7 @@ class InputValidator {
 
 		// API Config validation
 		if (config.apiConfig) {
-			if (typeof config.apiConfig !== "object") {
+			if (!isObject(config.apiConfig)) {
 				errors.push("'apiConfig' must be an object");
 			} else {
 				this.validateApiConfig(config.apiConfig, errors, warnings);
@@ -422,7 +429,7 @@ class InputValidator {
 
 		// Rate Limiter validation
 		if (config.rateLimiter) {
-			if (typeof config.rateLimiter !== "object") {
+			if (!isObject(config.rateLimiter)) {
 				errors.push("'rateLimiter' must be an object");
 			} else {
 				this.validateRateLimiterConfig(config.rateLimiter, errors, warnings);
@@ -431,7 +438,7 @@ class InputValidator {
 
 		// Retry options validation
 		if (config.retryOptions) {
-			if (typeof config.retryOptions !== "object") {
+			if (!isObject(config.retryOptions)) {
 				errors.push("'retryOptions' must be an object");
 			} else {
 				this.validateRetryOptions(config.retryOptions, errors, warnings);
@@ -440,7 +447,7 @@ class InputValidator {
 
 		// Context configuration validation
 		if (config.context) {
-			if (typeof config.context !== "object") {
+			if (!isObject(config.context)) {
 				errors.push("'context' must be an object");
 			} else {
 				this.validateContextConfig(config.context, errors, warnings);
@@ -449,7 +456,7 @@ class InputValidator {
 
 		// Quality checks validation
 		if (config.qualityChecks) {
-			if (typeof config.qualityChecks !== "object") {
+			if (!isObject(config.qualityChecks)) {
 				errors.push("'qualityChecks' must be an object");
 			} else {
 				this.validateQualityChecks(config.qualityChecks, errors, warnings);
@@ -458,7 +465,7 @@ class InputValidator {
 
 		// Length control validation
 		if (config.lengthControl) {
-			if (typeof config.lengthControl !== "object") {
+			if (!isObject(config.lengthControl)) {
 				errors.push("'lengthControl' must be an object");
 			} else {
 				this.validateLengthControl(config.lengthControl, errors);
@@ -467,7 +474,7 @@ class InputValidator {
 
 		// Advanced settings validation
 		if (config.advanced) {
-			if (typeof config.advanced !== "object") {
+			if (!isObject(config.advanced)) {
 				errors.push("'advanced' must be an object");
 			} else {
 				this.validateAdvancedConfig(config.advanced, errors);
@@ -500,29 +507,31 @@ class InputValidator {
 
 	/**
 	 * Validate API config for each provider.
-	 * @param {Record<string, ApiProviderConfig>} apiConfig - API configuration object.
+	 * @param {Record<string, unknown>} apiConfig - Raw API configuration object.
 	 * @param {string[]} errors - Array to push errors to.
 	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateApiConfig(
-		apiConfig: Record<string, ApiProviderConfig>,
+		apiConfig: UnvalidatedSection,
 		errors: string[],
 		warnings: string[]
 	): void {
-		for (const [provider, settings] of Object.entries(apiConfig)) {
+		for (const [provider, rawSettings] of Object.entries(apiConfig)) {
 			if (!this.VALID_PROVIDERS.includes(provider)) {
 				warnings.push(`Unknown provider in apiConfig: '${provider}'`);
 				continue;
 			}
 
-			if (typeof settings !== "object") {
+			if (typeof rawSettings !== "object") {
 				errors.push(`apiConfig.${provider} must be an object`);
 				continue;
 			}
+			// typeof null === "object": a null entry gets through and throws on property access
+			const settings = rawSettings as UnvalidatedSection;
 
 			// Validate temperature
 			if (settings.temperature !== undefined) {
-				const temp = parseFloat(settings.temperature as any);
+				const temp = parseFloat(String(settings.temperature));
 				if (isNaN(temp) || temp < 0 || temp > 2) {
 					errors.push(`apiConfig.${provider}.temperature must be between 0 and 2`);
 				}
@@ -535,7 +544,7 @@ class InputValidator {
 
 			// Validate maxTokens
 			if (settings.maxTokens !== undefined) {
-				const tokens = parseInt(settings.maxTokens as any);
+				const tokens = parseInt(String(settings.maxTokens));
 				if (isNaN(tokens) || tokens < 100 || tokens > 8000) {
 					errors.push(`apiConfig.${provider}.maxTokens must be between 100 and 8000`);
 				}
@@ -545,18 +554,21 @@ class InputValidator {
 
 	/**
 	 * Validate rate limiter configuration.
-	 * @param {RateLimiterConfig} rateLimiter - Rate limiter configuration.
+	 * @param {Record<string, unknown>} rateLimiter - Raw rate limiter configuration.
 	 * @param {string[]} errors - Array to push errors to.
 	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateRateLimiterConfig(
-		rateLimiter: RateLimiterConfig,
+		rateLimiter: UnvalidatedSection,
 		errors: string[],
 		_warnings: string[]
 	): void {
 		if (rateLimiter.queueStrategy) {
 			const validStrategies = ["fifo", "priority"];
-			if (!validStrategies.includes(rateLimiter.queueStrategy)) {
+			if (
+				typeof rateLimiter.queueStrategy !== "string" ||
+				!validStrategies.includes(rateLimiter.queueStrategy)
+			) {
 				errors.push(
 					`rateLimiter.queueStrategy must be one of: ${validStrategies.join(", ")}`
 				);
@@ -564,24 +576,26 @@ class InputValidator {
 		}
 
 		if (rateLimiter.queueTimeout !== undefined) {
-			const timeout = parseInt(rateLimiter.queueTimeout as any);
+			const timeout = parseInt(String(rateLimiter.queueTimeout));
 			if (isNaN(timeout) || timeout < 1000 || timeout > 120000) {
 				errors.push("rateLimiter.queueTimeout must be between 1000 and 120000 ms");
 			}
 		}
 
 		if (rateLimiter.providerLimits) {
-			if (typeof rateLimiter.providerLimits !== "object") {
+			if (!isObject(rateLimiter.providerLimits)) {
 				errors.push("rateLimiter.providerLimits must be an object");
 			} else {
-				for (const [provider, limits] of Object.entries(rateLimiter.providerLimits)) {
+				for (const [provider, rawLimits] of Object.entries(rateLimiter.providerLimits)) {
 					if (!this.VALID_PROVIDERS.includes(provider)) {
 						_warnings.push(`Unknown provider in providerLimits: '${provider}'`);
 						continue;
 					}
+					// Not checked to be an object: primitives read as undefined, null throws
+					const limits = rawLimits as UnvalidatedSection;
 
 					if (limits.rpm !== undefined) {
-						const rpm = parseInt(limits.rpm as any);
+						const rpm = parseInt(String(limits.rpm));
 						if (isNaN(rpm) || rpm < 1 || rpm > 10000) {
 							errors.push(
 								`rateLimiter.providerLimits.${provider}.rpm must be between 1 and 10000`
@@ -590,7 +604,7 @@ class InputValidator {
 					}
 
 					if (limits.concurrency !== undefined) {
-						const conc = parseInt(limits.concurrency as any);
+						const conc = parseInt(String(limits.concurrency));
 						if (isNaN(conc) || conc < 1 || conc > 50) {
 							errors.push(
 								`rateLimiter.providerLimits.${provider}.concurrency must be between 1 and 50`
@@ -604,81 +618,80 @@ class InputValidator {
 
 	/**
 	 * Validate retry options.
-	 * @param {RetryOptions} retryOptions - Retry options.
+	 * @param {Record<string, unknown>} retryOptions - Raw retry options.
 	 * @param {string[]} errors - Array to push errors to.
 	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateRetryOptions(
-		retryOptions: RetryOptions,
+		retryOptions: UnvalidatedSection,
 		errors: string[],
 		_warnings: string[]
 	): void {
 		if (retryOptions.maxRetries !== undefined) {
-			const retries = parseInt(retryOptions.maxRetries as any);
+			const retries = parseInt(String(retryOptions.maxRetries));
 			if (isNaN(retries) || retries < 0 || retries > 10) {
 				errors.push("retryOptions.maxRetries must be between 0 and 10");
 			}
 		}
 
 		if (retryOptions.initialDelay !== undefined) {
-			const delay = parseInt(retryOptions.initialDelay as any);
+			const delay = parseInt(String(retryOptions.initialDelay));
 			if (isNaN(delay) || delay < 100 || delay > 10000) {
 				errors.push("retryOptions.initialDelay must be between 100 and 10000 ms");
 			}
 		}
 
 		if (retryOptions.maxDelay !== undefined) {
-			const delay = parseInt(retryOptions.maxDelay as any);
+			const delay = parseInt(String(retryOptions.maxDelay));
 			if (isNaN(delay) || delay < 1000 || delay > 60000) {
 				errors.push("retryOptions.maxDelay must be between 1000 and 60000 ms");
 			}
 		}
 
-		if (
-			retryOptions.initialDelay !== undefined &&
-			retryOptions.maxDelay !== undefined &&
-			retryOptions.initialDelay > retryOptions.maxDelay
-		) {
+		// Compares the raw values (numbers in a well-formed config)
+		const initialDelay = retryOptions.initialDelay as number | undefined;
+		const maxDelay = retryOptions.maxDelay as number | undefined;
+		if (initialDelay !== undefined && maxDelay !== undefined && initialDelay > maxDelay) {
 			errors.push("retryOptions.initialDelay cannot be greater than maxDelay");
 		}
 	}
 
 	/**
 	 * Validate context configuration.
-	 * @param {ContextConfig} context - Context configuration.
+	 * @param {Record<string, unknown>} context - Raw context configuration.
 	 * @param {string[]} errors - Array to push errors to.
 	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateContextConfig(
-		context: ContextConfig,
+		context: UnvalidatedSection,
 		errors: string[],
 		warnings: string[]
 	): void {
 		if (context.aiProvider) {
 			try {
 				this.validateProvider(context.aiProvider, "context.aiProvider");
-			} catch (error: any) {
-				errors.push(`Invalid context.aiProvider: ${error.message}`);
+			} catch (error) {
+				errors.push(`Invalid context.aiProvider: ${errorMessage(error)}`);
 			}
 		}
 
 		if (context.minTextLength !== undefined) {
-			const length = parseInt(context.minTextLength as any);
+			const length = parseInt(String(context.minTextLength));
 			if (isNaN(length) || length < 0 || length > 1000) {
 				errors.push("context.minTextLength must be between 0 and 1000");
 			}
 		}
 
-		if (context.detection) {
+		if (isObject(context.detection)) {
 			if (context.detection.threshold !== undefined) {
-				const threshold = parseInt(context.detection.threshold as any);
+				const threshold = parseInt(String(context.detection.threshold));
 				if (isNaN(threshold) || threshold < 1 || threshold > 20) {
 					errors.push("context.detection.threshold must be between 1 and 20");
 				}
 			}
 
 			if (context.detection.minConfidence !== undefined) {
-				const confidence = parseFloat(context.detection.minConfidence as any);
+				const confidence = parseFloat(String(context.detection.minConfidence));
 				if (isNaN(confidence) || confidence < 0 || confidence > 1) {
 					errors.push("context.detection.minConfidence must be between 0 and 1");
 				}
@@ -696,12 +709,12 @@ class InputValidator {
 
 	/**
 	 * Validate quality checks configuration.
-	 * @param {QualityChecksConfig} qualityChecks - Quality checks configuration.
+	 * @param {Record<string, unknown>} qualityChecks - Raw quality checks configuration.
 	 * @param {string[]} errors - Array to push errors to.
 	 * @param {string[]} warnings - Array to push warnings to.
 	 */
 	static validateQualityChecks(
-		qualityChecks: QualityChecksConfig,
+		qualityChecks: UnvalidatedSection,
 		errors: string[],
 		warnings: string[]
 	): void {
@@ -716,13 +729,16 @@ class InputValidator {
 
 	/**
 	 * Validate length control configuration.
-	 * @param {LengthControlConfig} lengthControl - Length control configuration.
+	 * @param {Record<string, unknown>} lengthControl - Raw length control configuration.
 	 * @param {string[]} errors - Array to push errors to.
 	 */
-	static validateLengthControl(lengthControl: LengthControlConfig, errors: string[]): void {
+	static validateLengthControl(lengthControl: UnvalidatedSection, errors: string[]): void {
 		if (lengthControl.mode) {
 			const validModes = ["strict", "flexible", "exact", "relaxed", "smart"];
-			if (!validModes.includes(lengthControl.mode)) {
+			if (
+				typeof lengthControl.mode !== "string" ||
+				!validModes.includes(lengthControl.mode)
+			) {
 				errors.push(`lengthControl.mode must be one of: ${validModes.join(", ")}`);
 			}
 		}
@@ -736,26 +752,26 @@ class InputValidator {
 
 	/**
 	 * Validate advanced configuration.
-	 * @param {AdvancedConfig} advanced - Advanced configuration.
+	 * @param {Record<string, unknown>} advanced - Raw advanced configuration.
 	 * @param {string[]} errors - Array to push errors to.
 	 */
-	static validateAdvancedConfig(advanced: AdvancedConfig, errors: string[]): void {
+	static validateAdvancedConfig(advanced: UnvalidatedSection, errors: string[]): void {
 		if (advanced.timeoutMs !== undefined) {
-			const timeout = parseInt(advanced.timeoutMs as any);
+			const timeout = parseInt(String(advanced.timeoutMs));
 			if (isNaN(timeout) || timeout < 1000 || timeout > 300000) {
 				errors.push("advanced.timeoutMs must be between 1000 and 300000 ms (5 min)");
 			}
 		}
 
 		if (advanced.maxKeyLength !== undefined) {
-			const length = parseInt(advanced.maxKeyLength as any);
+			const length = parseInt(String(advanced.maxKeyLength));
 			if (isNaN(length) || length < 100 || length > 50000) {
 				errors.push("advanced.maxKeyLength must be between 100 and 50000");
 			}
 		}
 
 		if (advanced.maxBatchSize !== undefined) {
-			const size = parseInt(advanced.maxBatchSize as any);
+			const size = parseInt(String(advanced.maxBatchSize));
 			if (isNaN(size) || size < 1 || size > 100) {
 				errors.push("advanced.maxBatchSize must be between 1 and 100");
 			}
@@ -764,14 +780,14 @@ class InputValidator {
 
 	/**
 	 * Validate object depth to prevent circular references and deep nesting.
-	 * @param {any} obj - Object to validate.
+	 * @param {unknown} obj - Object to validate.
 	 * @param {number} [maxDepth=10] - Maximum depth.
 	 * @param {number} [currentDepth=0] - Current depth.
 	 * @returns {boolean} - True if valid.
 	 * @throws {Error} If depth exceeded.
 	 */
 	static validateObjectDepth(
-		obj: any,
+		obj: unknown,
 		maxDepth: number = this.MAX_CONFIG_DEPTH,
 		currentDepth: number = 0
 	): boolean {

@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
-import { FileManager } from "../../../src/utils/file-manager";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { FileManager } from "../../../src/utils/file-manager.js";
 import { promises as fs } from "fs";
-import { JsonAdapter } from "../../../src/core/adapters/json-adapter";
 
 // Mock fs
 vi.mock("fs", async () => {
@@ -29,7 +28,7 @@ describe("FileManager", () => {
 
 	describe("readFile", () => {
 		it("should read and parse JSON file using JsonAdapter by default", async () => {
-			(fs.readFile as any).mockResolvedValue('{"key": "value"}');
+			vi.mocked(fs.readFile).mockResolvedValue('{"key": "value"}');
 
 			const result = await FileManager.readFile("test.json");
 			expect(result).toEqual({ key: "value" });
@@ -37,7 +36,7 @@ describe("FileManager", () => {
 		});
 
 		it("should throw error on file read failure", async () => {
-			(fs.readFile as any).mockRejectedValue(new Error("Read failed"));
+			vi.mocked(fs.readFile).mockRejectedValue(new Error("Read failed"));
 
 			await expect(FileManager.readFile("test.json")).rejects.toThrow("File read error");
 		});
@@ -46,7 +45,7 @@ describe("FileManager", () => {
 	describe("writeFile", () => {
 		it("should serialize and write JSON file", async () => {
 			const data = { key: "value" };
-			(fs.access as any).mockResolvedValue(undefined); // File exists for backup check
+			vi.mocked(fs.access).mockResolvedValue(undefined); // File exists for backup check
 
 			await FileManager.writeFile("test.json", data, { atomic: false, backupFiles: false });
 

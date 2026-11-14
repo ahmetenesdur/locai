@@ -10,8 +10,15 @@ export interface AnalysisResult {
 	confidence: number;
 	keywords: string[];
 	explanation: string;
-	prompt: string;
+	/** Category prompt; undefined when neither the category nor the fallback defines one */
+	prompt?: string;
 	method?: string;
+}
+
+export interface ContextCategory {
+	keywords?: string[];
+	prompt?: string;
+	weight?: number;
 }
 
 export interface ContextConfig {
@@ -20,7 +27,7 @@ export interface ContextConfig {
 	minTextLength?: number;
 	cacheSize?: number;
 	cacheTTL?: number;
-	categories?: Record<string, any>;
+	categories?: Record<string, ContextCategory>;
 	detection?: {
 		threshold?: number;
 		minConfidence?: number;
@@ -31,11 +38,31 @@ export interface ContextConfig {
 		prompt?: string;
 	};
 	analysisOptions?: {
+		model?: string;
+		temperature?: number;
 		maxTokens?: number;
 		timeout?: number;
 		retries?: number;
 	};
-	[key: string]: any;
+	/** Provider fallback chain used for analysis calls */
+	fallbackOrder?: string[];
+}
+
+/** One entry of the JSON array the model returns for a batch analysis prompt */
+interface BatchAnalysisItem {
+	index: number;
+	category: string;
+	confidence: number;
+	keywords?: string[];
+	explanation?: string;
+}
+
+/** The JSON object the model returns for a single-text analysis prompt */
+interface AnalysisResponse {
+	category: string;
+	confidence: number;
+	keywords?: string[];
+	explanation?: string;
 }
 
 export interface Stats {
@@ -150,8 +177,9 @@ class AIContextAnalyzer {
 						this.cache.set(cacheKey, aiResult);
 					}
 				}
-			} catch (error: any) {
-				console.error("Batch AI analysis failed:", error.message);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.error("Batch AI analysis failed:", message);
 			}
 		}
 
@@ -177,24 +205,27 @@ class AIContextAnalyzer {
 		this.stats.totalAnalyzed += texts.length;
 		this.stats.aiCalls++; // Only one API call for the batch
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const provider = ProviderFactory.getProvider(apiProvider, true, this.config as any);
+		const provider = ProviderFactory.getProvider(apiProvider, true, this.config);
 		if (!provider) {
 			throw new Error("AI provider not available for context analysis");
 		}
 
 		const batchPrompt = this._createBatchAnalysisPrompt(texts);
 
-		const result = await rateLimiter.enqueue(apiProvider.toLowerCase(), () =>
-			(provider as any).analyze(batchPrompt, {
+		const result = await rateLimiter.enqueue(apiProvider.toLowerCase(), () => {
+			if (!provider.analyze) {
+				throw new TypeError("provider.analyze is not a function");
+			}
+			const analysisOptions = {
 				...this.config.analysisOptions,
 				maxTokens: Math.min(4000, this.config.analysisOptions?.maxTokens || 2000),
 				timeout: this.config.analysisOptions?.timeout || 10000,
 				retries: this.config.analysisOptions?.retries || 2,
-			})
-		);
+			};
+			return provider.analyze(batchPrompt, analysisOptions);
+		});
 
-		return this._parseBatchAnalysisResult(result as string, texts.length);
+		return this._parseBatchAnalysisResult(result, texts.length);
 	}
 
 	// Create batch analysis prompt for multiple texts
@@ -295,7 +326,7 @@ RESPONSE FORMAT:
 				throw new Error("No valid JSON array found in AI response");
 			}
 
-			let analysisArray: any[];
+			let analysisArray: BatchAnalysisItem[];
 			try {
 				analysisArray = JSON.parse(jsonMatch[0]);
 			} catch (jsonError) {
@@ -311,7 +342,7 @@ RESPONSE FORMAT:
 			}
 
 			// Create results array with proper indexing
-			const results = new Array(expectedCount).fill(null);
+			const results: (AnalysisResult | null)[] = new Array(expectedCount).fill(null);
 
 			for (const item of analysisArray) {
 				if (!item.category || typeof item.confidence !== "number" || !item.index) {
@@ -348,8 +379,9 @@ RESPONSE FORMAT:
 			}
 
 			return results;
-		} catch (error: any) {
-			console.error("Error parsing batch AI analysis result:", error.message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error("Error parsing batch AI analysis result:", message);
 			return new Array(expectedCount).fill(null);
 		}
 	}
@@ -361,7 +393,7 @@ RESPONSE FORMAT:
 				throw new Error("No valid JSON found in AI response");
 			}
 
-			let analysisData: any;
+			let analysisData: AnalysisResponse;
 			try {
 				analysisData = JSON.parse(jsonMatch[0]);
 			} catch (jsonError) {
@@ -396,8 +428,9 @@ RESPONSE FORMAT:
 				explanation: analysisData.explanation || "No explanation provided",
 				prompt: this.config.categories?.[category]?.prompt || this.config.fallback?.prompt,
 			};
-		} catch (error: any) {
-			console.error("Error parsing AI analysis result:", error.message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error("Error parsing AI analysis result:", message);
 			return null;
 		}
 	}

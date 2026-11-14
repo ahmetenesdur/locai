@@ -107,7 +107,6 @@ describe("InputValidator", () => {
 		});
 
 		it("should throw for null/undefined", () => {
-			// @ts-expect-error Testing runtime check
 			expect(() => InputValidator.validateText(null)).toThrow("cannot be null");
 		});
 

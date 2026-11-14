@@ -54,7 +54,11 @@ describe("ObjectTransformer", () => {
 		});
 
 		it("should handle circular references gracefully", () => {
-			const obj: any = { a: 1 };
+			interface Circular {
+				a: number;
+				self?: Circular;
+			}
+			const obj: Circular = { a: 1 };
 			obj.self = obj;
 			const clone = ObjectTransformer.deepClone(obj);
 			expect(clone.a).toBe(1);

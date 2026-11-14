@@ -72,7 +72,7 @@ Ensure brand consistency by defining immutable terms.
 
 **With Glossary:**
 
-> Configuration: `glossary: { "Dashboard": "Kontrol Merkezi" }`
+> Configuration: `glossary: { glossary: { Dashboard: { tr: "Kontrol Merkezi" } } }`
 > Translation: "Locai **Kontrol Merkezi**ne hoş geldiniz." (Brand consistent)
 
 ## 5. Context Awareness

@@ -1,3 +1,16 @@
+import type { TranslationObject } from "../../utils/object-transformer.js";
+
+/**
+ * Options accepted by {@link FileFormatAdapter.serialize}.
+ * Adapters ignore options that do not apply to their format.
+ */
+export interface SerializeOptions {
+	/** Indentation width (JSON, YAML) */
+	indent?: number;
+	/** Request compact output where the format supports it */
+	compact?: boolean;
+}
+
 /**
  * Interface for file format adapters
  */
@@ -11,14 +24,12 @@ export interface FileFormatAdapter {
 	 * Parse file content into a key-value object
 	 * @param content - Raw string content
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	parse(content: string): Promise<Record<string, any>>;
+	parse(content: string): Promise<TranslationObject>;
 
 	/**
 	 * Serialize data object into string format
 	 * @param data - Key-value object
 	 * @param options - Serialization options
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	serialize(data: Record<string, any>, options?: any): Promise<string>;
+	serialize(data: TranslationObject, options?: SerializeOptions): Promise<string>;
 }

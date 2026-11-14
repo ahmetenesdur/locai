@@ -1,5 +1,4 @@
 import { promises as fs } from "fs";
-import path from "path";
 
 export enum LocaleStructure {
 	FLAT = "flat", // en.json, tr.json
@@ -34,7 +33,7 @@ export class StructureDetector {
 			}
 
 			return LocaleStructure.UNKNOWN;
-		} catch (error) {
+		} catch {
 			return LocaleStructure.UNKNOWN;
 		}
 	}

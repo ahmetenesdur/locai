@@ -1,3 +1,4 @@
+import type { TranslationObject } from "../../utils/object-transformer.js";
 import { FileFormatAdapter } from "./base-adapter.js";
 
 /**
@@ -7,8 +8,8 @@ import { FileFormatAdapter } from "./base-adapter.js";
 export class IosAdapter implements FileFormatAdapter {
 	extensions = [".strings"];
 
-	async parse(content: string): Promise<Record<string, any>> {
-		const result: Record<string, any> = {};
+	async parse(content: string): Promise<TranslationObject> {
+		const result: TranslationObject = {};
 		const lines = content.split(/\r?\n/);
 
 		for (const line of lines) {
@@ -37,7 +38,7 @@ export class IosAdapter implements FileFormatAdapter {
 		return result;
 	}
 
-	async serialize(data: Record<string, any>): Promise<string> {
+	async serialize(data: TranslationObject): Promise<string> {
 		let output = "";
 
 		// Sort keys for deterministic output

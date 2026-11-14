@@ -1,4 +1,5 @@
-import { FileFormatAdapter } from "./base-adapter.js";
+import type { TranslationObject } from "../../utils/object-transformer.js";
+import { FileFormatAdapter, SerializeOptions } from "./base-adapter.js";
 import yaml from "js-yaml";
 
 /**
@@ -7,17 +8,17 @@ import yaml from "js-yaml";
 export class YamlAdapter implements FileFormatAdapter {
 	extensions = [".yaml", ".yml"];
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async parse(content: string): Promise<Record<string, any>> {
+	async parse(content: string): Promise<TranslationObject> {
 		try {
-			return (yaml.load(content) as Record<string, any>) || {};
-		} catch (error: any) {
-			throw new Error(`YAML parse error: ${error.message}`);
+			return (yaml.load(content) as TranslationObject | undefined) || {};
+		} catch (error) {
+			throw new Error(
+				`YAML parse error: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async serialize(data: Record<string, any>, options: any = {}): Promise<string> {
+	async serialize(data: TranslationObject, options: SerializeOptions = {}): Promise<string> {
 		return yaml.dump(data, {
 			indent: options.indent || 2,
 			lineWidth: -1, // Disable line wrapping

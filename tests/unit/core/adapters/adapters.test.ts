@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { JsonAdapter } from "../../../../src/core/adapters/json-adapter";
-import { YamlAdapter } from "../../../../src/core/adapters/yaml-adapter";
-import { PoAdapter } from "../../../../src/core/adapters/po-adapter";
-import { PropertiesAdapter } from "../../../../src/core/adapters/properties-adapter";
-import { FormatFactory } from "../../../../src/core/adapters/factory";
+import { JsonAdapter } from "../../../../src/core/adapters/json-adapter.js";
+import { YamlAdapter } from "../../../../src/core/adapters/yaml-adapter.js";
+import { PoAdapter } from "../../../../src/core/adapters/po-adapter.js";
+import { PropertiesAdapter } from "../../../../src/core/adapters/properties-adapter.js";
+import { FormatFactory } from "../../../../src/core/adapters/factory.js";
 
 describe("FileFormatAdapters", () => {
 	describe("JsonAdapter", () => {

@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import QualityChecker from "../../../../src/utils/quality/index.js";
+import type { CheckerOptions } from "../../../../src/utils/quality/base-checker.js";
 
 describe("QualityChecker", () => {
 	let qualityChecker: QualityChecker;
-	const defaultOptions = {
-		rules: {
-			placeholderConsistency: true,
-			htmlTagsConsistency: true,
-			punctuationCheck: true,
-			lengthValidation: true,
-			quoteBalanceCheck: true,
-			sanitizeOutput: true,
-		},
+	// Rule toggles are top-level options (callers spread `qualityChecks.rules` into them)
+	const defaultOptions: CheckerOptions = {
+		placeholderConsistency: true,
+		htmlTagsConsistency: true,
+		punctuationCheck: true,
+		lengthValidation: true,
+		quoteBalanceCheck: true,
+		sanitizeOutput: true,
 	};
 
 	beforeEach(() => {

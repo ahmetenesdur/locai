@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AndroidAdapter } from "../../../../src/core/adapters/android-adapter";
+import { AndroidAdapter } from "../../../../src/core/adapters/android-adapter.js";
 
 describe("AndroidAdapter", () => {
 	const adapter = new AndroidAdapter();

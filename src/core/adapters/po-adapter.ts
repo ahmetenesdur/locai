@@ -1,5 +1,6 @@
+import type { TranslationObject } from "../../utils/object-transformer.js";
 import { FileFormatAdapter } from "./base-adapter.js";
-import gettextParser from "gettext-parser";
+import gettextParser, { PoTranslation } from "gettext-parser";
 
 /**
  * Adapter for Gettext PO files
@@ -7,8 +8,7 @@ import gettextParser from "gettext-parser";
 export class PoAdapter implements FileFormatAdapter {
 	extensions = [".po", ".pot"];
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async parse(content: string): Promise<Record<string, any>> {
+	async parse(content: string): Promise<TranslationObject> {
 		try {
 			const po = gettextParser.po.parse(content);
 			const result: Record<string, string> = {};
@@ -24,14 +24,15 @@ export class PoAdapter implements FileFormatAdapter {
 			}
 
 			return result;
-		} catch (error: any) {
-			throw new Error(`PO parse error: ${error.message}`);
+		} catch (error) {
+			throw new Error(
+				`PO parse error: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async serialize(data: Record<string, any>, options: any = {}): Promise<string> {
-		const translations: any = {
+	async serialize(data: TranslationObject): Promise<string> {
+		const translations: Record<string, Record<string, PoTranslation>> = {
 			"": {},
 		};
 
@@ -39,7 +40,8 @@ export class PoAdapter implements FileFormatAdapter {
 		for (const [key, value] of Object.entries(data)) {
 			translations[""][key] = {
 				msgid: key,
-				msgstr: [value],
+				// gettext-parser writes falsy msgstr values as "" and stringifies the rest
+				msgstr: [value ? String(value) : ""],
 			};
 		}
 

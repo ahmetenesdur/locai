@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ToneVerifier } from "../../../../src/utils/quality/tone-verifier.js";
-import ProviderFactory from "../../../../src/core/provider-factory.js";
+import ProviderFactory, { type AIProvider } from "../../../../src/core/provider-factory.js";
+
+const mockProvider = vi.hoisted(() => ({
+	chat: vi.fn<NonNullable<AIProvider["chat"]>>(),
+	analyze: vi.fn<NonNullable<AIProvider["analyze"]>>(),
+	translate: vi.fn<AIProvider["translate"]>(),
+}));
 
 // Mock ProviderFactory
 vi.mock("../../../../src/core/provider-factory.js", () => {
-	const mockProvider = {
-		chat: vi.fn(),
-		analyze: vi.fn(),
-		translate: vi.fn(),
-	};
 	return {
 		default: {
 			getProvider: vi.fn(() => mockProvider),
@@ -19,17 +20,15 @@ vi.mock("../../../../src/core/provider-factory.js", () => {
 
 describe("ToneVerifier", () => {
 	let verifier: ToneVerifier;
-	let mockProvider: any;
 
 	beforeEach(() => {
 		verifier = new ToneVerifier();
-		mockProvider = ProviderFactory.getProvider("openai");
 		vi.clearAllMocks();
 	});
 
 	it("should use requested provider", async () => {
 		mockProvider.chat.mockResolvedValue(JSON.stringify({ passed: true, score: 10 }));
-		const result = await verifier.verify("src", "trgt", "en", "es", "formal", "gemini");
+		await verifier.verify("src", "trgt", "en", "es", "formal", "gemini");
 		expect(ProviderFactory.getProvider).toHaveBeenCalledWith("gemini", true);
 	});
 

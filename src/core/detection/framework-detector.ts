@@ -45,7 +45,7 @@ export class FrameworkDetector {
 				if (deps["react-i18next"] || deps.react) {
 					return { framework: "react", localesDir: "public/locales", fileFormat: "json" };
 				}
-			} catch (e) {
+			} catch {
 				// No package.json or invalid
 			}
 
